@@ -269,7 +269,7 @@ td.dispo-cell{cursor:pointer}
 
 <script>
 // ======= EDIT THIS: paste your deployed Apps Script Web App URL here =======
-var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_UP2bMVZqciEWItLgdtQVV5OdpVYMqiri7dzHACCM9YgwcTug/exec";
+var BACKEND_URL = "PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE";
 // =============================================================================
 
 (function(){
@@ -330,9 +330,14 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
   function uid(prefix){ return prefix + "_" + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
   // ---------- API ----------
+  // Apps Script Web Apps 302-redirect every call to an internal URL, and a
+  // POST becomes a GET across that redirect (dropping its body) — so we send
+  // everything as GET, with the JSON payload in a query parameter, which
+  // survives the redirect intact.
   function api(action, extra){
     var payload = Object.assign({action:action, token: state.token}, extra||{});
-    return fetch(BACKEND_URL, {method:"POST", body: JSON.stringify(payload)})
+    var url = BACKEND_URL + "?payload=" + encodeURIComponent(JSON.stringify(payload));
+    return fetch(url)
       .then(function(r){ return r.json(); })
       .catch(function(){ return {ok:false, error:"network"}; });
   }

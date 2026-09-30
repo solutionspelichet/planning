@@ -291,7 +291,7 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
   var MONTHS_FR = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
   var DOW_FR = ["L","M","M","J","V","S","D"];
   var SESSION_KEY = "pe_session_v1";
-  var POLL_MS = 12000;
+  var POLL_MS = 20000; // Apps Script calls can take several seconds; polling too tight piles up requests.
 
   var state = {
     token: null, role: null, username: null,
@@ -361,7 +361,7 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
   }
   function logout(){
     clearSession();
-    if (state.pollTimer) clearInterval(state.pollTimer);
+    if (state.pollTimer) clearTimeout(state.pollTimer);
     $("#mainApp").hidden = true;
     $("#loginScreen").hidden = false;
     $("#loginError").textContent = "";
@@ -395,9 +395,19 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
     $("#whoRole").textContent = state.role;
     document.body.classList.toggle("view-only", !canEdit());
     $("#adminTabBtn").hidden = state.role !== "admin";
-    refreshAll();
-    if (state.pollTimer) clearInterval(state.pollTimer);
-    state.pollTimer = setInterval(refreshAll, POLL_MS);
+    if (state.pollTimer) clearTimeout(state.pollTimer);
+    schedulePoll(0);
+  }
+
+  // Waits for each getAll to finish before scheduling the next one, instead
+  // of a fixed setInterval — Apps Script response times vary a lot (from
+  // under a second to 30+ seconds), and a fixed interval would pile up
+  // overlapping requests when a call runs long.
+  function schedulePoll(delay){
+    if (state.pollTimer) clearTimeout(state.pollTimer);
+    state.pollTimer = setTimeout(function(){
+      refreshAll().then(function(){ schedulePoll(POLL_MS); });
+    }, delay);
   }
 
   function refreshAll(){

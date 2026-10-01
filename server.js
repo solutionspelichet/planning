@@ -116,6 +116,10 @@ db.exec(`
     startDate TEXT NOT NULL,
     endDate TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
 `);
 
 // ---------- migrations for columns added after initial release ----------
@@ -323,8 +327,18 @@ app.get('/api/all', requireAuth, (req, res) => {
     dossiers: db.prepare('SELECT * FROM dossiers').all().map(rowToDossier),
     assignments: db.prepare('SELECT * FROM assignments').all().map(rowToAssignment),
     absences: db.prepare('SELECT * FROM absences').all().map(rowToAbsence),
-    vehicleDowntimes: db.prepare('SELECT * FROM vehicle_downtimes').all().map(rowToVehicleDowntime)
+    vehicleDowntimes: db.prepare('SELECT * FROM vehicle_downtimes').all().map(rowToVehicleDowntime),
+    settings: Object.fromEntries(db.prepare('SELECT key, value FROM settings').all().map(r => [r.key, r.value]))
   });
+});
+
+app.post('/api/settings', requireAuth, requireWrite, (req, res) => {
+  const values = req.body.values || {};
+  const upsert = db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value');
+  const tx = db.transaction(() => { Object.keys(values).forEach(k => upsert.run(k, String(values[k]))); });
+  tx();
+  broadcast();
+  res.json({ ok: true });
 });
 
 app.post('/api/employees', requireAuth, requireWrite, (req, res) => {

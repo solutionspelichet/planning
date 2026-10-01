@@ -13,6 +13,7 @@
   --dispo-free:#2f9e5c; --dispo-idle:#ffffff; --dispo-conflict:#c1443a;
   --reason-conges:#3467b8; --reason-maladie:#c1443a; --reason-recup:#1f8a70;
   --reason-entretien:#c98a1b; --reason-reparation:#7a4fc4; --reason-accident:#c1443a;
+  --type-border-width:10px; --slot-header-pad:10px;
 }
 @media (prefers-color-scheme: dark){
   :root{
@@ -119,15 +120,18 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 .legend i{width:9px;height:9px;border-radius:3px;display:inline-block}
 
 #dossierList,#nextDayList{display:flex;flex-wrap:nowrap;gap:12px;align-items:start;padding-bottom:6px;overflow-x:auto;min-width:0}
-.dossier-card{border:1px solid var(--border);border-left:4px solid var(--border);border-radius:11px;padding:10px 12px;background:var(--bg);
-  flex:0 0 230px;width:230px}
+.dossier-card{border:1px solid var(--border);border-left:var(--type-border-width) solid var(--border);border-radius:11px;padding:10px 12px;background:var(--bg);
+  flex:0 0 230px;width:230px;overflow:hidden}
 .dossier-card.type-NL{border-left-color:var(--chip-nl)}
 .dossier-card.type-INTER{border-left-color:var(--chip-inter)}
 .dossier-card.type-GM{border-left-color:var(--chip-gm)}
-.dossier-slot-banner{height:6px;border-radius:9px 9px 0 0;margin:-10px -12px 10px -12px;background:var(--border)}
-.dossier-slot-banner.slot-J{background:var(--chip-j)}
-.dossier-slot-banner.slot-M{background:var(--chip-m)}
-.dossier-slot-banner.slot-A{background:var(--chip-a)}
+.dossier-slot-header{display:block;width:100%;border:none;margin:-10px -12px 10px -12px;padding:var(--slot-header-pad) 12px;
+  font:inherit;font-weight:800;font-size:13px;letter-spacing:.03em;text-align:center;text-transform:uppercase;
+  cursor:pointer;background:var(--border);color:var(--fg);appearance:none;-webkit-appearance:none;border-radius:0}
+.dossier-slot-header:disabled{cursor:default}
+.dossier-slot-header.slot-J{background:var(--chip-j);color:#fff}
+.dossier-slot-header.slot-M{background:var(--chip-m);color:#fff}
+.dossier-slot-header.slot-A{background:var(--chip-a);color:#fff}
 .dossier-head{display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap}
 .dossier-head input.client-name{font:inherit;font-weight:700;font-size:14.5px;border:none;background:transparent;
   color:var(--fg);flex:1;min-width:120px;border-radius:6px;padding:2px 4px}
@@ -215,6 +219,7 @@ table.week-table tr.week-sub td.week-metric-label{padding-left:16px;text-transfo
 .address-stack .info-field textarea,.info-field.wide textarea{width:100%;font-size:13px;padding:7px 9px;font-family:inherit;
   border:1px solid var(--border);background:var(--surface);color:var(--fg);border-radius:6px;resize:vertical}
 .info-field.wide{width:100%;margin-bottom:8px}
+.info-field.wide textarea{resize:none;overflow:hidden;min-height:44px}
 .address-field textarea.addr-gm{background:#fde2e1;border-color:#e2534d;color:#7a1f1b}
 .address-field textarea.addr-transit{background:#e1f5e6;border-color:#3fa15a;color:#1d5c32}
 td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
@@ -254,6 +259,16 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
 .search-results .opt:hover{background:var(--weekend)}
 .search-results .opt .opt-sub{display:block;font-size:11px;color:var(--fg-muted)}
 .search-results .opt-empty{padding:8px 10px;font-size:12px;color:var(--fg-muted)}
+
+.settings-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)}
+.settings-row:last-child{border-bottom:none}
+.settings-row label{font-size:13px}
+.settings-row input[type="color"]{width:44px;height:30px;border:1px solid var(--border);border-radius:6px;padding:2px;background:var(--surface);cursor:pointer}
+.settings-row .num-wrap{display:flex;align-items:center;gap:4px}
+.settings-row input[type="number"]{width:64px;border:1px solid var(--border);background:var(--surface);color:var(--fg);border-radius:6px;padding:5px 7px;font:inherit;font-size:12.5px}
+.settings-preview{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px}
+.settings-swatch{display:inline-flex;align-items:center;justify-content:center;padding:4px 12px;border-radius:20px;color:#fff;font-weight:700;font-size:11px}
+.settings-mini-card{width:160px}
 
 .vg-grid{display:flex;flex-wrap:wrap;gap:12px}
 .vg-card{border:1px solid var(--border);border-radius:11px;padding:12px 14px;background:var(--bg);min-width:220px;max-width:280px}
@@ -313,6 +328,7 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
       <button class="tab-btn" data-tab="vehicules">Véhicules</button>
       <button class="tab-btn" data-tab="vacances">Vacances &amp; Garage</button>
       <button class="tab-btn" data-tab="dashboard">Dashboard</button>
+      <button class="tab-btn" data-tab="settings">Settings</button>
       <button class="tab-btn edit-only" data-tab="admin" id="adminTabBtn">Admin</button>
     </div>
     <div class="search-wrap">
@@ -346,6 +362,12 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
           </div>
           <div class="cal-dow" id="vgCalDow"></div>
           <div class="cal-days" id="vgCalDays"></div>
+        </div>
+        <div class="calendar">
+          <h3 style="font-size:12.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--fg-muted);margin-bottom:10px">
+            Congés &amp; Garage — <span id="vgDayTitle">—</span>
+          </h3>
+          <div class="vg-grid" id="vgDayPanel"></div>
         </div>
       </div>
       <div class="day-panel">
@@ -391,9 +413,6 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
       <span><i style="background:var(--dispo-conflict)"></i>Sur-réservé (2 fois ou plus)</span>
     </div>
     <div class="grid-wrap"><div id="dispoTableHost" style="min-height:120px"></div></div>
-
-    <h2 style="font-size:15px;margin:26px 0 10px">Absences &amp; Garage — <span id="vgDayTitle">—</span></h2>
-    <div class="vg-grid" id="vgDayPanel"></div>
   </div>
 
   <div class="view" id="view-vacances" hidden>
@@ -420,6 +439,15 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
           <button id="addDowntimeBtn">Ajouter</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <div class="view" id="view-settings" hidden>
+    <div class="settings-preview" id="settingsPreview"></div>
+    <div class="company-grid" id="settingsGroups" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr))"></div>
+    <div class="day-panel-actions edit-only" style="margin-top:16px">
+      <button class="btn" id="saveSettingsBtn">Enregistrer</button>
+      <button class="btn btn-ghost" id="resetSettingsBtn">Réinitialiser les valeurs par défaut</button>
     </div>
   </div>
 
@@ -516,7 +544,6 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     {id:"MRE", name:"Master Relocation", color:"#8b6b45"},
     {id:"OJ",  name:"OK Job", color:"#5a6b8c"}
   ];
-  var DAY_SLOTS = ["J","M","A"];
   var MOVE_TYPES = ["NL","INTER","GM"];
   var VEHICLE_TYPES = ["VL","Fourgon","PL"];
   var ABSENCE_REASONS = ["Congés","Maladie","Récupération"];
@@ -525,6 +552,32 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     "Congés":"var(--reason-conges)", "Maladie":"var(--reason-maladie)", "Récupération":"var(--reason-recup)",
     "Entretien":"var(--reason-entretien)", "Réparation":"var(--reason-reparation)", "Accident":"var(--reason-accident)"
   };
+  var SETTINGS_SCHEMA = [
+    {group:"Créneaux (bandeau en haut des chantiers)", items:[
+      {key:"chip-j", label:"J — Journée", type:"color", def:"#3467b8"},
+      {key:"chip-m", label:"M — Matin", type:"color", def:"#1f8a70"},
+      {key:"chip-a", label:"A — Après-midi", type:"color", def:"#7a4fc4"}
+    ]},
+    {group:"Types de déménagement (bordure des chantiers)", items:[
+      {key:"chip-nl", label:"NL — National", type:"color", def:"#8b8578"},
+      {key:"chip-inter", label:"INTER — International", type:"color", def:"#c98a1b"},
+      {key:"chip-gm", label:"GM — Grand mouvement", type:"color", def:"#c1443a"}
+    ]},
+    {group:"Motifs d'absence du personnel", items:[
+      {key:"reason-conges", label:"Congés", type:"color", def:"#3467b8"},
+      {key:"reason-maladie", label:"Maladie", type:"color", def:"#c1443a"},
+      {key:"reason-recup", label:"Récupération", type:"color", def:"#1f8a70"}
+    ]},
+    {group:"Motifs d'immobilisation véhicule", items:[
+      {key:"reason-entretien", label:"Entretien", type:"color", def:"#c98a1b"},
+      {key:"reason-reparation", label:"Réparation", type:"color", def:"#7a4fc4"},
+      {key:"reason-accident", label:"Accident", type:"color", def:"#c1443a"}
+    ]},
+    {group:"Épaisseurs", items:[
+      {key:"type-border-width", label:"Bordure type de déménagement", type:"number", def:10, min:2, max:24},
+      {key:"slot-header-pad", label:"Bandeau créneau", type:"number", def:10, min:4, max:30}
+    ]}
+  ];
   var CODE_LOAD = {J:1, M:0.5, A:0.5};
   var MONTHS_FR = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
   var DOW_FR = ["L","M","M","J","V","S","D"];
@@ -533,13 +586,13 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
 
   var state = {
     token: null, role: null, username: null,
-    employees: [], vehicles: [], dossiers: [], assignments: [], absences: [], vehicleDowntimes: [],
+    employees: [], vehicles: [], dossiers: [], assignments: [], absences: [], vehicleDowntimes: [], settings: {}, settingsDraft: {},
     collapsedCompanies: {},
     nextDayCollapsed: false,
     cursor: new Date(2026, 9, 1),
     selectedDate: fmtDate(new Date(2026, 9, 6)),
     vgCursor: new Date(2026, 9, 1),
-    vgSelectedDate: null,
+    vgSelectedDate: fmtDate(new Date(2026, 9, 6)),
     activeTab: "planning",
     pollTimer: null,
     eventSource: null,
@@ -601,6 +654,7 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
       case "saveAbsence": return request("POST", "/api/absences", {item: extra.item});
       case "deleteAbsence": return request("DELETE", "/api/absences/" + encodeURIComponent(extra.id));
       case "saveDowntime": return request("POST", "/api/vehicle-downtimes", {item: extra.item});
+      case "saveSettings": return request("POST", "/api/settings", {values: extra.values});
       case "deleteDowntime": return request("DELETE", "/api/vehicle-downtimes/" + encodeURIComponent(extra.id));
       case "listUsers": return request("GET", "/api/users");
       case "createUser": return request("POST", "/api/users", {username: extra.username, password: extra.password, role: extra.role});
@@ -700,10 +754,13 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
       state.assignments = res.assignments || [];
       state.absences = res.absences || [];
       state.vehicleDowntimes = res.vehicleDowntimes || [];
+      state.settings = res.settings || {};
+      applySettingsToRoot(state.settings);
       renderEffectifs(); renderVehicles(); renderCalendar(); renderDayPanel(); renderAvailability();
       renderVgCalendar(); renderVgDayPanel();
       if (state.activeTab === "dashboard") renderDashboard();
       if (state.activeTab === "vacances") { renderAbsenceSelects(); renderAbsenceList(); renderDowntimeList(); }
+      if (state.activeTab === "settings") renderSettingsTab();
       if (state.role === "admin") { renderUsers(); renderBackups(); }
     });
   }
@@ -716,10 +773,13 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     $("#view-effectifs").hidden = tab !== "effectifs";
     $("#view-vehicules").hidden = tab !== "vehicules";
     $("#view-vacances").hidden = tab !== "vacances";
+    $("#view-settings").hidden = tab !== "settings";
     $("#view-dashboard").hidden = tab !== "dashboard";
     $("#view-admin").hidden = tab !== "admin";
     if (tab === "dashboard") renderDashboard();
     if (tab === "vacances") { renderAbsenceSelects(); renderAbsenceList(); renderDowntimeList(); }
+    if (tab === "settings") renderSettingsTab();
+    else applySettingsToRoot(state.settings); // leaving Settings: drop any unsaved live-preview changes
   }
   $all(".tab-btn").forEach(function(b){ b.addEventListener("click", function(){ setTab(b.dataset.tab); }); });
 
@@ -910,7 +970,7 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
           for (var n=0; n<Math.min(active.length,4); n++) row.appendChild(el("span",{class:"dot"+(isConflict?" warn-dot":"")}));
           cell.appendChild(row);
         }
-        cell.addEventListener("click", function(dateStr){ return function(){ state.selectedDate=dateStr; renderCalendar(); renderDayPanel(); }; }(c.date));
+        cell.addEventListener("click", function(dateStr){ return function(){ state.selectedDate=dateStr; state.vgSelectedDate=dateStr; renderCalendar(); renderDayPanel(); renderVgCalendar(); renderVgDayPanel(); }; }(c.date));
       }
       host.appendChild(cell);
     });
@@ -1092,6 +1152,94 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     });
   });
 
+  // ---------- settings (couleurs, épaisseurs) ----------
+  function settingValue(values, item){
+    var v = values[item.key];
+    if (v === undefined || v === null || v === "") return item.def;
+    return item.type === "number" ? Number(v) : v;
+  }
+  function applySettingsToRoot(values){
+    values = values || {};
+    SETTINGS_SCHEMA.forEach(function(g){
+      g.items.forEach(function(it){
+        var v = settingValue(values, it);
+        document.documentElement.style.setProperty("--" + it.key, it.type === "number" ? (v + "px") : v);
+      });
+    });
+  }
+  function renderSettingsPreview(){
+    var host = $("#settingsPreview"); if (!host) return;
+    host.innerHTML = "";
+    ["J","M","A"].forEach(function(s){
+      host.appendChild(el("span", {class:"settings-swatch", style:"background:var(--chip-"+s.toLowerCase()+")", text:"Créneau "+s}));
+    });
+    ["NL","INTER","GM"].forEach(function(t){
+      host.appendChild(el("span", {class:"settings-swatch", style:"background:var(--chip-"+t.toLowerCase()+")", text:"Type "+t}));
+    });
+    var card = el("div", {class:"dossier-card settings-mini-card type-GM"});
+    card.appendChild(el("div", {class:"dossier-slot-header slot-M", text:"M — MATIN"}));
+    card.appendChild(el("div", {style:"font-weight:700;font-size:13px", text:"Aperçu chantier"}));
+    host.appendChild(card);
+  }
+  function renderSettingsTab(){
+    state.settingsDraft = Object.assign({}, state.settings);
+    applySettingsToRoot(state.settingsDraft);
+    renderSettingsPreview();
+    var host = $("#settingsGroups"); if (!host) return;
+    host.innerHTML = "";
+    SETTINGS_SCHEMA.forEach(function(g){
+      var card = el("div", {class:"company-card"});
+      card.appendChild(el("h3", {text: g.group}));
+      g.items.forEach(function(it){
+        var row = el("div", {class:"settings-row"});
+        row.appendChild(el("label", {text: it.label}));
+        var input;
+        if (it.type === "color"){
+          input = el("input", {type:"color", value: settingValue(state.settingsDraft, it)});
+          input.disabled = !canEdit();
+          input.addEventListener("input", function(){
+            state.settingsDraft[it.key] = input.value;
+            applySettingsToRoot(state.settingsDraft);
+            renderSettingsPreview();
+          });
+          row.appendChild(input);
+        } else {
+          var wrap = el("div", {class:"num-wrap"});
+          input = el("input", {type:"number", value: settingValue(state.settingsDraft, it), min:String(it.min), max:String(it.max)});
+          input.disabled = !canEdit();
+          input.addEventListener("input", function(){
+            state.settingsDraft[it.key] = input.value;
+            applySettingsToRoot(state.settingsDraft);
+            renderSettingsPreview();
+          });
+          wrap.appendChild(input);
+          wrap.appendChild(el("span", {text:"px"}));
+          row.appendChild(wrap);
+        }
+        card.appendChild(row);
+      });
+      host.appendChild(card);
+    });
+  }
+  var saveSettingsBtn = $("#saveSettingsBtn");
+  if (saveSettingsBtn) saveSettingsBtn.addEventListener("click", function(){
+    if (!canEdit()) return;
+    api("saveSettings", {values: state.settingsDraft}).then(function(res){
+      if (!res.ok) return toast("Enregistrement impossible");
+      toast("Réglages enregistrés"); refreshAll();
+    });
+  });
+  var resetSettingsBtn = $("#resetSettingsBtn");
+  if (resetSettingsBtn) resetSettingsBtn.addEventListener("click", function(){
+    if (!canEdit()) return;
+    var defaults = {};
+    SETTINGS_SCHEMA.forEach(function(g){ g.items.forEach(function(it){ defaults[it.key] = it.def; }); });
+    state.settingsDraft = defaults;
+    applySettingsToRoot(defaults);
+    renderSettingsPreview();
+    renderSettingsTab();
+  });
+
   // ---------- day panel ----------
   // ---------- chantiers automatiques (Dépôt / Archivage) ----------
   // Looked up by name, not a hardcoded id, so this keeps working if the
@@ -1192,7 +1340,18 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
   function renderDossierCard(dossier, conflicts, dateStr){
     var assignment = assignmentFor(dossier.id, dateStr);
     var card = el("div", {class:"dossier-card" + (dossier.moveType ? " type-"+dossier.moveType : "")});
-    card.appendChild(el("div", {class:"dossier-slot-banner" + (assignment.slot ? " slot-"+assignment.slot : "")}));
+    var slotHeader = el("select", {class:"dossier-slot-header" + (assignment.slot ? " slot-"+assignment.slot : "")});
+    slotHeader.disabled = !canEdit();
+    [["", "— Créneau non défini —"], ["J","J — JOURNÉE"], ["M","M — MATIN"], ["A","A — APRÈS-MIDI"]].forEach(function(pair){
+      var opt = el("option", {value:pair[0], text:pair[1]});
+      if (pair[0] === (assignment.slot||"")) opt.setAttribute("selected","selected");
+      slotHeader.appendChild(opt);
+    });
+    slotHeader.addEventListener("change", function(){
+      slotHeader.className = "dossier-slot-header" + (slotHeader.value ? " slot-"+slotHeader.value : "");
+      saveAssignment(assignment, {slot: slotHeader.value});
+    });
+    card.appendChild(slotHeader);
     if (canEdit()){ card.draggable = true; card.dataset.id = dossier.id; card.classList.add("draggable-row"); }
     var totalDays = dayCount(dossier.startDate, dossier.endDate);
     var idx = dayIndex(dossier.startDate, dateStr);
@@ -1294,22 +1453,23 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     infoGrid.appendChild(selectField("Type de déménagement", "moveType", MOVE_TYPES, "type-", dossier,
       function(patch){ saveDossierMeta(dossier, patch); }, true));
     card.appendChild(infoGrid);
+    function autoGrow(ta){ ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; }
     function textareaField(labelText, key, placeholder){
       var field = el("div", {class:"info-field wide"});
       field.appendChild(el("label", {text:labelText}));
       var input = el("textarea", {rows:"2", placeholder: placeholder||""});
       input.value = dossier[key]||"";
       input.disabled = !canEdit();
+      input.addEventListener("input", function(){ autoGrow(input); });
       input.addEventListener("change", function(){ var patch={}; patch[key]=input.value; saveDossierMeta(dossier, patch); });
       field.appendChild(input);
+      setTimeout(function(){ autoGrow(input); }, 0);
       return field;
     }
     card.appendChild(textareaField("Tâche à réaliser (une par ligne)", "task", "Ex. chargement, livraison, garde-meuble…"));
     card.appendChild(textareaField("Commentaire", "comment", "Notes diverses…"));
 
     var dayFields = el("div", {class:"day-fields"});
-    dayFields.appendChild(selectField("Créneau", "slot", DAY_SLOTS, "slot-", assignment,
-      function(patch){ saveAssignment(assignment, patch); }, true));
     var timeField = el("div", {class:"info-field narrow"});
     timeField.appendChild(el("label", {text:"Arrivée sur site"}));
     var timeInput = el("input", {type:"time", value: assignment.arrivalTime || ""});
@@ -1597,7 +1757,7 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
           var load = (loadKey==="emp"?loads.empLoad:loads.vehUse)[item.id] || 0;
           var td = el("td", {class:"dispo-cell"+(isWeekend2?" weekend":""), title:item.name+" — "+dateStr});
           td.appendChild(el("span", {class:"dispo-swatch", style:"background:"+swatchColor(load)}));
-          td.addEventListener("click", function(dateStr){ return function(){ state.selectedDate=dateStr; setTab("planning"); renderCalendar(); renderDayPanel(); }; }(dateStr));
+          td.addEventListener("click", function(dateStr){ return function(){ state.selectedDate=dateStr; state.vgSelectedDate=dateStr; setTab("planning"); renderCalendar(); renderDayPanel(); renderVgCalendar(); renderVgDayPanel(); }; }(dateStr));
           row.appendChild(td);
         }
         tbody.appendChild(row);
@@ -1741,7 +1901,7 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
         var td = el("td", {class: ds===todayStr ? "week-today" : "", text:String(r.fn(ds))});
         if (!r.sub){
           td.style.cursor = "pointer";
-          td.addEventListener("click", function(ds){ return function(){ state.selectedDate = ds; setTab("planning"); renderCalendar(); renderDayPanel(); }; }(ds));
+          td.addEventListener("click", function(ds){ return function(){ state.selectedDate = ds; state.vgSelectedDate = ds; setTab("planning"); renderCalendar(); renderDayPanel(); renderVgCalendar(); renderVgDayPanel(); }; }(ds));
         }
         row.appendChild(td);
       });
@@ -2160,9 +2320,11 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
   function closeSearch(){ var host = $("#searchResults"); host.hidden = true; $("#globalSearch").value = ""; }
   function goToDossier(d){
     state.selectedDate = d.startDate;
+    state.vgSelectedDate = d.startDate;
     state.cursor = new Date(parseDate(d.startDate).getFullYear(), parseDate(d.startDate).getMonth(), 1);
+    state.vgCursor = new Date(parseDate(d.startDate).getFullYear(), parseDate(d.startDate).getMonth(), 1);
     setTab("planning");
-    renderCalendar(); renderDayPanel(); renderAvailability();
+    renderCalendar(); renderDayPanel(); renderAvailability(); renderVgCalendar(); renderVgDayPanel();
     closeSearch();
   }
   var globalSearchInput = $("#globalSearch");

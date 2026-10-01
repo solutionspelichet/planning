@@ -70,7 +70,10 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 .quick-pane{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;flex-wrap:wrap;gap:10px;min-height:0;overflow:hidden}
 .quick-group{flex:1 1 130px;min-width:0;display:flex;flex-direction:column;min-height:0;border-left:1px solid var(--border);padding-left:10px}
 .quick-group:first-child{border-left:none;padding-left:0}
-.quick-group-label{flex:none;font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--fg-muted);margin-bottom:3px}
+.quick-group-head{flex:none;display:flex;align-items:center;justify-content:space-between;gap:4px;margin-bottom:3px}
+.quick-group-label{font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--fg-muted)}
+.quick-expand{border:none;background:transparent;color:var(--fg-muted);cursor:pointer;font-size:12px;line-height:1;padding:0 2px;flex:none}
+.quick-expand:hover{color:var(--accent)}
 .quick-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;overflow-y:auto;min-height:0;flex:1 1 auto}
 .quick-list li{font-size:12.5px;padding:2px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .quick-empty{flex:none;font-size:12px;color:var(--fg-muted);font-style:italic}
@@ -636,7 +639,13 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
   }
   function renderQuickGroup(label, names){
     var wrap = el("div", {class:"quick-group"});
-    wrap.appendChild(el("div", {class:"quick-group-label", text: label + " · " + names.length}));
+    var head = el("div", {class:"quick-group-head"});
+    head.appendChild(el("div", {class:"quick-group-label", text: label + " · " + names.length}));
+    if (names.length){
+      head.appendChild(el("button", {class:"quick-expand", "aria-label":"Voir toute la liste", title:"Voir toute la liste", text:"⤢",
+        onclick: function(ev){ openQuickListPopover(ev.target, label, names); }}));
+    }
+    wrap.appendChild(head);
     if (!names.length){
       wrap.appendChild(el("div", {class:"quick-empty", text:"Aucun disponible"}));
     } else {
@@ -645,6 +654,15 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
       wrap.appendChild(ul);
     }
     return wrap;
+  }
+  function openQuickListPopover(anchor, label, names){
+    closePopover();
+    var rect = anchor.getBoundingClientRect();
+    var pop = el("div", {class:"popover"});
+    pop.style.top = (rect.bottom+4)+"px"; pop.style.left = Math.min(rect.left, window.innerWidth-246)+"px";
+    pop.appendChild(el("div", {class:"opt-group", text: label + " · " + names.length}));
+    names.forEach(function(n){ pop.appendChild(el("div", {class:"opt", text:n})); });
+    document.body.appendChild(pop);
   }
   // Renders straight into the day-row pane next to the matching jobsite list
   // (not a standalone card), so the two line up and scroll together instead
@@ -946,7 +964,7 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
 
   function closePopover(){ var p = $(".popover"); if (p) p.remove(); }
   document.addEventListener("click", function(ev){
-    if (!ev.target.closest(".popover") && !ev.target.closest(".add-chip")) closePopover();
+    if (!ev.target.closest(".popover") && !ev.target.closest(".add-chip") && !ev.target.closest(".quick-expand")) closePopover();
   });
   function openEmployeePicker(anchor, assignment){
     if (!canEdit()) return;

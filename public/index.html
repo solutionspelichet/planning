@@ -120,6 +120,16 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 .legend{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;font-size:11.5px;color:var(--fg-muted)}
 .legend span{display:inline-flex;align-items:center;gap:5px}
 .legend i{width:9px;height:9px;border-radius:3px;display:inline-block}
+.planning-filter{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:12px}
+.planning-filter .filter-label{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--fg-muted)}
+.filter-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 12px 4px 10px;border-radius:20px;
+  font:inherit;font-size:12px;font-weight:700;color:var(--fg-muted);background:var(--surface);
+  border:1.5px solid var(--border);cursor:pointer}
+.filter-chip i{width:9px;height:9px;border-radius:3px;display:inline-block}
+.filter-chip:hover{border-color:var(--fc,var(--accent))}
+.filter-chip.active{background:var(--fc);border-color:var(--fc);color:#fff}
+.filter-chip.active i{background:rgba(255,255,255,.9)}
+.filter-chip.filter-clear{color:var(--fg-muted);border-style:dashed}
 
 #dossierList,#nextDayList{display:flex;flex-wrap:nowrap;gap:12px;align-items:start;padding-bottom:6px;overflow-x:auto;min-width:0}
 .dossier-card{border:1px solid var(--border);border-left:var(--type-border-width) solid var(--border);border-radius:11px;padding:10px 12px;background:var(--bg);
@@ -394,6 +404,7 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
           <span><i style="background:var(--chip-inter)"></i>INTER International</span>
           <span><i style="background:var(--chip-gm)"></i>GM Grand mouvement</span>
         </div>
+        <div class="planning-filter" id="planningFilterBar"></div>
         <div id="conflictBanner"></div>
         <div class="day-row">
           <div class="quick-pane" id="quickViewToday"></div>
@@ -554,6 +565,14 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     {id:"OJ",  name:"OK Job", color:"#5a6b8c"}
   ];
   var MOVE_TYPES = ["NL","INTER","GM"];
+  var PLANNING_FILTER_TYPES = [
+    {key:"NL", label:"NL", color:"var(--chip-nl)"},
+    {key:"INTER", label:"INTER", color:"var(--chip-inter)"},
+    {key:"GM", label:"GM", color:"var(--chip-gm)"},
+    {key:"DEPOT", label:"Dépôt", color:"var(--type-depot)"},
+    {key:"ARCHIVAGE", label:"Archivage", color:"var(--type-archivage)"},
+    {key:"NONE", label:"Sans type", color:"var(--fg-muted)"}
+  ];
   var VEHICLE_TYPES = ["VL","Fourgon","PL"];
   var ABSENCE_REASONS = ["Congés","Maladie","Récupération"];
   var VEHICLE_DOWNTIME_REASONS = ["Entretien","Réparation","Accident"];
@@ -607,7 +626,8 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     activeTab: "planning",
     pollTimer: null,
     eventSource: null,
-    autoDossiersEnsured: {}
+    autoDossiersEnsured: {},
+    planningFilter: []
   };
 
   function $(sel, root){ return (root||document).querySelector(sel); }
@@ -1289,8 +1309,43 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     ensureOneAutoDossier("archivage_" + dateStr, dateStr, "Archivage", ["kamin","morgan"]);
   }
 
+  function planningFilterKey(dossier){
+    return autoDossierKind(dossier) || dossier.moveType || "NONE";
+  }
+  function matchesPlanningFilter(dossier){
+    if (!state.planningFilter.length) return true;
+    return state.planningFilter.indexOf(planningFilterKey(dossier)) !== -1;
+  }
+  function renderPlanningFilterBar(){
+    var host = $("#planningFilterBar"); if (!host) return;
+    host.innerHTML = "";
+    host.appendChild(el("span", {class:"filter-label", text:"Filtrer :"}));
+    PLANNING_FILTER_TYPES.forEach(function(t){
+      var active = state.planningFilter.indexOf(t.key) !== -1;
+      var chip = el("button", {type:"button", class:"filter-chip" + (active ? " active" : ""), style:"--fc:" + t.color}, [
+        el("i", {style:"background:" + t.color}),
+        el("span", {text:t.label})
+      ]);
+      chip.addEventListener("click", function(){
+        var i = state.planningFilter.indexOf(t.key);
+        if (i === -1) state.planningFilter.push(t.key); else state.planningFilter.splice(i, 1);
+        renderDayPanel();
+      });
+      host.appendChild(chip);
+    });
+    if (state.planningFilter.length){
+      var clearBtn = el("button", {type:"button", class:"filter-chip filter-clear", text:"✕ Réinitialiser"});
+      clearBtn.addEventListener("click", function(){
+        state.planningFilter = [];
+        renderDayPanel();
+      });
+      host.appendChild(clearBtn);
+    }
+  }
+
   function renderDayPanel(){
     ensureAutoDossiersForDate(state.selectedDate);
+    renderPlanningFilterBar();
     var d = parseDate(state.selectedDate);
     var dow = ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d.getDay()];
     $("#dayTitle").textContent = dow + " " + d.getDate() + " " + MONTHS_FR[d.getMonth()] + " " + d.getFullYear();
@@ -1303,10 +1358,13 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     }
     renderQuickPane("#quickViewToday", state.selectedDate);
     var host = $("#dossierList"); host.innerHTML = "";
+    var filteredToday = dossiersToday.filter(matchesPlanningFilter);
     if (!dossiersToday.length){
       host.appendChild(el("div", {class:"empty-note", text:"Aucun dossier ce jour-là." + (canEdit() ? " Cliquez sur « + Nouveau dossier » pour en créer un." : "")}));
+    } else if (!filteredToday.length){
+      host.appendChild(el("div", {class:"empty-note", text:"Aucun chantier ne correspond au filtre sélectionné."}));
     } else {
-      dossiersToday.forEach(function(dossier, idx){ host.appendChild(renderDossierCard(dossier, conflicts, state.selectedDate, idx+1)); });
+      filteredToday.forEach(function(dossier){ host.appendChild(renderDossierCard(dossier, conflicts, state.selectedDate, dossiersToday.indexOf(dossier)+1)); });
     }
     syncPaneHeight("#quickViewToday", "#dossierList");
     renderNextDayPanel();
@@ -1338,10 +1396,13 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     }
     var listHost = $("#nextDayList");
     listHost.innerHTML = "";
+    var filteredNext = dossiersNext.filter(matchesPlanningFilter);
     if (!dossiersNext.length){
       listHost.appendChild(el("div", {class:"empty-note", text:"Aucun dossier ce jour-là."}));
+    } else if (!filteredNext.length){
+      listHost.appendChild(el("div", {class:"empty-note", text:"Aucun chantier ne correspond au filtre sélectionné."}));
     } else {
-      dossiersNext.forEach(function(dossier, idx){ listHost.appendChild(renderDossierCard(dossier, conflictsNext, nextDateStr, idx+1)); });
+      filteredNext.forEach(function(dossier){ listHost.appendChild(renderDossierCard(dossier, conflictsNext, nextDateStr, dossiersNext.indexOf(dossier)+1)); });
     }
     syncPaneHeight("#quickViewNext", "#nextDayList");
   }

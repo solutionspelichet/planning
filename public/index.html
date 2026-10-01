@@ -10,9 +10,10 @@
   --accent:#d97328; --accent-fg:#ffffff; --weekend:#efe9df; --danger:#c1443a; --danger-bg:#fbe9e6;
   --chip-j:#3467b8; --chip-m:#1f8a70; --chip-a:#7a4fc4;
   --chip-nl:#8b8578; --chip-inter:#c98a1b; --chip-gm:#c1443a;
-  --dispo-free:#2f9e5c; --dispo-idle:#ffffff; --dispo-conflict:#c1443a;
+  --dispo-free:#2f9e5c; --dispo-idle:#ffffff; --dispo-conflict:#c1443a; --dispo-absent:#d9a824;
   --reason-conges:#3467b8; --reason-maladie:#c1443a; --reason-recup:#1f8a70;
   --reason-entretien:#c98a1b; --reason-reparation:#7a4fc4; --reason-accident:#c1443a;
+  --type-depot:#3d8b8b; --type-archivage:#8b6b45;
   --type-border-width:10px; --slot-header-pad:10px;
 }
 @media (prefers-color-scheme: dark){
@@ -21,9 +22,10 @@
     --accent:#e8863c; --accent-fg:#1b1a17; --weekend:#2c2a25; --danger:#e0685c; --danger-bg:#3a2320;
     --chip-j:#5b8fe0; --chip-m:#3cb495; --chip-a:#a284e8;
     --chip-nl:#9a927f; --chip-inter:#e0a940; --chip-gm:#e0685c;
-    --dispo-free:#3cb46f; --dispo-idle:#2a2823; --dispo-conflict:#e0685c;
+    --dispo-free:#3cb46f; --dispo-idle:#2a2823; --dispo-conflict:#e0685c; --dispo-absent:#e0b23c;
     --reason-conges:#5b8fe0; --reason-maladie:#e0685c; --reason-recup:#3cb495;
     --reason-entretien:#e0a940; --reason-reparation:#a284e8; --reason-accident:#e0685c;
+    --type-depot:#4ba3a3; --type-archivage:#a6855f;
   }
 }
 *{box-sizing:border-box}
@@ -125,13 +127,19 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 .dossier-card.type-NL{border-left-color:var(--chip-nl)}
 .dossier-card.type-INTER{border-left-color:var(--chip-inter)}
 .dossier-card.type-GM{border-left-color:var(--chip-gm)}
-.dossier-slot-header{display:block;width:100%;border:none;margin:-10px -12px 10px -12px;padding:var(--slot-header-pad) 12px;
+.dossier-card.auto-DEPOT{border-left-color:var(--type-depot)}
+.dossier-card.auto-ARCHIVAGE{border-left-color:var(--type-archivage)}
+.dossier-slot-wrap{position:relative;margin:-10px -12px 10px -12px}
+.dossier-slot-header{display:block;width:100%;border:none;margin:0;padding:var(--slot-header-pad) 12px;
   font:inherit;font-weight:800;font-size:13px;letter-spacing:.03em;text-align:center;text-transform:uppercase;
   cursor:pointer;background:var(--border);color:var(--fg);appearance:none;-webkit-appearance:none;border-radius:0}
 .dossier-slot-header:disabled{cursor:default}
 .dossier-slot-header.slot-J{background:var(--chip-j);color:#fff}
 .dossier-slot-header.slot-M{background:var(--chip-m);color:#fff}
 .dossier-slot-header.slot-A{background:var(--chip-a);color:#fff}
+.dossier-order-badge{position:absolute;top:50%;right:7px;transform:translateY(-50%);
+  font-size:10.5px;font-weight:800;color:#fff;background:rgba(0,0,0,.28);
+  padding:1px 7px;border-radius:10px;pointer-events:none}
 .dossier-head{display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap}
 .dossier-head input.client-name{font:inherit;font-weight:700;font-size:14.5px;border:none;background:transparent;
   color:var(--fg);flex:1;min-width:120px;border-radius:6px;padding:2px 4px}
@@ -411,6 +419,7 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
       <span><i style="background:var(--dispo-free)"></i>Disponible (affecté une fois)</span>
       <span><i style="background:var(--dispo-idle);border:1px solid var(--border)"></i>Non affecté</span>
       <span><i style="background:var(--dispo-conflict)"></i>Sur-réservé (2 fois ou plus)</span>
+      <span><i style="background:var(--dispo-absent)"></i>Absent / véhicule immobilisé</span>
     </div>
     <div class="grid-wrap"><div id="dispoTableHost" style="min-height:120px"></div></div>
   </div>
@@ -561,7 +570,9 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     {group:"Types de déménagement (bordure des chantiers)", items:[
       {key:"chip-nl", label:"NL — National", type:"color", def:"#8b8578"},
       {key:"chip-inter", label:"INTER — International", type:"color", def:"#c98a1b"},
-      {key:"chip-gm", label:"GM — Grand mouvement", type:"color", def:"#c1443a"}
+      {key:"chip-gm", label:"GM — Grand mouvement", type:"color", def:"#c1443a"},
+      {key:"type-depot", label:"Dépôt", type:"color", def:"#3d8b8b"},
+      {key:"type-archivage", label:"Archivage", type:"color", def:"#8b6b45"}
     ]},
     {group:"Motifs d'absence du personnel", items:[
       {key:"reason-conges", label:"Congés", type:"color", def:"#3467b8"},
@@ -1176,13 +1187,18 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     ["NL","INTER","GM"].forEach(function(t){
       host.appendChild(el("span", {class:"settings-swatch", style:"background:var(--chip-"+t.toLowerCase()+")", text:"Type "+t}));
     });
+    ["DEPOT","ARCHIVAGE"].forEach(function(k){
+      host.appendChild(el("span", {class:"settings-swatch", style:"background:var(--type-"+k.toLowerCase()+")", text: k==="DEPOT"?"Dépôt":"Archivage"}));
+    });
     var card = el("div", {class:"dossier-card settings-mini-card type-GM"});
     card.appendChild(el("div", {class:"dossier-slot-header slot-M", text:"M — MATIN"}));
     card.appendChild(el("div", {style:"font-weight:700;font-size:13px", text:"Aperçu chantier"}));
     host.appendChild(card);
   }
-  function renderSettingsTab(){
-    state.settingsDraft = Object.assign({}, state.settings);
+  // presetDraft lets the reset button hand over fresh defaults without this
+  // function immediately clobbering them with the still-saved state.settings.
+  function renderSettingsTab(presetDraft){
+    state.settingsDraft = presetDraft || Object.assign({}, state.settings);
     applySettingsToRoot(state.settingsDraft);
     renderSettingsPreview();
     var host = $("#settingsGroups"); if (!host) return;
@@ -1234,10 +1250,8 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     if (!canEdit()) return;
     var defaults = {};
     SETTINGS_SCHEMA.forEach(function(g){ g.items.forEach(function(it){ defaults[it.key] = it.def; }); });
-    state.settingsDraft = defaults;
-    applySettingsToRoot(defaults);
-    renderSettingsPreview();
-    renderSettingsTab();
+    renderSettingsTab(defaults);
+    toast("Valeurs par défaut rétablies — cliquez Enregistrer pour confirmer");
   });
 
   // ---------- day panel ----------
@@ -1292,7 +1306,7 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     if (!dossiersToday.length){
       host.appendChild(el("div", {class:"empty-note", text:"Aucun dossier ce jour-là." + (canEdit() ? " Cliquez sur « + Nouveau dossier » pour en créer un." : "")}));
     } else {
-      dossiersToday.forEach(function(dossier){ host.appendChild(renderDossierCard(dossier, conflicts, state.selectedDate)); });
+      dossiersToday.forEach(function(dossier, idx){ host.appendChild(renderDossierCard(dossier, conflicts, state.selectedDate, idx+1)); });
     }
     syncPaneHeight("#quickViewToday", "#dossierList");
     renderNextDayPanel();
@@ -1327,7 +1341,7 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     if (!dossiersNext.length){
       listHost.appendChild(el("div", {class:"empty-note", text:"Aucun dossier ce jour-là."}));
     } else {
-      dossiersNext.forEach(function(dossier){ listHost.appendChild(renderDossierCard(dossier, conflictsNext, nextDateStr)); });
+      dossiersNext.forEach(function(dossier, idx){ listHost.appendChild(renderDossierCard(dossier, conflictsNext, nextDateStr, idx+1)); });
     }
     syncPaneHeight("#quickViewNext", "#nextDayList");
   }
@@ -1337,9 +1351,17 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     renderNextDayPanel();
   });
 
-  function renderDossierCard(dossier, conflicts, dateStr){
+  function autoDossierKind(dossier){
+    if (dossier.id.indexOf("depot_") === 0) return "DEPOT";
+    if (dossier.id.indexOf("archivage_") === 0) return "ARCHIVAGE";
+    return null;
+  }
+  function renderDossierCard(dossier, conflicts, dateStr, orderIndex){
     var assignment = assignmentFor(dossier.id, dateStr);
-    var card = el("div", {class:"dossier-card" + (dossier.moveType ? " type-"+dossier.moveType : "")});
+    var autoKind = autoDossierKind(dossier);
+    var typeClass = autoKind ? " auto-"+autoKind : (dossier.moveType ? " type-"+dossier.moveType : "");
+    var card = el("div", {class:"dossier-card" + typeClass});
+    var slotWrap = el("div", {class:"dossier-slot-wrap"});
     var slotHeader = el("select", {class:"dossier-slot-header" + (assignment.slot ? " slot-"+assignment.slot : "")});
     slotHeader.disabled = !canEdit();
     [["", "— Créneau non défini —"], ["J","J — JOURNÉE"], ["M","M — MATIN"], ["A","A — APRÈS-MIDI"]].forEach(function(pair){
@@ -1351,7 +1373,9 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
       slotHeader.className = "dossier-slot-header" + (slotHeader.value ? " slot-"+slotHeader.value : "");
       saveAssignment(assignment, {slot: slotHeader.value});
     });
-    card.appendChild(slotHeader);
+    slotWrap.appendChild(slotHeader);
+    if (orderIndex) slotWrap.appendChild(el("span", {class:"dossier-order-badge", text:String(orderIndex)}));
+    card.appendChild(slotWrap);
     if (canEdit()){ card.draggable = true; card.dataset.id = dossier.id; card.classList.add("draggable-row"); }
     var totalDays = dayCount(dossier.startDate, dossier.endDate);
     var idx = dayIndex(dossier.startDate, dateStr);
@@ -1734,7 +1758,7 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     }
     thead.appendChild(headRow); table.appendChild(thead);
     var tbody = el("tbody");
-    function swatchColor(load){ if (!load) return "var(--dispo-idle)"; if (load>1) return "var(--dispo-conflict)"; return "var(--dispo-free)"; }
+    function swatchColor(load, isOut){ if (isOut) return "var(--dispo-absent)"; if (!load) return "var(--dispo-idle)"; if (load>1) return "var(--dispo-conflict)"; return "var(--dispo-free)"; }
     function addSection(label, items, loadKey, sectionId){
       if (!items.length) return;
       var collapsed = !!state.collapsedCompanies[sectionId];
@@ -1755,8 +1779,9 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
           var dow2 = new Date(year,month,dd).getDay(); var isWeekend2 = dow2===0||dow2===6;
           var loads = loadsForDate(dateStr);
           var load = (loadKey==="emp"?loads.empLoad:loads.vehUse)[item.id] || 0;
-          var td = el("td", {class:"dispo-cell"+(isWeekend2?" weekend":""), title:item.name+" — "+dateStr});
-          td.appendChild(el("span", {class:"dispo-swatch", style:"background:"+swatchColor(load)}));
+          var isOut = loadKey==="emp" ? isEmployeeAbsentOn(item.id, dateStr) : isVehicleDownOn(item.id, dateStr);
+          var td = el("td", {class:"dispo-cell"+(isWeekend2?" weekend":""), title:item.name+" — "+dateStr+(isOut?" (absent/immobilisé)":"")});
+          td.appendChild(el("span", {class:"dispo-swatch", style:"background:"+swatchColor(load, isOut)}));
           td.addEventListener("click", function(dateStr){ return function(){ state.selectedDate=dateStr; state.vgSelectedDate=dateStr; setTab("planning"); renderCalendar(); renderDayPanel(); renderVgCalendar(); renderVgDayPanel(); }; }(dateStr));
           row.appendChild(td);
         }

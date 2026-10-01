@@ -61,23 +61,14 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
   font-weight:700;cursor:pointer;font-size:14px;margin-top:6px}
 .login-error{color:var(--danger);font-size:12.5px;margin-top:10px;min-height:1em}
 
-.planning-grid{display:grid;grid-template-columns:520px 300px 1fr;gap:18px;align-items:start}
-@media (max-width:1300px){
-  .planning-grid{grid-template-columns:520px 1fr}
-  .planning-grid .day-panel{grid-column:1 / -1}
-}
-@media (max-width:760px){ .planning-grid{grid-template-columns:1fr} .planning-grid .day-panel{grid-column:auto} }
+.planning-grid{display:grid;grid-template-columns:300px 1fr;gap:18px;align-items:start}
+@media (max-width:760px){ .planning-grid{grid-template-columns:1fr} }
 
-.quickview{display:flex;flex-direction:column;gap:12px;position:sticky;top:80px}
-.quick-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;max-height:calc(50vh - 60px);display:flex;flex-direction:column}
-.quick-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;flex:none}
-.quick-card-title{font-size:12.5px;font-weight:700;text-transform:capitalize;color:var(--fg)}
-.quick-toggle{border:none;background:transparent;color:var(--fg-muted);cursor:pointer;font-size:11px;width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;flex:none}
-.quick-toggle:hover{background:var(--weekend);color:var(--fg)}
-.quick-card-body{display:flex;flex-wrap:wrap;gap:10px;flex:1;min-height:0}
-.quick-card.collapsed{max-height:none}
-.quick-card.collapsed .quick-card-body{display:none}
-.quick-group{flex:1 1 130px;min-width:0;margin-bottom:0;display:flex;flex-direction:column;min-height:0;border-left:1px solid var(--border);padding-left:10px}
+.day-row{display:grid;grid-template-columns:460px 1fr;gap:18px;align-items:start;margin-top:14px}
+@media (max-width:700px){ .day-row{grid-template-columns:1fr} .quick-pane{flex-wrap:nowrap} .quick-group{flex-basis:90px} }
+
+.quick-pane{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;flex-wrap:wrap;gap:10px;height:380px;overflow:hidden}
+.quick-group{flex:1 1 130px;min-width:0;display:flex;flex-direction:column;min-height:0;border-left:1px solid var(--border);padding-left:10px}
 .quick-group:first-child{border-left:none;padding-left:0}
 .quick-group-label{flex:none;font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--fg-muted);margin-bottom:3px}
 .quick-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;overflow-y:auto;min-height:0;flex:1 1 auto}
@@ -270,7 +261,6 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
 
   <div class="view" id="view-planning">
     <div class="planning-grid">
-      <div class="quickview" id="quickView"></div>
       <div class="calendar">
         <div class="cal-head">
           <button id="prevMonth" aria-label="Mois précédent">‹</button>
@@ -294,7 +284,10 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
           <span><i style="background:var(--chip-gm)"></i>GM Grand mouvement</span>
         </div>
         <div id="conflictBanner"></div>
-        <div id="dossierList"></div>
+        <div class="day-row">
+          <div class="quick-pane" id="quickViewToday"></div>
+          <div id="dossierList"></div>
+        </div>
 
         <div class="next-day-section">
           <button class="next-day-toggle" id="nextDayToggle">
@@ -302,7 +295,10 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
             <span id="nextDayTitle">Jour suivant</span>
           </button>
           <div id="nextDayConflictBanner"></div>
-          <div id="nextDayList"></div>
+          <div class="day-row" id="nextDayRow">
+            <div class="quick-pane" id="quickViewNext"></div>
+            <div id="nextDayList"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -422,7 +418,6 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     employees: [], vehicles: [], dossiers: [], assignments: [],
     collapsedCompanies: {},
     nextDayCollapsed: false,
-    quickNextCollapsed: false,
     cursor: new Date(2026, 9, 1),
     selectedDate: fmtDate(new Date(2026, 9, 6)),
     activeTab: "planning",
@@ -578,7 +573,7 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
       state.vehicles = res.vehicles || [];
       state.dossiers = res.dossiers || [];
       state.assignments = res.assignments || [];
-      renderEffectifs(); renderVehicles(); renderCalendar(); renderDayPanel(); renderAvailability(); renderQuickView();
+      renderEffectifs(); renderVehicles(); renderCalendar(); renderDayPanel(); renderAvailability();
       if (state.activeTab === "dashboard") renderDashboard();
       if (state.role === "admin") { renderUsers(); renderBackups(); }
     });
@@ -639,11 +634,6 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
       .map(function(v){ return v.name; });
     return { pel: unassigned("PEL"), sj: unassigned("SJ"), vehicles: vehicles };
   }
-  function quickDayLabel(dateStr){
-    var d = parseDate(dateStr);
-    var dow = ["dim.","lun.","mar.","mer.","jeu.","ven.","sam."][d.getDay()];
-    return dow + " " + d.getDate() + " " + MONTHS_FR[d.getMonth()].slice(0,3);
-  }
   function renderQuickGroup(label, names){
     var wrap = el("div", {class:"quick-group"});
     wrap.appendChild(el("div", {class:"quick-group-label", text: label + " · " + names.length}));
@@ -656,31 +646,16 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     }
     return wrap;
   }
-  function renderQuickCard(dateStr, opts){
-    opts = opts || {};
-    var collapsed = !!opts.collapsed;
-    var card = el("div", {class:"quick-card" + (collapsed ? " collapsed" : "")});
-    var head = el("div", {class:"quick-card-head"});
-    head.appendChild(el("div", {class:"quick-card-title", text: opts.title + " · " + quickDayLabel(dateStr)}));
-    if (opts.collapsible){
-      var toggle = el("button", {class:"quick-toggle", "aria-label":"Afficher/masquer", text: collapsed ? "▸" : "▾",
-        onclick: function(){ state.quickNextCollapsed = !state.quickNextCollapsed; renderQuickView(); }});
-      head.appendChild(toggle);
-    }
-    card.appendChild(head);
-    var avail = quickAvailability(dateStr);
-    var body = el("div", {class:"quick-card-body"});
-    body.appendChild(renderQuickGroup("Pelichet", avail.pel));
-    body.appendChild(renderQuickGroup("SwissJob", avail.sj));
-    body.appendChild(renderQuickGroup("Véhicules dispo", avail.vehicles));
-    card.appendChild(body);
-    return card;
-  }
-  function renderQuickView(){
-    var host = $("#quickView"); if (!host) return;
+  // Renders straight into the day-row pane next to the matching jobsite list
+  // (not a standalone card), so the two line up and scroll together instead
+  // of a separately-positioned/sticky sidebar drifting out of sync.
+  function renderQuickPane(hostSelector, dateStr){
+    var host = $(hostSelector); if (!host) return;
     host.innerHTML = "";
-    host.appendChild(renderQuickCard(state.selectedDate, {title:"Ce jour"}));
-    host.appendChild(renderQuickCard(addDays(state.selectedDate, 1), {title:"Jour suivant", collapsible:true, collapsed: state.quickNextCollapsed}));
+    var avail = quickAvailability(dateStr);
+    host.appendChild(renderQuickGroup("Pelichet", avail.pel));
+    host.appendChild(renderQuickGroup("SwissJob", avail.sj));
+    host.appendChild(renderQuickGroup("Véhicules dispo", avail.vehicles));
   }
 
   // ---------- calendar ----------
@@ -711,7 +686,7 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
           for (var n=0; n<Math.min(active.length,4); n++) row.appendChild(el("span",{class:"dot"+(isConflict?" warn-dot":"")}));
           cell.appendChild(row);
         }
-        cell.addEventListener("click", function(dateStr){ return function(){ state.selectedDate=dateStr; renderCalendar(); renderDayPanel(); renderQuickView(); }; }(c.date));
+        cell.addEventListener("click", function(dateStr){ return function(){ state.selectedDate=dateStr; renderCalendar(); renderDayPanel(); }; }(c.date));
       }
       host.appendChild(cell);
     });
@@ -735,12 +710,13 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
       var names = conflicts.employees.map(empName).concat(conflicts.vehicles.map(vehName));
       banner.appendChild(el("div", {class:"conflict-banner", text:"⚠ Double réservation ce jour-là : " + names.join(", ")}));
     }
+    renderQuickPane("#quickViewToday", state.selectedDate);
     var host = $("#dossierList"); host.innerHTML = "";
     if (!dossiersToday.length){
       host.appendChild(el("div", {class:"empty-note", text:"Aucun dossier ce jour-là." + (canEdit() ? " Cliquez sur « + Nouveau dossier » pour en créer un." : "")}));
-      return;
+    } else {
+      dossiersToday.forEach(function(dossier){ host.appendChild(renderDossierCard(dossier, conflicts, state.selectedDate)); });
     }
-    dossiersToday.forEach(function(dossier){ host.appendChild(renderDossierCard(dossier, conflicts, state.selectedDate)); });
     renderNextDayPanel();
   }
 
@@ -755,10 +731,11 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     var dow = ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d.getDay()];
     $("#nextDayTitle").textContent = "Jour suivant — " + dow + " " + d.getDate() + " " + MONTHS_FR[d.getMonth()] + " " + d.getFullYear();
     $("#nextDayToggleIcon").textContent = state.nextDayCollapsed ? "▸" : "▾";
-    var listHost = $("#nextDayList");
+    var rowHost = $("#nextDayRow");
     var bannerHost = $("#nextDayConflictBanner");
-    if (state.nextDayCollapsed){ listHost.hidden = true; bannerHost.hidden = true; return; }
-    listHost.hidden = false; bannerHost.hidden = false;
+    if (state.nextDayCollapsed){ rowHost.hidden = true; bannerHost.hidden = true; return; }
+    rowHost.hidden = false; bannerHost.hidden = false;
+    renderQuickPane("#quickViewNext", nextDateStr);
     var dossiersNext = activeDossiersOn(nextDateStr).sort(function(a,b){ return (a.displayOrder||0)-(b.displayOrder||0); });
     var conflictsNext = computeConflicts(nextDateStr);
     bannerHost.innerHTML = "";
@@ -766,12 +743,13 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
       var names = conflictsNext.employees.map(empName).concat(conflictsNext.vehicles.map(vehName));
       bannerHost.appendChild(el("div", {class:"conflict-banner", text:"⚠ Double réservation ce jour-là : " + names.join(", ")}));
     }
+    var listHost = $("#nextDayList");
     listHost.innerHTML = "";
     if (!dossiersNext.length){
       listHost.appendChild(el("div", {class:"empty-note", text:"Aucun dossier ce jour-là."}));
-      return;
+    } else {
+      dossiersNext.forEach(function(dossier){ listHost.appendChild(renderDossierCard(dossier, conflictsNext, nextDateStr)); });
     }
-    dossiersNext.forEach(function(dossier){ listHost.appendChild(renderDossierCard(dossier, conflictsNext, nextDateStr)); });
   }
   var nextDayToggleBtn = $("#nextDayToggle");
   if (nextDayToggleBtn) nextDayToggleBtn.addEventListener("click", function(){
@@ -1087,7 +1065,7 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
           var load = (loadKey==="emp"?loads.empLoad:loads.vehUse)[item.id] || 0;
           var td = el("td", {class:"dispo-cell"+(isWeekend2?" weekend":""), title:item.name+" — "+dateStr});
           td.appendChild(el("span", {class:"dispo-swatch", style:"background:"+swatchColor(load)}));
-          td.addEventListener("click", function(dateStr){ return function(){ state.selectedDate=dateStr; setTab("planning"); renderCalendar(); renderDayPanel(); renderQuickView(); }; }(dateStr));
+          td.addEventListener("click", function(dateStr){ return function(){ state.selectedDate=dateStr; setTab("planning"); renderCalendar(); renderDayPanel(); }; }(dateStr));
           row.appendChild(td);
         }
         tbody.appendChild(row);
@@ -1231,7 +1209,7 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
         var td = el("td", {class: ds===todayStr ? "week-today" : "", text:String(r.fn(ds))});
         if (!r.sub){
           td.style.cursor = "pointer";
-          td.addEventListener("click", function(ds){ return function(){ state.selectedDate = ds; setTab("planning"); renderCalendar(); renderDayPanel(); renderQuickView(); }; }(ds));
+          td.addEventListener("click", function(ds){ return function(){ state.selectedDate = ds; setTab("planning"); renderCalendar(); renderDayPanel(); }; }(ds));
         }
         row.appendChild(td);
       });

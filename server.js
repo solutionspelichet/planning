@@ -129,6 +129,18 @@ db.exec(`
     changedBy TEXT DEFAULT '',
     changedAt INTEGER NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS action_log (
+    id TEXT PRIMARY KEY,
+    entityType TEXT NOT NULL,
+    entityId TEXT NOT NULL,
+    action TEXT NOT NULL,
+    beforeJson TEXT,
+    afterJson TEXT,
+    performedBy TEXT DEFAULT '',
+    performedAt INTEGER NOT NULL,
+    undone INTEGER NOT NULL DEFAULT 0,
+    undoneAt INTEGER
+  );
 `);
 
 // ---------- migrations for columns added after initial release ----------
@@ -375,42 +387,39 @@ app.post('/api/settings', requireAuth, requireWrite, (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/employees', requireAuth, requireWrite, (req, res) => {
-  const e = req.body.item || {};
-  if (!e.id || !e.name || !e.company) return res.status(400).json({ ok: false, error: 'bad_request' });
+// ---------- generic action log (undo) ----------
+// Every create/update/delete on the entities below is logged with a full
+// before/after row snapshot, so the last N actions can be shown — and
+// reversed — from any tab, regardless of which screen made the change.
+// Settings and user accounts are deliberately not included: bulk key/value
+// changes and account security aren't a good fit for a single-click undo.
+const ACTION_LOG_LIMIT = 200;
+function recordAction(entityType, entityId, action, before, after, performedBy) {
+  if (JSON.stringify(before || null) === JSON.stringify(after || null)) return; // no actual change
+  db.prepare(`
+    INSERT INTO action_log (id, entityType, entityId, action, beforeJson, afterJson, performedBy, performedAt)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(crypto.randomUUID(), entityType, entityId, action, before ? JSON.stringify(before) : null, after ? JSON.stringify(after) : null, performedBy || '', Date.now());
+  db.prepare('DELETE FROM action_log WHERE id NOT IN (SELECT id FROM action_log ORDER BY performedAt DESC LIMIT ?)').run(ACTION_LOG_LIMIT);
+}
+
+function saveEmployeeRow(e) {
   db.prepare(`
     INSERT INTO employees (id, company, name, active, "order") VALUES (?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET company=excluded.company, name=excluded.name, active=excluded.active, "order"=excluded."order"
   `).run(e.id, e.company, e.name, e.active === false ? 0 : 1, e.order || 0);
-  broadcast();
-  res.json({ ok: true });
-});
-app.delete('/api/employees/:id', requireAuth, requireWrite, (req, res) => {
-  db.prepare('DELETE FROM employees WHERE id = ?').run(req.params.id);
-  broadcast();
-  res.json({ ok: true });
-});
+}
+function removeEmployeeRow(id) { db.prepare('DELETE FROM employees WHERE id = ?').run(id); }
 
-app.post('/api/vehicles', requireAuth, requireWrite, (req, res) => {
-  const v = req.body.item || {};
-  if (!v.id || !v.name) return res.status(400).json({ ok: false, error: 'bad_request' });
+function saveVehicleRow(v) {
   db.prepare(`
     INSERT INTO vehicles (id, name, active, "order", type, capacity) VALUES (?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET name=excluded.name, active=excluded.active, "order"=excluded."order", type=excluded.type, capacity=excluded.capacity
   `).run(v.id, v.name, v.active === false ? 0 : 1, v.order || 0, v.type || '', v.capacity || '');
-  broadcast();
-  res.json({ ok: true });
-});
-app.delete('/api/vehicles/:id', requireAuth, requireWrite, (req, res) => {
-  db.prepare('DELETE FROM vehicles WHERE id = ?').run(req.params.id);
-  broadcast();
-  res.json({ ok: true });
-});
+}
+function removeVehicleRow(id) { db.prepare('DELETE FROM vehicles WHERE id = ?').run(id); }
 
-app.post('/api/dossiers', requireAuth, requireWrite, (req, res) => {
-  const d = req.body.item || {};
-  if (!d.id || !d.startDate || !d.endDate) return res.status(400).json({ ok: false, error: 'bad_request' });
-  const oldRow = db.prepare('SELECT * FROM dossiers WHERE id = ?').get(d.id);
+function saveDossierRow(d) {
   db.prepare(`
     INSERT INTO dossiers (id, client, dossierNumber, startDate, endDate, addressFrom, addressTo, volume, seller, coordinator, task, comment, moveType, createdAt, displayOrder, sameResourcesAllDays)
     VALUES (@id, @client, @dossierNumber, @startDate, @endDate, @addressFrom, @addressTo, @volume, @seller, @coordinator, @task, @comment, @moveType, @createdAt, @displayOrder, @sameResourcesAllDays)
@@ -426,17 +435,133 @@ app.post('/api/dossiers', requireAuth, requireWrite, (req, res) => {
     createdAt: d.createdAt || Date.now(), displayOrder: d.displayOrder || 0,
     sameResourcesAllDays: d.sameResourcesAllDays ? 1 : 0
   });
-  recordDossierHistory(oldRow, d, req.session.username);
-  broadcast();
-  res.json({ ok: true });
-});
-app.delete('/api/dossiers/:id', requireAuth, requireWrite, (req, res) => {
+}
+function removeDossierRow(id) {
   const tx = db.transaction((id) => {
     db.prepare('DELETE FROM dossiers WHERE id = ?').run(id);
     db.prepare('DELETE FROM assignments WHERE dossierId = ?').run(id);
     db.prepare('DELETE FROM dossier_history WHERE dossierId = ?').run(id);
   });
-  tx(req.params.id);
+  tx(id);
+}
+
+function saveAssignmentRow(a) {
+  db.prepare(`
+    INSERT INTO assignments (id, dossierId, date, employeesJson, vehicleIdsJson, arrivalTime, slot)
+    VALUES (@id, @dossierId, @date, @employeesJson, @vehicleIdsJson, @arrivalTime, @slot)
+    ON CONFLICT(id) DO UPDATE SET
+      employeesJson=excluded.employeesJson, vehicleIdsJson=excluded.vehicleIdsJson,
+      arrivalTime=excluded.arrivalTime, slot=excluded.slot
+  `).run({
+    id: a.id, dossierId: a.dossierId, date: a.date,
+    employeesJson: JSON.stringify(a.employees || []),
+    vehicleIdsJson: JSON.stringify(a.vehicleIds || []),
+    arrivalTime: a.arrivalTime || '', slot: a.slot || ''
+  });
+}
+function removeAssignmentRow(id) { db.prepare('DELETE FROM assignments WHERE id = ?').run(id); }
+
+function saveAbsenceRow(a) {
+  db.prepare(`
+    INSERT INTO absences (id, employeeId, reason, startDate, endDate) VALUES (@id, @employeeId, @reason, @startDate, @endDate)
+    ON CONFLICT(id) DO UPDATE SET employeeId=excluded.employeeId, reason=excluded.reason, startDate=excluded.startDate, endDate=excluded.endDate
+  `).run({ id: a.id, employeeId: a.employeeId, reason: a.reason, startDate: a.startDate, endDate: a.endDate });
+}
+function removeAbsenceRow(id) { db.prepare('DELETE FROM absences WHERE id = ?').run(id); }
+
+function saveDowntimeRow(v) {
+  db.prepare(`
+    INSERT INTO vehicle_downtimes (id, vehicleId, reason, startDate, endDate) VALUES (@id, @vehicleId, @reason, @startDate, @endDate)
+    ON CONFLICT(id) DO UPDATE SET vehicleId=excluded.vehicleId, reason=excluded.reason, startDate=excluded.startDate, endDate=excluded.endDate
+  `).run({ id: v.id, vehicleId: v.vehicleId, reason: v.reason, startDate: v.startDate, endDate: v.endDate });
+}
+function removeDowntimeRow(id) { db.prepare('DELETE FROM vehicle_downtimes WHERE id = ?').run(id); }
+
+const ENTITIES = {
+  employee: { table: 'employees', getRow: id => db.prepare('SELECT * FROM employees WHERE id = ?').get(id), rowTo: rowToEmployee, save: saveEmployeeRow, remove: removeEmployeeRow },
+  vehicle: { table: 'vehicles', getRow: id => db.prepare('SELECT * FROM vehicles WHERE id = ?').get(id), rowTo: rowToVehicle, save: saveVehicleRow, remove: removeVehicleRow },
+  dossier: { table: 'dossiers', getRow: id => db.prepare('SELECT * FROM dossiers WHERE id = ?').get(id), rowTo: rowToDossier, save: saveDossierRow, remove: removeDossierRow },
+  assignment: { table: 'assignments', getRow: id => db.prepare('SELECT * FROM assignments WHERE id = ?').get(id), rowTo: rowToAssignment, save: saveAssignmentRow, remove: removeAssignmentRow },
+  absence: { table: 'absences', getRow: id => db.prepare('SELECT * FROM absences WHERE id = ?').get(id), rowTo: rowToAbsence, save: saveAbsenceRow, remove: removeAbsenceRow },
+  downtime: { table: 'vehicle_downtimes', getRow: id => db.prepare('SELECT * FROM vehicle_downtimes WHERE id = ?').get(id), rowTo: rowToVehicleDowntime, save: saveDowntimeRow, remove: removeDowntimeRow }
+};
+
+function rowToActionLog(r) {
+  return {
+    id: r.id, entityType: r.entityType, entityId: r.entityId, action: r.action,
+    before: r.beforeJson ? JSON.parse(r.beforeJson) : null, after: r.afterJson ? JSON.parse(r.afterJson) : null,
+    performedBy: r.performedBy || '', performedAt: r.performedAt, undone: !!r.undone
+  };
+}
+app.get('/api/action-log', requireAuth, (req, res) => {
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 10));
+  res.json({ ok: true, actions: db.prepare('SELECT * FROM action_log ORDER BY performedAt DESC LIMIT ?').all(limit).map(rowToActionLog) });
+});
+app.post('/api/action-log/:id/undo', requireAuth, requireWrite, (req, res) => {
+  const row = db.prepare('SELECT * FROM action_log WHERE id = ?').get(req.params.id);
+  if (!row) return res.status(404).json({ ok: false, error: 'not_found' });
+  if (row.undone) return res.json({ ok: false, error: 'already_undone' });
+  const entity = ENTITIES[row.entityType];
+  if (!entity) return res.status(400).json({ ok: false, error: 'unknown_entity' });
+  if (row.action === 'create') {
+    entity.remove(row.entityId);
+  } else {
+    if (!row.beforeJson) return res.status(400).json({ ok: false, error: 'nothing_to_restore' });
+    entity.save(entity.rowTo(JSON.parse(row.beforeJson)));
+  }
+  db.prepare('UPDATE action_log SET undone = 1, undoneAt = ? WHERE id = ?').run(Date.now(), row.id);
+  broadcast();
+  res.json({ ok: true });
+});
+
+app.post('/api/employees', requireAuth, requireWrite, (req, res) => {
+  const e = req.body.item || {};
+  if (!e.id || !e.name || !e.company) return res.status(400).json({ ok: false, error: 'bad_request' });
+  const before = ENTITIES.employee.getRow(e.id);
+  saveEmployeeRow(e);
+  recordAction('employee', e.id, before ? 'update' : 'create', before, ENTITIES.employee.getRow(e.id), req.session.username);
+  broadcast();
+  res.json({ ok: true });
+});
+app.delete('/api/employees/:id', requireAuth, requireWrite, (req, res) => {
+  const before = ENTITIES.employee.getRow(req.params.id);
+  removeEmployeeRow(req.params.id);
+  if (before) recordAction('employee', req.params.id, 'delete', before, null, req.session.username);
+  broadcast();
+  res.json({ ok: true });
+});
+
+app.post('/api/vehicles', requireAuth, requireWrite, (req, res) => {
+  const v = req.body.item || {};
+  if (!v.id || !v.name) return res.status(400).json({ ok: false, error: 'bad_request' });
+  const before = ENTITIES.vehicle.getRow(v.id);
+  saveVehicleRow(v);
+  recordAction('vehicle', v.id, before ? 'update' : 'create', before, ENTITIES.vehicle.getRow(v.id), req.session.username);
+  broadcast();
+  res.json({ ok: true });
+});
+app.delete('/api/vehicles/:id', requireAuth, requireWrite, (req, res) => {
+  const before = ENTITIES.vehicle.getRow(req.params.id);
+  removeVehicleRow(req.params.id);
+  if (before) recordAction('vehicle', req.params.id, 'delete', before, null, req.session.username);
+  broadcast();
+  res.json({ ok: true });
+});
+
+app.post('/api/dossiers', requireAuth, requireWrite, (req, res) => {
+  const d = req.body.item || {};
+  if (!d.id || !d.startDate || !d.endDate) return res.status(400).json({ ok: false, error: 'bad_request' });
+  const oldRow = ENTITIES.dossier.getRow(d.id);
+  saveDossierRow(d);
+  recordDossierHistory(oldRow, d, req.session.username);
+  recordAction('dossier', d.id, oldRow ? 'update' : 'create', oldRow, ENTITIES.dossier.getRow(d.id), req.session.username);
+  broadcast();
+  res.json({ ok: true });
+});
+app.delete('/api/dossiers/:id', requireAuth, requireWrite, (req, res) => {
+  const before = ENTITIES.dossier.getRow(req.params.id);
+  removeDossierRow(req.params.id);
+  if (before) recordAction('dossier', req.params.id, 'delete', before, null, req.session.username);
   broadcast();
   res.json({ ok: true });
 });
@@ -450,18 +575,9 @@ app.get('/api/dossiers/:id/history', requireAuth, (req, res) => {
 app.post('/api/assignments', requireAuth, requireWrite, (req, res) => {
   const a = req.body.item || {};
   if (!a.id || !a.dossierId || !a.date) return res.status(400).json({ ok: false, error: 'bad_request' });
-  db.prepare(`
-    INSERT INTO assignments (id, dossierId, date, employeesJson, vehicleIdsJson, arrivalTime, slot)
-    VALUES (@id, @dossierId, @date, @employeesJson, @vehicleIdsJson, @arrivalTime, @slot)
-    ON CONFLICT(id) DO UPDATE SET
-      employeesJson=excluded.employeesJson, vehicleIdsJson=excluded.vehicleIdsJson,
-      arrivalTime=excluded.arrivalTime, slot=excluded.slot
-  `).run({
-    id: a.id, dossierId: a.dossierId, date: a.date,
-    employeesJson: JSON.stringify(a.employees || []),
-    vehicleIdsJson: JSON.stringify(a.vehicleIds || []),
-    arrivalTime: a.arrivalTime || '', slot: a.slot || ''
-  });
+  const before = ENTITIES.assignment.getRow(a.id);
+  saveAssignmentRow(a);
+  recordAction('assignment', a.id, before ? 'update' : 'create', before, ENTITIES.assignment.getRow(a.id), req.session.username);
   broadcast();
   res.json({ ok: true });
 });
@@ -469,15 +585,16 @@ app.post('/api/assignments', requireAuth, requireWrite, (req, res) => {
 app.post('/api/absences', requireAuth, requireWrite, (req, res) => {
   const a = req.body.item || {};
   if (!a.id || !a.employeeId || !a.reason || !a.startDate || !a.endDate) return res.status(400).json({ ok: false, error: 'bad_request' });
-  db.prepare(`
-    INSERT INTO absences (id, employeeId, reason, startDate, endDate) VALUES (@id, @employeeId, @reason, @startDate, @endDate)
-    ON CONFLICT(id) DO UPDATE SET employeeId=excluded.employeeId, reason=excluded.reason, startDate=excluded.startDate, endDate=excluded.endDate
-  `).run({ id: a.id, employeeId: a.employeeId, reason: a.reason, startDate: a.startDate, endDate: a.endDate });
+  const before = ENTITIES.absence.getRow(a.id);
+  saveAbsenceRow(a);
+  recordAction('absence', a.id, before ? 'update' : 'create', before, ENTITIES.absence.getRow(a.id), req.session.username);
   broadcast();
   res.json({ ok: true });
 });
 app.delete('/api/absences/:id', requireAuth, requireWrite, (req, res) => {
-  db.prepare('DELETE FROM absences WHERE id = ?').run(req.params.id);
+  const before = ENTITIES.absence.getRow(req.params.id);
+  removeAbsenceRow(req.params.id);
+  if (before) recordAction('absence', req.params.id, 'delete', before, null, req.session.username);
   broadcast();
   res.json({ ok: true });
 });
@@ -485,15 +602,16 @@ app.delete('/api/absences/:id', requireAuth, requireWrite, (req, res) => {
 app.post('/api/vehicle-downtimes', requireAuth, requireWrite, (req, res) => {
   const v = req.body.item || {};
   if (!v.id || !v.vehicleId || !v.reason || !v.startDate || !v.endDate) return res.status(400).json({ ok: false, error: 'bad_request' });
-  db.prepare(`
-    INSERT INTO vehicle_downtimes (id, vehicleId, reason, startDate, endDate) VALUES (@id, @vehicleId, @reason, @startDate, @endDate)
-    ON CONFLICT(id) DO UPDATE SET vehicleId=excluded.vehicleId, reason=excluded.reason, startDate=excluded.startDate, endDate=excluded.endDate
-  `).run({ id: v.id, vehicleId: v.vehicleId, reason: v.reason, startDate: v.startDate, endDate: v.endDate });
+  const before = ENTITIES.downtime.getRow(v.id);
+  saveDowntimeRow(v);
+  recordAction('downtime', v.id, before ? 'update' : 'create', before, ENTITIES.downtime.getRow(v.id), req.session.username);
   broadcast();
   res.json({ ok: true });
 });
 app.delete('/api/vehicle-downtimes/:id', requireAuth, requireWrite, (req, res) => {
-  db.prepare('DELETE FROM vehicle_downtimes WHERE id = ?').run(req.params.id);
+  const before = ENTITIES.downtime.getRow(req.params.id);
+  removeDowntimeRow(req.params.id);
+  if (before) recordAction('downtime', req.params.id, 'delete', before, null, req.session.username);
   broadcast();
   res.json({ ok: true });
 });

@@ -61,8 +61,27 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
   font-weight:700;cursor:pointer;font-size:14px;margin-top:6px}
 .login-error{color:var(--danger);font-size:12.5px;margin-top:10px;min-height:1em}
 
-.planning-grid{display:grid;grid-template-columns:300px 1fr;gap:18px;align-items:start}
-@media (max-width:760px){ .planning-grid{grid-template-columns:1fr} }
+.planning-grid{display:grid;grid-template-columns:220px 300px 1fr;gap:18px;align-items:start}
+@media (max-width:980px){
+  .planning-grid{grid-template-columns:220px 1fr}
+  .planning-grid .day-panel{grid-column:1 / -1}
+}
+@media (max-width:760px){ .planning-grid{grid-template-columns:1fr} .planning-grid .day-panel{grid-column:auto} }
+
+.quickview{display:flex;flex-direction:column;gap:12px;position:sticky;top:80px}
+.quick-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px}
+.quick-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.quick-card-title{font-size:12.5px;font-weight:700;text-transform:capitalize;color:var(--fg)}
+.quick-toggle{border:none;background:transparent;color:var(--fg-muted);cursor:pointer;font-size:11px;width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;flex:none}
+.quick-toggle:hover{background:var(--weekend);color:var(--fg)}
+.quick-card.collapsed .quick-card-body{display:none}
+.quick-group{margin-bottom:10px}
+.quick-group:last-child{margin-bottom:0}
+.quick-group-label{font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--fg-muted);margin-bottom:3px}
+.quick-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.quick-list li{font-size:12.5px;padding:2px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.quick-empty{font-size:12px;color:var(--fg-muted);font-style:italic}
+
 .calendar{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;position:sticky;top:80px}
 .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .cal-head button{width:28px;height:28px;border-radius:8px;border:1px solid var(--border);background:var(--bg);
@@ -93,9 +112,9 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 .legend span{display:inline-flex;align-items:center;gap:5px}
 .legend i{width:9px;height:9px;border-radius:3px;display:inline-block}
 
-#dossierList{display:flex;flex-wrap:wrap;gap:12px;align-items:start}
+#dossierList{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;align-items:start}
 .dossier-card{border:1px solid var(--border);border-radius:11px;padding:12px 14px;background:var(--bg);
-  flex:1 1 300px;min-width:270px;max-width:380px}
+  min-width:0;max-width:420px}
 .dossier-head{display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap}
 .dossier-head input.client-name{font:inherit;font-weight:700;font-size:14.5px;border:none;background:transparent;
   color:var(--fg);flex:1;min-width:120px;border-radius:6px;padding:2px 4px}
@@ -127,7 +146,7 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 .dossier-foot{display:flex;justify-content:flex-end;margin-top:8px}
 .link-btn{border:none;background:none;color:var(--fg-muted);font-size:12px;cursor:pointer;text-decoration:underline}
 .link-btn:hover{color:var(--danger)}
-.empty-note{font-size:13px;color:var(--fg-muted);padding:24px 4px;text-align:center;flex:1 1 100%}
+.empty-note{font-size:13px;color:var(--fg-muted);padding:24px 4px;text-align:center;flex:1 1 100%;grid-column:1 / -1}
 
 .popover{position:fixed;z-index:60;background:var(--surface);border:1px solid var(--border);border-radius:10px;
   box-shadow:0 10px 28px rgba(0,0,0,.2);padding:8px;width:230px;max-height:280px;overflow:auto}
@@ -206,6 +225,7 @@ td.dispo-cell{cursor:pointer}
 
   <div class="view" id="view-planning">
     <div class="planning-grid">
+      <div class="quickview" id="quickView"></div>
       <div class="calendar">
         <div class="cal-head">
           <button id="prevMonth" aria-label="Mois précédent">‹</button>
@@ -299,7 +319,8 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
     cursor: new Date(2026, 9, 1),
     selectedDate: fmtDate(new Date(2026, 9, 6)),
     activeTab: "planning",
-    pollTimer: null
+    pollTimer: null,
+    quickNextCollapsed: false
   };
 
   function $(sel, root){ return (root||document).querySelector(sel); }
@@ -324,6 +345,7 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
   function parseDate(s){ var p = s.split("-").map(Number); return new Date(p[0], p[1]-1, p[2]); }
   function dayCount(a,b){ return Math.round((parseDate(b)-parseDate(a))/86400000)+1; }
   function dayIndex(a,b){ return Math.round((parseDate(b)-parseDate(a))/86400000)+1; }
+  function addDays(dateStr, n){ var d = parseDate(dateStr); return fmtDate(new Date(d.getFullYear(), d.getMonth(), d.getDate()+n)); }
   function empName(id){ var e = state.employees.find(function(x){return x.id===id;}); return e?e.name:"(supprimé)"; }
   function vehName(id){ var v = state.vehicles.find(function(x){return x.id===id;}); return v?v.name:"(supprimé)"; }
   function canEdit(){ return state.role === "admin" || state.role === "planning"; }
@@ -420,7 +442,7 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
       state.vehicles = res.vehicles || [];
       state.dossiers = res.dossiers || [];
       state.assignments = res.assignments || [];
-      renderEffectifs(); renderVehicles(); renderCalendar(); renderDayPanel(); renderAvailability();
+      renderEffectifs(); renderVehicles(); renderCalendar(); renderDayPanel(); renderAvailability(); renderQuickView();
       if (state.role === "admin") renderUsers();
     });
   }
@@ -463,6 +485,65 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
     };
   }
 
+  // ---------- quick view (effectifs & véhicules disponibles) ----------
+  function quickAvailability(dateStr){
+    var loads = loadsForDate(dateStr);
+    function unassigned(companyId){
+      return state.employees
+        .filter(function(e){ return e.company===companyId && e.active!==false && !(e.id in loads.empLoad); })
+        .sort(function(a,b){ return (a.order||0)-(b.order||0); })
+        .map(function(e){ return e.name; });
+    }
+    var vehicles = state.vehicles
+      .filter(function(v){ return v.active!==false && !(v.id in loads.vehUse); })
+      .sort(function(a,b){ return (a.order||0)-(b.order||0); })
+      .map(function(v){ return v.name; });
+    return { pel: unassigned("PEL"), sj: unassigned("SJ"), vehicles: vehicles };
+  }
+  function quickDayLabel(dateStr){
+    var d = parseDate(dateStr);
+    var dow = ["dim.","lun.","mar.","mer.","jeu.","ven.","sam."][d.getDay()];
+    return dow + " " + d.getDate() + " " + MONTHS_FR[d.getMonth()].slice(0,3);
+  }
+  function renderQuickGroup(label, names){
+    var wrap = el("div", {class:"quick-group"});
+    wrap.appendChild(el("div", {class:"quick-group-label", text: label + " · " + names.length}));
+    if (!names.length){
+      wrap.appendChild(el("div", {class:"quick-empty", text:"Aucun disponible"}));
+    } else {
+      var ul = el("ul", {class:"quick-list"});
+      names.forEach(function(n){ ul.appendChild(el("li", {text:n, title:n})); });
+      wrap.appendChild(ul);
+    }
+    return wrap;
+  }
+  function renderQuickCard(dateStr, opts){
+    opts = opts || {};
+    var collapsed = !!opts.collapsed;
+    var card = el("div", {class:"quick-card" + (collapsed ? " collapsed" : "")});
+    var head = el("div", {class:"quick-card-head"});
+    head.appendChild(el("div", {class:"quick-card-title", text: opts.title + " · " + quickDayLabel(dateStr)}));
+    if (opts.collapsible){
+      var toggle = el("button", {class:"quick-toggle", "aria-label":"Afficher/masquer", text: collapsed ? "▸" : "▾",
+        onclick: function(){ state.quickNextCollapsed = !state.quickNextCollapsed; renderQuickView(); }});
+      head.appendChild(toggle);
+    }
+    card.appendChild(head);
+    var avail = quickAvailability(dateStr);
+    var body = el("div", {class:"quick-card-body"});
+    body.appendChild(renderQuickGroup("Pelichet", avail.pel));
+    body.appendChild(renderQuickGroup("SwissJob", avail.sj));
+    body.appendChild(renderQuickGroup("Véhicules dispo", avail.vehicles));
+    card.appendChild(body);
+    return card;
+  }
+  function renderQuickView(){
+    var host = $("#quickView"); if (!host) return;
+    host.innerHTML = "";
+    host.appendChild(renderQuickCard(state.selectedDate, {title:"Ce jour"}));
+    host.appendChild(renderQuickCard(addDays(state.selectedDate, 1), {title:"Jour suivant", collapsible:true, collapsed: state.quickNextCollapsed}));
+  }
+
   // ---------- calendar ----------
   function renderDow(){ var host=$("#calDow"); host.innerHTML=""; DOW_FR.forEach(function(d){ host.appendChild(el("div",{text:d})); }); }
   function renderCalendar(){
@@ -491,7 +572,7 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
           for (var n=0; n<Math.min(active.length,4); n++) row.appendChild(el("span",{class:"dot"+(isConflict?" warn-dot":"")}));
           cell.appendChild(row);
         }
-        cell.addEventListener("click", function(dateStr){ return function(){ state.selectedDate=dateStr; renderCalendar(); renderDayPanel(); }; }(c.date));
+        cell.addEventListener("click", function(dateStr){ return function(){ state.selectedDate=dateStr; renderCalendar(); renderDayPanel(); renderQuickView(); }; }(c.date));
       }
       host.appendChild(cell);
     });
@@ -767,7 +848,7 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
           var load = (loadKey==="emp"?loads.empLoad:loads.vehUse)[item.id] || 0;
           var td = el("td", {class:"dispo-cell"+(isWeekend2?" weekend":""), title:item.name+" — "+dateStr});
           td.appendChild(el("span", {class:"dispo-swatch", style:"background:"+swatchColor(load)}));
-          td.addEventListener("click", function(dateStr){ return function(){ state.selectedDate=dateStr; setTab("planning"); renderCalendar(); renderDayPanel(); }; }(dateStr));
+          td.addEventListener("click", function(dateStr){ return function(){ state.selectedDate=dateStr; setTab("planning"); renderCalendar(); renderDayPanel(); renderQuickView(); }; }(dateStr));
           row.appendChild(td);
         }
         tbody.appendChild(row);

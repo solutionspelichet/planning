@@ -65,9 +65,9 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 @media (max-width:760px){ .planning-grid{grid-template-columns:1fr} }
 
 .day-row{display:grid;grid-template-columns:460px 1fr;gap:18px;align-items:start;margin-top:14px}
-@media (max-width:700px){ .day-row{grid-template-columns:1fr} .quick-pane{flex-wrap:nowrap} .quick-group{flex-basis:90px} }
+@media (max-width:700px){ .day-row{grid-template-columns:1fr} .quick-pane{flex-wrap:nowrap;height:220px} .quick-group{flex-basis:90px} }
 
-.quick-pane{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;flex-wrap:wrap;gap:10px;height:380px;overflow:hidden}
+.quick-pane{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;flex-wrap:wrap;gap:10px;min-height:0;overflow:hidden}
 .quick-group{flex:1 1 130px;min-width:0;display:flex;flex-direction:column;min-height:0;border-left:1px solid var(--border);padding-left:10px}
 .quick-group:first-child{border-left:none;padding-left:0}
 .quick-group-label{flex:none;font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--fg-muted);margin-bottom:3px}
@@ -657,6 +657,27 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     host.appendChild(renderQuickGroup("SwissJob", avail.sj));
     host.appendChild(renderQuickGroup("Véhicules dispo", avail.vehicles));
   }
+  // Matches the pane's height to its jobsite list's rendered height (CSS
+  // alone can't: letting the pane's own content size the grid row would
+  // let a 90-name list blow up the row instead of scrolling inside it).
+  // Skipped below 701px, where .day-row stacks to one column and a fixed
+  // CSS height applies instead.
+  function syncPaneHeight(paneSelector, listSelector){
+    var pane = $(paneSelector), list = $(listSelector);
+    if (!pane || !list) return;
+    if (window.matchMedia("(max-width: 700px)").matches){ pane.style.height = ""; return; }
+    pane.style.height = Math.max(list.getBoundingClientRect().height, 120) + "px";
+  }
+  (function(){
+    var resizeTimer;
+    window.addEventListener("resize", function(){
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(function(){
+        syncPaneHeight("#quickViewToday", "#dossierList");
+        syncPaneHeight("#quickViewNext", "#nextDayList");
+      }, 150);
+    });
+  })();
 
   // ---------- calendar ----------
   function renderDow(){ var host=$("#calDow"); host.innerHTML=""; DOW_FR.forEach(function(d){ host.appendChild(el("div",{text:d})); }); }
@@ -717,6 +738,7 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     } else {
       dossiersToday.forEach(function(dossier){ host.appendChild(renderDossierCard(dossier, conflicts, state.selectedDate)); });
     }
+    syncPaneHeight("#quickViewToday", "#dossierList");
     renderNextDayPanel();
   }
 
@@ -750,6 +772,7 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     } else {
       dossiersNext.forEach(function(dossier){ listHost.appendChild(renderDossierCard(dossier, conflictsNext, nextDateStr)); });
     }
+    syncPaneHeight("#quickViewNext", "#nextDayList");
   }
   var nextDayToggleBtn = $("#nextDayToggle");
   if (nextDayToggleBtn) nextDayToggleBtn.addEventListener("click", function(){

@@ -23,7 +23,7 @@
 }
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:'Public Sans',system-ui,sans-serif;margin:0}
-.app{max-width:1280px;margin:0 auto;padding:0 16px 40px}
+.app{max-width:none;margin:0 auto;padding:0 16px 40px}
 h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0}
 [hidden]{display:none!important}
 .view-only .edit-only{display:none!important}
@@ -233,17 +233,24 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
 #printArea{display:none}
 @page{size:landscape;margin:12mm}
 @media print{
-  body *{visibility:hidden}
+  body *{visibility:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   #printArea,#printArea *{visibility:visible}
   #printArea{display:block;position:absolute;top:0;left:0;width:100%}
 }
 .print-title{font-size:17px;font-weight:800;margin:0 0 14px;color:#111}
 .print-empty{font-style:italic;color:#555}
-.print-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.print-card{border:1px solid #999;border-radius:6px;padding:10px;break-inside:avoid;font-size:11.5px;color:#111}
+.print-grid{display:flex;flex-wrap:wrap;gap:10px}
+.print-card{border:1px solid #999;border-radius:6px;padding:10px;break-inside:avoid;font-size:11.5px;color:#111;flex:1 1 190px;min-width:190px}
 .print-card h3{font-size:13px;margin:0 0 6px}
 .print-row{margin-bottom:4px;line-height:1.3}
 .print-label{font-weight:700;text-transform:uppercase;font-size:9px;color:#555;margin-right:4px}
+.print-badge{display:inline-block;padding:1px 8px;border-radius:10px;color:#fff;font-weight:700;font-size:10.5px}
+.print-badge.slot-J{background:#3467b8}
+.print-badge.slot-M{background:#1f8a70}
+.print-badge.slot-A{background:#7a4fc4}
+.print-badge.type-NL{background:#8b8578}
+.print-badge.type-INTER{background:#c98a1b}
+.print-badge.type-GM{background:#c1443a}
 </style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700;800&display=swap">
 </head>
@@ -1097,6 +1104,13 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     row.appendChild(document.createTextNode(value || "—"));
     return row;
   }
+  function printBadgeField(label, value, badgePrefix){
+    var row = el("div", {class:"print-row"});
+    row.appendChild(el("span", {class:"print-label", text:label+" :"}));
+    if (value) row.appendChild(el("span", {class:"print-badge "+badgePrefix+value, text:value}));
+    else row.appendChild(document.createTextNode("—"));
+    return row;
+  }
   function renderPrintCard(dossier, dateStr){
     var assignment = assignmentFor(dossier.id, dateStr);
     var card = el("div", {class:"print-card"});
@@ -1104,11 +1118,11 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     card.appendChild(printField("Départ", dossier.addressFrom));
     card.appendChild(printField("Arrivée", dossier.addressTo));
     card.appendChild(printField("Volume", dossier.volume));
-    card.appendChild(printField("Type", dossier.moveType));
+    card.appendChild(printBadgeField("Type", dossier.moveType, "type-"));
     card.appendChild(printField("Vendeur", dossier.seller));
     card.appendChild(printField("Coordinatrice", dossier.coordinator));
     card.appendChild(printField("Tâche", dossier.task));
-    card.appendChild(printField("Créneau", assignment.slot));
+    card.appendChild(printBadgeField("Créneau", assignment.slot, "slot-"));
     card.appendChild(printField("Arrivée sur site", assignment.arrivalTime));
     card.appendChild(printField("Effectif", (assignment.employees||[]).map(function(a){ return empName(a.employeeId); }).join(", ")));
     card.appendChild(printField("Véhicules", (assignment.vehicleIds||[]).map(vehName).join(", ")));

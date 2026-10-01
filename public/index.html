@@ -239,6 +239,7 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
 }
 .print-title{font-size:17px;font-weight:800;margin:0 0 14px;color:#111}
 .print-empty{font-style:italic;color:#555}
+.print-page + .print-page{break-before:page}
 .print-grid{display:flex;flex-wrap:nowrap;gap:8px}
 .print-card{border:1px solid #999;border-radius:6px;padding:8px;break-inside:avoid;font-size:10.5px;color:#111;flex:1 1 0;min-width:0;overflow-wrap:break-word}
 .print-card h3{font-size:13px;margin:0 0 6px}
@@ -1128,18 +1129,26 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     card.appendChild(printField("Véhicules", (assignment.vehicleIds||[]).map(vehName).join(", ")));
     return card;
   }
+  var PRINT_PER_PAGE = 5;
   function printDayDossiers(){
     var d = parseDate(state.selectedDate);
     var dow = ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d.getDay()];
+    var titleText = "Chantiers — " + dow + " " + d.getDate() + " " + MONTHS_FR[d.getMonth()] + " " + d.getFullYear();
     var dossiersToday = activeDossiersOn(state.selectedDate).sort(function(a,b){ return (a.displayOrder||0)-(b.displayOrder||0); });
     var area = $("#printArea"); area.innerHTML = "";
-    area.appendChild(el("div", {class:"print-title", text:"Chantiers — " + dow + " " + d.getDate() + " " + MONTHS_FR[d.getMonth()] + " " + d.getFullYear()}));
     if (!dossiersToday.length){
+      area.appendChild(el("div", {class:"print-title", text:titleText}));
       area.appendChild(el("div", {class:"print-empty", text:"Aucun chantier ce jour-là."}));
     } else {
-      var grid = el("div", {class:"print-grid"});
-      dossiersToday.forEach(function(dossier){ grid.appendChild(renderPrintCard(dossier, state.selectedDate)); });
-      area.appendChild(grid);
+      for (var i = 0; i < dossiersToday.length; i += PRINT_PER_PAGE){
+        var chunk = dossiersToday.slice(i, i + PRINT_PER_PAGE);
+        var page = el("div", {class:"print-page"});
+        page.appendChild(el("div", {class:"print-title", text:titleText}));
+        var grid = el("div", {class:"print-grid"});
+        chunk.forEach(function(dossier){ grid.appendChild(renderPrintCard(dossier, state.selectedDate)); });
+        page.appendChild(grid);
+        area.appendChild(page);
+      }
     }
     window.print();
   }

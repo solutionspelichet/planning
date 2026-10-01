@@ -69,11 +69,13 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 @media (max-width:760px){ .planning-grid{grid-template-columns:1fr} .planning-grid .day-panel{grid-column:auto} }
 
 .quickview{display:flex;flex-direction:column;gap:12px;position:sticky;top:80px}
-.quick-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px}
-.quick-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.quick-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;max-height:calc(50vh - 60px);display:flex;flex-direction:column}
+.quick-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;flex:none}
 .quick-card-title{font-size:12.5px;font-weight:700;text-transform:capitalize;color:var(--fg)}
 .quick-toggle{border:none;background:transparent;color:var(--fg-muted);cursor:pointer;font-size:11px;width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;flex:none}
 .quick-toggle:hover{background:var(--weekend);color:var(--fg)}
+.quick-card-body{overflow-y:auto;min-height:0}
+.quick-card.collapsed{max-height:none}
 .quick-card.collapsed .quick-card-body{display:none}
 .quick-group{margin-bottom:10px}
 .quick-group:last-child{margin-bottom:0}
@@ -101,7 +103,7 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 .cal-day.selected .dot{background:var(--accent-fg)}
 .cal-day .warn-dot{background:var(--danger)!important}
 
-.day-panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;min-width:0}
+.day-panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;min-width:0;width:max-content;max-width:none}
 .day-panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap}
 .day-panel-head h2{font-size:16px;text-transform:capitalize}
 .btn{border:none;background:var(--accent);color:var(--accent-fg);border-radius:8px;padding:8px 14px;
@@ -112,19 +114,19 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 .legend span{display:inline-flex;align-items:center;gap:5px}
 .legend i{width:9px;height:9px;border-radius:3px;display:inline-block}
 
-#dossierList{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;align-items:start}
-.dossier-card{border:1px solid var(--border);border-radius:11px;padding:12px 14px;background:var(--bg);
-  min-width:0;max-width:420px}
+#dossierList,#nextDayList{display:flex;flex-wrap:nowrap;gap:12px;align-items:start;padding-bottom:6px}
+.dossier-card{border:1px solid var(--border);border-radius:11px;padding:10px 12px;background:var(--bg);
+  flex:0 0 230px;width:230px}
 .dossier-head{display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap}
 .dossier-head input.client-name{font:inherit;font-weight:700;font-size:14.5px;border:none;background:transparent;
   color:var(--fg);flex:1;min-width:120px;border-radius:6px;padding:2px 4px}
 .dossier-head input.client-name:focus{background:var(--surface);outline:1px solid var(--accent)}
 .day-badge{font-size:11px;font-weight:700;color:var(--fg-muted);background:var(--surface);
   border:1px solid var(--border);border-radius:20px;padding:3px 9px;flex:none}
-.date-range{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--fg-muted);margin-bottom:10px}
-.date-range input{border:1px solid var(--border);background:var(--surface);color:var(--fg);border-radius:6px;padding:3px 6px;font:inherit;font-size:12px}
+.date-range{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;font-size:12px;color:var(--fg-muted);margin-bottom:10px}
+.date-range input{border:1px solid var(--border);background:var(--surface);color:var(--fg);border-radius:6px;padding:3px 4px;font:inherit;font-size:11.5px;min-width:0;flex:1 1 92px}
 .section-label{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--fg-muted);margin:8px 0 5px}
-.info-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px 10px;margin-bottom:6px}
+.info-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(95px,1fr));gap:6px 8px;margin-bottom:6px}
 .info-field label{display:block;font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--fg-muted);margin-bottom:2px}
 .info-field input{width:100%;border:1px solid var(--border);background:var(--surface);color:var(--fg);border-radius:6px;padding:5px 7px;font:inherit;font-size:12.5px}
 .info-field.narrow{max-width:110px}
@@ -132,6 +134,7 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .chip{display:inline-flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:4px 6px 4px 10px;font-size:12.5px}
 .chip.conflict{border-color:var(--danger);background:var(--danger-bg)}
+.chip.chip-pl{border-color:#c0362c;background:#fde2e1;color:#7a1f1b;font-weight:700}
 .info-field select{width:100%;border:1px solid var(--border);background:var(--surface);color:var(--fg);border-radius:6px;padding:5px 7px;font:inherit;font-size:12.5px;font-weight:700}
 .info-field select.slot-J{background:var(--chip-j);color:#fff;border-color:var(--chip-j)}
 .info-field select.slot-M{background:var(--chip-m);color:#fff;border-color:var(--chip-m)}
@@ -146,7 +149,7 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 .dossier-foot{display:flex;justify-content:flex-end;margin-top:8px}
 .link-btn{border:none;background:none;color:var(--fg-muted);font-size:12px;cursor:pointer;text-decoration:underline}
 .link-btn:hover{color:var(--danger)}
-.empty-note{font-size:13px;color:var(--fg-muted);padding:24px 4px;text-align:center;flex:1 1 100%;grid-column:1 / -1}
+.empty-note{font-size:13px;color:var(--fg-muted);padding:24px 4px;text-align:center;flex:1 1 100%}
 
 .popover{position:fixed;z-index:60;background:var(--surface);border:1px solid var(--border);border-radius:10px;
   box-shadow:0 10px 28px rgba(0,0,0,.2);padding:8px;width:230px;max-height:280px;overflow:auto}
@@ -156,7 +159,7 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 .popover .opt:hover{background:var(--weekend)}
 .popover .opt-empty{padding:8px;font-size:12px;color:var(--fg-muted)}
 
-.grid-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
+.grid-wrap{overflow-x:auto;overflow-y:auto;max-height:65vh;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
 table.dispo{border-collapse:collapse;width:100%;font-size:12px}
 table.dispo th,table.dispo td{border-bottom:1px solid var(--border)}
 table.dispo thead th{position:sticky;top:0;background:var(--surface);z-index:2;padding:6px 3px;text-align:center;font-weight:700;color:var(--fg-muted);font-size:11px}
@@ -167,6 +170,47 @@ thead th.dispo-name-col{z-index:3}
 tr.dispo-sep td{background:var(--bg);font-weight:800;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--fg-muted);padding:6px 10px;position:sticky;left:0}
 td.dispo-cell{cursor:pointer}
 .dispo-swatch{display:block;margin:3px auto;width:18px;height:18px;border-radius:5px}
+.dispo-toggle{font:inherit;font-weight:800;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--fg-muted);background:none;border:none;padding:0;cursor:pointer}
+.dispo-toggle:hover{color:var(--fg)}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px}
+.stat-value{font-size:28px;font-weight:800;color:var(--accent)}
+.stat-label{font-size:12px;color:var(--fg-muted);margin-top:4px}
+.chart-sub{font-size:12px;color:var(--fg-muted);margin:0 0 14px}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:16px}
+.chart-card h3{font-size:12.5px;font-weight:700;margin:0 0 10px;color:var(--fg-muted);text-transform:uppercase;letter-spacing:.03em}
+.chart-legend{display:flex;gap:14px;font-size:11.5px;color:var(--fg-muted);margin-top:6px}
+.chart-legend span{display:flex;align-items:center;gap:5px}
+.chart-legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+table.week-table{border-collapse:collapse;width:100%;font-size:12.5px}
+table.week-table th,table.week-table td{padding:8px 6px;text-align:center;border-bottom:1px solid var(--border)}
+table.week-table th{color:var(--fg-muted);font-weight:700;font-size:11px}
+table.week-table td.week-metric-label{text-align:left;color:var(--fg-muted);font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}
+table.week-table th.week-today,table.week-table td.week-today{background:var(--bg)}
+table.week-table td.week-daynum{font-size:10.5px;color:var(--fg-muted);font-weight:400}
+table.week-table tr.week-sub td{color:var(--fg-muted);font-size:11.5px;font-weight:400}
+table.week-table tr.week-sub td.week-metric-label{padding-left:16px;text-transform:none;font-weight:400}
+.type-filter{display:flex;gap:6px;margin-bottom:10px}
+.type-filter button{border:1px solid var(--border);background:var(--bg);color:var(--fg-muted);font:inherit;font-size:11px;font-weight:700;
+  padding:4px 10px;border-radius:20px;cursor:pointer}
+.type-filter button.active{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.veh-type-select{font:inherit;font-size:11.5px;border:1px solid var(--border);background:var(--surface);color:var(--fg);
+  border-radius:6px;padding:3px 5px;margin-right:6px}
+.next-day-section{margin-top:22px;padding-top:16px;border-top:1px solid var(--border)}
+.next-day-toggle{display:flex;align-items:center;gap:8px;font:inherit;font-size:14px;font-weight:700;
+  background:none;border:none;color:var(--fg);cursor:pointer;padding:0 0 10px;width:100%;text-align:left}
+.next-day-toggle:hover{color:var(--accent)}
+.address-stack{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
+.address-stack .info-field textarea{width:100%;font-size:13px;padding:7px 9px;font-family:inherit;
+  border:1px solid var(--border);background:var(--surface);color:var(--fg);border-radius:6px;resize:vertical}
+.address-field textarea.addr-gm{background:#fde2e1;border-color:#e2534d;color:#7a1f1b}
+.address-field textarea.addr-transit{background:#e1f5e6;border-color:#3fa15a;color:#1d5c32}
+td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
+.draggable-row{cursor:grab}
+.draggable-row:active{cursor:grabbing}
+.dragging{opacity:.4}
+.copy-all-days{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--fg-muted);margin-bottom:10px;cursor:pointer}
+.copy-all-days input{margin:0}
 
 .company-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
 .company-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;min-width:0}
@@ -214,6 +258,7 @@ td.dispo-cell{cursor:pointer}
       <button class="tab-btn active" data-tab="planning">Planning</button>
       <button class="tab-btn" data-tab="effectifs">Effectifs</button>
       <button class="tab-btn" data-tab="vehicules">Véhicules</button>
+      <button class="tab-btn" data-tab="dashboard">Dashboard</button>
       <button class="tab-btn edit-only" data-tab="admin" id="adminTabBtn">Admin</button>
     </div>
     <div class="who">
@@ -250,6 +295,15 @@ td.dispo-cell{cursor:pointer}
         </div>
         <div id="conflictBanner"></div>
         <div id="dossierList"></div>
+
+        <div class="next-day-section">
+          <button class="next-day-toggle" id="nextDayToggle">
+            <span id="nextDayToggleIcon">▾</span>
+            <span id="nextDayTitle">Jour suivant</span>
+          </button>
+          <div id="nextDayConflictBanner"></div>
+          <div id="nextDayList"></div>
+        </div>
       </div>
     </div>
 
@@ -260,6 +314,48 @@ td.dispo-cell{cursor:pointer}
       <span><i style="background:var(--dispo-conflict)"></i>Sur-réservé (2 fois ou plus)</span>
     </div>
     <div class="grid-wrap"><div id="dispoTableHost" style="min-height:120px"></div></div>
+  </div>
+
+  <div class="view" id="view-dashboard" hidden>
+    <h2 style="font-size:15px;margin:6px 0 12px">Aujourd'hui — <span id="dashDate">—</span></h2>
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-value" id="dashDossiers">0</div>
+        <div class="stat-label">Chantiers actifs</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="dashEmployees">0</div>
+        <div class="stat-label">Ressources humaines monopolisées</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="dashVehicles">0</div>
+        <div class="stat-label">Véhicules monopolisés</div>
+      </div>
+    </div>
+
+    <h2 style="font-size:15px;margin:28px 0 12px">Cette semaine</h2>
+    <div class="chart-card">
+      <div id="dashWeekTable"></div>
+    </div>
+
+    <h2 style="font-size:15px;margin:28px 0 4px">Évolution sur l'année</h2>
+    <p class="chart-sub" id="dashYearLabels">—</p>
+
+    <div class="chart-card">
+      <h3>Nombre de chantiers par mois</h3>
+      <div class="type-filter" id="filterDossiers"></div>
+      <div id="dashChartDossiers"></div>
+    </div>
+    <div class="chart-card">
+      <h3>Ressources humaines monopolisées par mois (personne-jours)</h3>
+      <div class="type-filter" id="filterEmployees"></div>
+      <div id="dashChartEmployees"></div>
+    </div>
+    <div class="chart-card">
+      <h3>Véhicules monopolisés par mois (véhicule-jours)</h3>
+      <div class="type-filter" id="filterVehicles"></div>
+      <div id="dashChartVehicles"></div>
+    </div>
   </div>
 
   <div class="view" id="view-effectifs" hidden><div class="company-grid" id="companyGrid"></div></div>
@@ -281,6 +377,17 @@ td.dispo-cell{cursor:pointer}
           <button id="createUserBtn">Créer</button>
         </div>
       </div>
+      <div class="company-card">
+        <h3><span>Sauvegardes</span></h3>
+        <p class="chart-sub" style="margin:0 0 10px">Automatiques à 10h, 14h, 16h, 20h et 22h · conservées 7 jours sur le serveur · copiées sur Google Drive (sauvegarde ultime).</p>
+        <button class="btn edit-only" id="runBackupBtn" style="margin-bottom:12px">Sauvegarder maintenant</button>
+        <ul class="emp-list" id="backupList"></ul>
+        <div class="add-row edit-only" style="flex-wrap:wrap;margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
+          <label style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--fg-muted);width:100%">Restaurer depuis un fichier (téléchargé depuis Drive)</label>
+          <input type="file" id="restoreFileInput" accept=".db" style="flex:1 1 100%">
+          <button id="restoreBtn">Restaurer</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -288,10 +395,6 @@ td.dispo-cell{cursor:pointer}
 <div class="toast" id="toast"></div>
 
 <script>
-// ======= EDIT THIS: paste your deployed Apps Script Web App URL here =======
-var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_UP2bMVZqciEWItLgdtQVV5OdpVYMqiri7dzHACCM9YgwcTug/exec";
-// =============================================================================
-
 (function(){
   "use strict";
 
@@ -307,20 +410,24 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
   ];
   var DAY_SLOTS = ["J","M","A"];
   var MOVE_TYPES = ["NL","INTER","GM"];
+  var VEHICLE_TYPES = ["VL","Fourgon","PL"];
   var CODE_LOAD = {J:1, M:0.5, A:0.5};
   var MONTHS_FR = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
   var DOW_FR = ["L","M","M","J","V","S","D"];
   var SESSION_KEY = "pe_session_v1";
-  var POLL_MS = 20000; // Apps Script calls can take several seconds; polling too tight piles up requests.
+  var POLL_MS = 30000; // safety net only — live updates arrive instantly via SSE
 
   var state = {
     token: null, role: null, username: null,
     employees: [], vehicles: [], dossiers: [], assignments: [],
+    collapsedCompanies: {},
+    nextDayCollapsed: false,
+    quickNextCollapsed: false,
     cursor: new Date(2026, 9, 1),
     selectedDate: fmtDate(new Date(2026, 9, 6)),
     activeTab: "planning",
     pollTimer: null,
-    quickNextCollapsed: false
+    eventSource: null
   };
 
   function $(sel, root){ return (root||document).querySelector(sel); }
@@ -345,23 +452,44 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
   function parseDate(s){ var p = s.split("-").map(Number); return new Date(p[0], p[1]-1, p[2]); }
   function dayCount(a,b){ return Math.round((parseDate(b)-parseDate(a))/86400000)+1; }
   function dayIndex(a,b){ return Math.round((parseDate(b)-parseDate(a))/86400000)+1; }
-  function addDays(dateStr, n){ var d = parseDate(dateStr); return fmtDate(new Date(d.getFullYear(), d.getMonth(), d.getDate()+n)); }
   function empName(id){ var e = state.employees.find(function(x){return x.id===id;}); return e?e.name:"(supprimé)"; }
   function vehName(id){ var v = state.vehicles.find(function(x){return x.id===id;}); return v?v.name:"(supprimé)"; }
+  function isVehPL(id){ var v = state.vehicles.find(function(x){return x.id===id;}); return !!v && v.type==="PL"; }
   function canEdit(){ return state.role === "admin" || state.role === "planning"; }
   function uid(prefix){ return prefix + "_" + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
   // ---------- API ----------
-  // Apps Script Web Apps 302-redirect every call to an internal URL, and a
-  // POST becomes a GET across that redirect (dropping its body) — so we send
-  // everything as GET, with the JSON payload in a query parameter, which
-  // survives the redirect intact.
-  function api(action, extra){
-    var payload = Object.assign({action:action, token: state.token}, extra||{});
-    var url = BACKEND_URL + "?payload=" + encodeURIComponent(JSON.stringify(payload));
-    return fetch(url)
-      .then(function(r){ return r.json(); })
+  // Real same-origin server: plain REST calls, no redirect/CORS workarounds
+  // needed. One `api(action, extra)` wrapper keeps every call site below
+  // unchanged regardless of which HTTP verb/route it maps to.
+  function request(method, path, body){
+    var headers = {};
+    if (state.token) headers["X-Auth-Token"] = state.token;
+    if (body !== undefined) headers["Content-Type"] = "application/json";
+    return fetch(path, { method: method, headers: headers, body: body !== undefined ? JSON.stringify(body) : undefined })
+      .then(function(r){ return r.json().catch(function(){ return {ok:false, error:"bad_response"}; }); })
       .catch(function(){ return {ok:false, error:"network"}; });
+  }
+  function api(action, extra){
+    extra = extra || {};
+    switch (action){
+      case "login": return request("POST", "/api/login", {username: extra.username, password: extra.password});
+      case "getAll": return request("GET", "/api/all");
+      case "saveEmployee": return request("POST", "/api/employees", {item: extra.item});
+      case "deleteEmployee": return request("DELETE", "/api/employees/" + encodeURIComponent(extra.id));
+      case "saveVehicle": return request("POST", "/api/vehicles", {item: extra.item});
+      case "deleteVehicle": return request("DELETE", "/api/vehicles/" + encodeURIComponent(extra.id));
+      case "saveDossier": return request("POST", "/api/dossiers", {item: extra.item});
+      case "deleteDossier": return request("DELETE", "/api/dossiers/" + encodeURIComponent(extra.id));
+      case "saveAssignment": return request("POST", "/api/assignments", {item: extra.item});
+      case "listUsers": return request("GET", "/api/users");
+      case "createUser": return request("POST", "/api/users", {username: extra.username, password: extra.password, role: extra.role});
+      case "deleteUser": return request("DELETE", "/api/users/" + encodeURIComponent(extra.username));
+      case "resetPassword": return request("POST", "/api/users/" + encodeURIComponent(extra.username) + "/reset-password", {password: extra.password});
+      case "listBackups": return request("GET", "/api/backups");
+      case "runBackup": return request("POST", "/api/backups/run");
+      default: return Promise.resolve({ok:false, error:"unknown_action"});
+    }
   }
 
   // ---------- auth ----------
@@ -384,6 +512,7 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
   function logout(){
     clearSession();
     if (state.pollTimer) clearTimeout(state.pollTimer);
+    if (state.eventSource) { state.eventSource.close(); state.eventSource = null; }
     $("#mainApp").hidden = true;
     $("#loginScreen").hidden = false;
     $("#loginError").textContent = "";
@@ -400,7 +529,7 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
     api("login", {username:username, password:password}).then(function(res){
       if (!res.ok){
         $("#loginError").textContent = res.error === "network"
-          ? "Impossible de joindre le serveur (vérifiez BACKEND_URL)."
+          ? "Impossible de joindre le serveur."
           : "Identifiant ou mot de passe incorrect.";
         return;
       }
@@ -417,14 +546,21 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
     $("#whoRole").textContent = state.role;
     document.body.classList.toggle("view-only", !canEdit());
     $("#adminTabBtn").hidden = state.role !== "admin";
-    if (state.pollTimer) clearTimeout(state.pollTimer);
-    schedulePoll(0);
+    refreshAll();
+    connectLive();
+    schedulePoll(POLL_MS);
   }
 
-  // Waits for each getAll to finish before scheduling the next one, instead
-  // of a fixed setInterval — Apps Script response times vary a lot (from
-  // under a second to 30+ seconds), and a fixed interval would pile up
-  // overlapping requests when a call runs long.
+  // Server pushes a "changed" event over SSE the instant any client writes,
+  // so every open tab updates within milliseconds. The slow poll below is
+  // just a safety net in case the SSE connection drops.
+  function connectLive(){
+    if (state.eventSource) state.eventSource.close();
+    var es = new EventSource("/api/events?token=" + encodeURIComponent(state.token));
+    es.onmessage = function(){ refreshAll(); };
+    es.onerror = function(){ /* browser auto-reconnects EventSource on its own */ };
+    state.eventSource = es;
+  }
   function schedulePoll(delay){
     if (state.pollTimer) clearTimeout(state.pollTimer);
     state.pollTimer = setTimeout(function(){
@@ -443,7 +579,8 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
       state.dossiers = res.dossiers || [];
       state.assignments = res.assignments || [];
       renderEffectifs(); renderVehicles(); renderCalendar(); renderDayPanel(); renderAvailability(); renderQuickView();
-      if (state.role === "admin") renderUsers();
+      if (state.activeTab === "dashboard") renderDashboard();
+      if (state.role === "admin") { renderUsers(); renderBackups(); }
     });
   }
 
@@ -454,7 +591,9 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
     $("#view-planning").hidden = tab !== "planning";
     $("#view-effectifs").hidden = tab !== "effectifs";
     $("#view-vehicules").hidden = tab !== "vehicules";
+    $("#view-dashboard").hidden = tab !== "dashboard";
     $("#view-admin").hidden = tab !== "admin";
+    if (tab === "dashboard") renderDashboard();
   }
   $all(".tab-btn").forEach(function(b){ b.addEventListener("click", function(){ setTab(b.dataset.tab); }); });
 
@@ -589,7 +728,7 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
     var d = parseDate(state.selectedDate);
     var dow = ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d.getDay()];
     $("#dayTitle").textContent = dow + " " + d.getDate() + " " + MONTHS_FR[d.getMonth()] + " " + d.getFullYear();
-    var dossiersToday = activeDossiersOn(state.selectedDate);
+    var dossiersToday = activeDossiersOn(state.selectedDate).sort(function(a,b){ return (a.displayOrder||0)-(b.displayOrder||0); });
     var conflicts = computeConflicts(state.selectedDate);
     var banner = $("#conflictBanner"); banner.innerHTML = "";
     if (conflicts.employees.length || conflicts.vehicles.length){
@@ -601,13 +740,50 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
       host.appendChild(el("div", {class:"empty-note", text:"Aucun dossier ce jour-là." + (canEdit() ? " Cliquez sur « + Nouveau dossier » pour en créer un." : "")}));
       return;
     }
-    dossiersToday.forEach(function(dossier){ host.appendChild(renderDossierCard(dossier, conflicts)); });
+    dossiersToday.forEach(function(dossier){ host.appendChild(renderDossierCard(dossier, conflicts, state.selectedDate)); });
+    renderNextDayPanel();
   }
 
-  function renderDossierCard(dossier, conflicts){
+  function addDays(dateStr, n){
+    var d = parseDate(dateStr);
+    d.setDate(d.getDate() + n);
+    return fmtDate(d);
+  }
+  function renderNextDayPanel(){
+    var nextDateStr = addDays(state.selectedDate, 1);
+    var d = parseDate(nextDateStr);
+    var dow = ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d.getDay()];
+    $("#nextDayTitle").textContent = "Jour suivant — " + dow + " " + d.getDate() + " " + MONTHS_FR[d.getMonth()] + " " + d.getFullYear();
+    $("#nextDayToggleIcon").textContent = state.nextDayCollapsed ? "▸" : "▾";
+    var listHost = $("#nextDayList");
+    var bannerHost = $("#nextDayConflictBanner");
+    if (state.nextDayCollapsed){ listHost.hidden = true; bannerHost.hidden = true; return; }
+    listHost.hidden = false; bannerHost.hidden = false;
+    var dossiersNext = activeDossiersOn(nextDateStr).sort(function(a,b){ return (a.displayOrder||0)-(b.displayOrder||0); });
+    var conflictsNext = computeConflicts(nextDateStr);
+    bannerHost.innerHTML = "";
+    if (conflictsNext.employees.length || conflictsNext.vehicles.length){
+      var names = conflictsNext.employees.map(empName).concat(conflictsNext.vehicles.map(vehName));
+      bannerHost.appendChild(el("div", {class:"conflict-banner", text:"⚠ Double réservation ce jour-là : " + names.join(", ")}));
+    }
+    listHost.innerHTML = "";
+    if (!dossiersNext.length){
+      listHost.appendChild(el("div", {class:"empty-note", text:"Aucun dossier ce jour-là."}));
+      return;
+    }
+    dossiersNext.forEach(function(dossier){ listHost.appendChild(renderDossierCard(dossier, conflictsNext, nextDateStr)); });
+  }
+  var nextDayToggleBtn = $("#nextDayToggle");
+  if (nextDayToggleBtn) nextDayToggleBtn.addEventListener("click", function(){
+    state.nextDayCollapsed = !state.nextDayCollapsed;
+    renderNextDayPanel();
+  });
+
+  function renderDossierCard(dossier, conflicts, dateStr){
     var card = el("div", {class:"dossier-card"});
+    if (canEdit()){ card.draggable = true; card.dataset.id = dossier.id; card.classList.add("draggable-row"); }
     var totalDays = dayCount(dossier.startDate, dossier.endDate);
-    var idx = dayIndex(dossier.startDate, state.selectedDate);
+    var idx = dayIndex(dossier.startDate, dateStr);
 
     var head = el("div", {class:"dossier-head"});
     var nameInput = el("input", {class:"client-name", value: dossier.client || "", placeholder:"Nom du client…"});
@@ -636,11 +812,28 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
     range.appendChild(endInput);
     card.appendChild(range);
 
-    function infoField(labelText, key, placeholder, narrow){
-      var field = el("div", {class:"info-field" + (narrow?" narrow":"")});
+    function infoField(labelText, key, placeholder, narrow, wide){
+      var field = el("div", {class:"info-field" + (narrow?" narrow":"") + (wide?" wide":"")});
       field.appendChild(el("label", {text:labelText}));
       var input = el("input", {value: dossier[key]||"", placeholder: placeholder||""});
       input.disabled = !canEdit();
+      input.addEventListener("change", function(){ var patch={}; patch[key]=input.value.trim(); saveDossierMeta(dossier, patch); });
+      field.appendChild(input);
+      return field;
+    }
+    function addressField(labelText, key){
+      var field = el("div", {class:"info-field address-field"});
+      field.appendChild(el("label", {text:labelText}));
+      var input = el("textarea", {value: dossier[key]||"", rows:"2", placeholder:"Rue, ville…"});
+      input.disabled = !canEdit();
+      function applyColor(){
+        var v = (input.value||"").trim().toLowerCase();
+        input.classList.remove("addr-gm", "addr-transit");
+        if (v === "gm") input.classList.add("addr-gm");
+        else if (v.indexOf("transit depot") !== -1) input.classList.add("addr-transit");
+      }
+      applyColor();
+      input.addEventListener("input", applyColor);
       input.addEventListener("change", function(){ var patch={}; patch[key]=input.value.trim(); saveDossierMeta(dossier, patch); });
       field.appendChild(input);
       return field;
@@ -664,9 +857,12 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
       return field;
     }
 
+    var addressStack = el("div", {class:"address-stack"});
+    addressStack.appendChild(addressField("Adresse de départ", "addressFrom"));
+    addressStack.appendChild(addressField("Adresse d'arrivée", "addressTo"));
+    card.appendChild(addressStack);
+
     var infoGrid = el("div", {class:"info-grid"});
-    infoGrid.appendChild(infoField("Adresse de départ", "addressFrom", "Rue, ville…"));
-    infoGrid.appendChild(infoField("Adresse d'arrivée", "addressTo", "Rue, ville…"));
     infoGrid.appendChild(infoField("Volume", "volume", "m³", true));
     infoGrid.appendChild(infoField("Vendeur", "seller", "Initiales", true));
     infoGrid.appendChild(infoField("Coordinatrice", "coordinator", "Initiales", true));
@@ -675,7 +871,7 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
     card.appendChild(infoGrid);
     card.appendChild(infoField("Tâche à réaliser", "task", "Ex. chargement, livraison, garde-meuble…"));
 
-    var assignment = assignmentFor(dossier.id, state.selectedDate);
+    var assignment = assignmentFor(dossier.id, dateStr);
 
     var dayFields = el("div", {class:"day-fields"});
     dayFields.appendChild(selectField("Créneau", "slot", DAY_SLOTS, "slot-", assignment,
@@ -688,6 +884,19 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
     timeField.appendChild(timeInput);
     dayFields.appendChild(timeField);
     card.appendChild(dayFields);
+
+    if (totalDays > 1 && canEdit()){
+      var copyRow = el("label", {class:"copy-all-days"});
+      var copyChk = el("input", {type:"checkbox"});
+      copyChk.checked = !!dossier.sameResourcesAllDays;
+      copyChk.addEventListener("change", function(){
+        saveDossierMeta(dossier, {sameResourcesAllDays: copyChk.checked});
+        if (copyChk.checked) copyAssignmentToAllDays(dossier, assignment, totalDays);
+      });
+      copyRow.appendChild(copyChk);
+      copyRow.appendChild(document.createTextNode("Même équipe et véhicules tous les jours (copie sur les " + totalDays + " jours)"));
+      card.appendChild(copyRow);
+    }
 
     card.appendChild(el("div", {class:"section-label", text: totalDays>1 ? "Effectif de ce jour" : "Effectif"}));
     var empChips = el("div", {class:"chips"});
@@ -708,7 +917,7 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
     var vehChips = el("div", {class:"chips"});
     (assignment.vehicleIds||[]).forEach(function(vid){
       var isConflict = conflicts.vehicles.indexOf(vid) !== -1;
-      var chip = el("span", {class:"chip"+(isConflict?" conflict":"")});
+      var chip = el("span", {class:"chip"+(isConflict?" conflict":"")+(isVehPL(vid)?" chip-pl":"")});
       chip.appendChild(el("span", {text: vehName(vid)}));
       chip.appendChild(el("button", {class:"edit-only", text:"✕", onclick: function(){
         var updated = (assignment.vehicleIds||[]).filter(function(x){ return x !== vid; });
@@ -793,6 +1002,27 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
       refreshAll();
     });
   }
+  function copyAssignmentToAllDays(dossier, assignment, totalDays){
+    if (!canEdit()) return;
+    var start = parseDate(dossier.startDate);
+    var promises = [];
+    for (var i=0; i<totalDays; i++){
+      var d = new Date(start); d.setDate(start.getDate()+i);
+      var ds = fmtDate(d);
+      if (ds === assignment.date) continue;
+      var item = {
+        id: dossier.id+"_"+ds, dossierId: dossier.id, date: ds,
+        employees: assignment.employees||[], vehicleIds: assignment.vehicleIds||[],
+        arrivalTime: assignment.arrivalTime||"", slot: assignment.slot||""
+      };
+      promises.push(api("saveAssignment", {item:item}));
+    }
+    Promise.all(promises).then(function(results){
+      var allOk = results.every(function(r){ return r.ok; });
+      toast(allOk ? "Équipe et véhicules copiés sur les " + totalDays + " jours" : "Certaines copies ont échoué");
+      refreshAll();
+    });
+  }
   function saveAssignment(assignment, patch){
     if (!canEdit()) return;
     var merged = Object.assign({}, assignment, patch);
@@ -812,7 +1042,7 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
     if (!canEdit()) return;
     api("saveDossier", {item:{
       id: uid("dos"), client:"Nouveau client", startDate: state.selectedDate, endDate: state.selectedDate,
-      addressFrom:"", addressTo:"", volume:"", seller:"", coordinator:"", task:"", moveType:""
+      addressFrom:"", addressTo:"", volume:"", seller:"", coordinator:"", task:"", moveType:"", displayOrder: Date.now()
     }}).then(function(res){
       if (!res.ok) return toast("Création impossible");
       toast("Dossier créé"); refreshAll();
@@ -835,12 +1065,21 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
     thead.appendChild(headRow); table.appendChild(thead);
     var tbody = el("tbody");
     function swatchColor(load){ if (!load) return "var(--dispo-idle)"; if (load>1) return "var(--dispo-conflict)"; return "var(--dispo-free)"; }
-    function addSection(label, items, loadKey){
+    function addSection(label, items, loadKey, sectionId){
       if (!items.length) return;
-      tbody.appendChild(el("tr", {class:"dispo-sep"}, [el("td", {colspan:String(nDays+1), text:label+" · "+items.length})]));
+      var collapsed = !!state.collapsedCompanies[sectionId];
+      var sepTd = el("td", {colspan:String(nDays+1)});
+      var toggleBtn = el("button", {class:"dispo-toggle", text: (collapsed?"▸ ":"▾ ")+label+" · "+items.length});
+      toggleBtn.addEventListener("click", function(){
+        state.collapsedCompanies[sectionId] = !state.collapsedCompanies[sectionId];
+        renderAvailability();
+      });
+      sepTd.appendChild(toggleBtn);
+      tbody.appendChild(el("tr", {class:"dispo-sep"}, [sepTd]));
+      if (collapsed) return;
       items.forEach(function(item){
         var row = el("tr");
-        row.appendChild(el("td", {class:"dispo-name-col", text:item.name}));
+        row.appendChild(el("td", {class:"dispo-name-col" + (item.type==="PL"?" dispo-pl":""), text:item.name}));
         for (var dd=1; dd<=nDays; dd++){
           var dateStr = fmtDate(new Date(year,month,dd));
           var dow2 = new Date(year,month,dd).getDay(); var isWeekend2 = dow2===0||dow2===6;
@@ -856,12 +1095,230 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
     }
     COMPANIES.forEach(function(co){
       var emps = state.employees.filter(function(e){ return e.company===co.id && e.active!==false; }).sort(function(a,b){ return (a.order||0)-(b.order||0); });
-      addSection(co.name, emps, "emp");
+      addSection(co.name, emps, "emp", "co-"+co.id);
     });
     var vehs = state.vehicles.filter(function(v){ return v.active!==false; }).sort(function(a,b){ return (a.order||0)-(b.order||0); });
-    addSection("Véhicules", vehs, "veh");
+    addSection("Véhicules", vehs, "veh", "vehicles");
     table.appendChild(tbody);
     host.innerHTML = ""; host.appendChild(table);
+  }
+
+  // ---------- dashboard ----------
+  function monthBounds(y, m){
+    return { start: fmtDate(new Date(y, m, 1)), end: fmtDate(new Date(y, m+1, 0)) };
+  }
+  function dossierCountsByMonth(year, type){
+    var arr = new Array(12).fill(0);
+    for (var m=0; m<12; m++){
+      var b = monthBounds(year, m);
+      arr[m] = state.dossiers.filter(function(d){
+        return d.startDate <= b.end && d.endDate >= b.start && (!type || d.moveType === type);
+      }).length;
+    }
+    return arr;
+  }
+  function empDaysByMonth(year, company){
+    var arr = new Array(12).fill(0);
+    var empCompanyMap = {}; state.employees.forEach(function(e){ empCompanyMap[e.id] = e.company; });
+    state.assignments.forEach(function(a){
+      if (!a.date || a.date.slice(0,4) !== String(year)) return;
+      var m = parseInt(a.date.slice(5,7), 10) - 1;
+      if (m < 0 || m > 11) return;
+      (a.employees||[]).forEach(function(x){
+        if (company && empCompanyMap[x.employeeId] !== company) return;
+        arr[m] += 1;
+      });
+    });
+    return arr;
+  }
+  function vehDaysByMonth(year, type){
+    var arr = new Array(12).fill(0);
+    var vehTypeMap = {}; state.vehicles.forEach(function(v){ vehTypeMap[v.id] = v.type; });
+    state.assignments.forEach(function(a){
+      if (!a.date || a.date.slice(0,4) !== String(year)) return;
+      var m = parseInt(a.date.slice(5,7), 10) - 1;
+      if (m < 0 || m > 11) return;
+      (a.vehicleIds||[]).forEach(function(vid){
+        if (type && vehTypeMap[vid] !== type) return;
+        arr[m] += 1;
+      });
+    });
+    return arr;
+  }
+  function computeDashboardData(dossierType, empCompany, vehType){
+    var thisYear = new Date().getFullYear();
+    var lastYear = thisYear - 1;
+    return {
+      thisYear: thisYear, lastYear: lastYear,
+      dossiersThis: dossierCountsByMonth(thisYear, dossierType),
+      dossiersLast: dossierCountsByMonth(lastYear, dossierType),
+      resThisEmp: empDaysByMonth(thisYear, empCompany),
+      resLastEmp: empDaysByMonth(lastYear, empCompany),
+      resThisVeh: vehDaysByMonth(thisYear, vehType),
+      resLastVeh: vehDaysByMonth(lastYear, vehType)
+    };
+  }
+  function todayStats(){
+    var dateStr = state.selectedDate;
+    var loads = loadsForDate(dateStr);
+    return {
+      dateStr: dateStr,
+      dossiers: activeDossiersOn(dateStr).length,
+      employees: Object.keys(loads.empLoad).length,
+      vehicles: Object.keys(loads.vehUse).length
+    };
+  }
+  var MONTHS_SHORT_FR = ["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
+  function getWeekDates(dateStr){
+    var d = parseDate(dateStr);
+    var dow = d.getDay(); // 0=Sun..6=Sat
+    var mondayOffset = dow === 0 ? -6 : 1 - dow;
+    var monday = new Date(d); monday.setDate(d.getDate() + mondayOffset);
+    var out = [];
+    for (var i=0; i<7; i++){
+      var day = new Date(monday); day.setDate(monday.getDate() + i);
+      out.push(fmtDate(day));
+    }
+    return out;
+  }
+  function dossierCountOn(dateStr, moveType){
+    return activeDossiersOn(dateStr).filter(function(d){ return !moveType || d.moveType === moveType; }).length;
+  }
+  function empCountOn(dateStr, empCompanyMap, company){
+    var set = {};
+    activeDossiersOn(dateStr).forEach(function(d){
+      var a = assignmentFor(d.id, dateStr);
+      (a.employees||[]).forEach(function(x){ if (!company || empCompanyMap[x.employeeId]===company) set[x.employeeId]=1; });
+    });
+    return Object.keys(set).length;
+  }
+  function vehCountOn(dateStr, vehTypeMap, type){
+    var set = {};
+    activeDossiersOn(dateStr).forEach(function(d){
+      var a = assignmentFor(d.id, dateStr);
+      (a.vehicleIds||[]).forEach(function(vid){ if (!type || vehTypeMap[vid]===type) set[vid]=1; });
+    });
+    return Object.keys(set).length;
+  }
+  function renderWeekTable(){
+    var host = $("#dashWeekTable");
+    var weekDates = getWeekDates(state.selectedDate);
+    var todayStr = state.selectedDate;
+    var empCompanyMap = {}; state.employees.forEach(function(e){ empCompanyMap[e.id] = e.company; });
+    var vehTypeMap = {}; state.vehicles.forEach(function(v){ vehTypeMap[v.id] = v.type; });
+    var table = el("table", {class:"week-table"});
+    var thead = el("thead"); var headRow = el("tr");
+    headRow.appendChild(el("th", {text:""}));
+    weekDates.forEach(function(ds){
+      var d = parseDate(ds);
+      var th = el("th", {class: ds===todayStr ? "week-today" : ""});
+      th.appendChild(document.createTextNode(DOW_FR[d.getDay()===0?6:d.getDay()-1]));
+      th.appendChild(el("div", {class:"week-daynum", text:String(d.getDate())+" "+MONTHS_SHORT_FR[d.getMonth()]}));
+      headRow.appendChild(th);
+    });
+    thead.appendChild(headRow); table.appendChild(thead);
+    var tbody = el("tbody");
+    var groups = [{label:"Chantiers", fn:function(ds){ return dossierCountOn(ds); }, sub:false}];
+    MOVE_TYPES.forEach(function(t){ groups.push({label:"— "+t, fn:function(ds){ return dossierCountOn(ds, t); }, sub:true}); });
+    groups.push({label:"Effectif mobilisé", fn:function(ds){ return empCountOn(ds, empCompanyMap); }, sub:false});
+    COMPANIES.forEach(function(co){ groups.push({label:"— "+co.name, fn:function(ds){ return empCountOn(ds, empCompanyMap, co.id); }, sub:true}); });
+    groups.push({label:"Véhicules mobilisés", fn:function(ds){ return vehCountOn(ds, vehTypeMap); }, sub:false});
+    VEHICLE_TYPES.forEach(function(t){ groups.push({label:"— "+t, fn:function(ds){ return vehCountOn(ds, vehTypeMap, t); }, sub:true}); });
+    groups.forEach(function(r){
+      var row = el("tr", {class: r.sub ? "week-sub" : ""});
+      row.appendChild(el("td", {class:"week-metric-label", text:r.label}));
+      weekDates.forEach(function(ds){
+        var td = el("td", {class: ds===todayStr ? "week-today" : "", text:String(r.fn(ds))});
+        if (!r.sub){
+          td.style.cursor = "pointer";
+          td.addEventListener("click", function(ds){ return function(){ state.selectedDate = ds; setTab("planning"); renderCalendar(); renderDayPanel(); renderQuickView(); }; }(ds));
+        }
+        row.appendChild(td);
+      });
+      tbody.appendChild(row);
+    });
+    table.appendChild(tbody);
+    host.innerHTML = ""; host.appendChild(table);
+  }
+  function renderGroupedBarChart(hostId, labels, seriesA, seriesB){
+    var host = $("#"+hostId);
+    var w = 780, h = 200, padL = 30, padB = 22, padT = 10, padR = 6;
+    var innerW = w - padL - padR, innerH = h - padT - padB;
+    var maxVal = Math.max(1, Math.max.apply(null, seriesA.values.concat(seriesB.values)));
+    var n = labels.length, groupW = innerW / n;
+    var barW = Math.max(4, Math.min(16, groupW/2 - 4));
+    var svgns = "http://www.w3.org/2000/svg";
+    function sv(tag, attrs){
+      var e = document.createElementNS(svgns, tag);
+      Object.keys(attrs||{}).forEach(function(k){ e.setAttribute(k, attrs[k]); });
+      return e;
+    }
+    var svg = sv("svg", {viewBox:"0 0 "+w+" "+h, width:"100%", height:h});
+    var steps = 4;
+    for (var s=0; s<=steps; s++){
+      var y = padT + innerH - (innerH*s/steps);
+      svg.appendChild(sv("line", {x1:padL, x2:w-padR, y1:y, y2:y, stroke:"var(--border)", "stroke-width":1}));
+      var t = sv("text", {x:padL-6, y:y+3, "text-anchor":"end", "font-size":9, fill:"var(--fg-muted)"});
+      t.textContent = Math.round(maxVal*s/steps);
+      svg.appendChild(t);
+    }
+    labels.forEach(function(label, i){
+      var gx = padL + i*groupW;
+      var va = seriesA.values[i]||0, vb = seriesB.values[i]||0;
+      var ha = innerH * va / maxVal, hb = innerH * vb / maxVal;
+      var xa = gx + groupW/2 - barW - 2, xb = gx + groupW/2 + 2;
+      svg.appendChild(sv("rect", {x:xa, y:padT+innerH-ha, width:barW, height:Math.max(0,ha), fill:seriesA.color, rx:2}));
+      svg.appendChild(sv("rect", {x:xb, y:padT+innerH-hb, width:barW, height:Math.max(0,hb), fill:seriesB.color, rx:2}));
+      var lt = sv("text", {x:gx+groupW/2, y:h-6, "text-anchor":"middle", "font-size":9, fill:"var(--fg-muted)"});
+      lt.textContent = label;
+      svg.appendChild(lt);
+    });
+    host.innerHTML = "";
+    host.appendChild(svg);
+    var legend = el("div", {class:"chart-legend"});
+    legend.appendChild(el("span", {}, [el("i",{style:"background:"+seriesA.color}), document.createTextNode(seriesA.name)]));
+    legend.appendChild(el("span", {}, [el("i",{style:"background:"+seriesB.color}), document.createTextNode(seriesB.name)]));
+    host.appendChild(legend);
+  }
+  var dashFilters = {dossiers:"", employees:"", vehicles:""};
+  function dossierFilterOptions(){
+    return [{id:"", label:"Tous"}].concat(MOVE_TYPES.map(function(t){ return {id:t, label:t}; }));
+  }
+  function companyFilterOptions(){
+    return [{id:"", label:"Toutes"}].concat(COMPANIES.map(function(co){ return {id:co.id, label:co.name}; }));
+  }
+  function vehicleFilterOptions(){
+    return [{id:"", label:"Tous"}].concat(VEHICLE_TYPES.map(function(t){ return {id:t, label:t}; }));
+  }
+  function renderTypeFilter(hostId, filterKey, options){
+    var host = $("#"+hostId); host.innerHTML = "";
+    options.forEach(function(opt){
+      var btn = el("button", {class: dashFilters[filterKey]===opt.id ? "active" : "", text:opt.label});
+      btn.addEventListener("click", function(){ dashFilters[filterKey] = opt.id; renderDashboard(); });
+      host.appendChild(btn);
+    });
+  }
+  function renderDashboard(){
+    var d = computeDashboardData(dashFilters.dossiers, dashFilters.employees, dashFilters.vehicles);
+    var t = todayStats();
+    $("#dashDate").textContent = t.dateStr;
+    $("#dashDossiers").textContent = t.dossiers;
+    $("#dashEmployees").textContent = t.employees;
+    $("#dashVehicles").textContent = t.vehicles;
+    renderWeekTable();
+    $("#dashYearLabels").textContent = "Cette année (" + d.thisYear + ") comparée à l'année précédente (" + d.lastYear + ")";
+    renderTypeFilter("filterDossiers", "dossiers", dossierFilterOptions());
+    renderTypeFilter("filterEmployees", "employees", companyFilterOptions());
+    renderTypeFilter("filterVehicles", "vehicles", vehicleFilterOptions());
+    renderGroupedBarChart("dashChartDossiers", MONTHS_SHORT_FR,
+      {name:String(d.thisYear), values:d.dossiersThis, color:"var(--accent)"},
+      {name:String(d.lastYear), values:d.dossiersLast, color:"var(--fg-muted)"});
+    renderGroupedBarChart("dashChartEmployees", MONTHS_SHORT_FR,
+      {name:String(d.thisYear), values:d.resThisEmp, color:"var(--accent)"},
+      {name:String(d.lastYear), values:d.resLastEmp, color:"var(--fg-muted)"});
+    renderGroupedBarChart("dashChartVehicles", MONTHS_SHORT_FR,
+      {name:String(d.thisYear), values:d.resThisVeh, color:"var(--accent)"},
+      {name:String(d.lastYear), values:d.resLastVeh, color:"var(--fg-muted)"});
   }
 
   // ---------- Effectifs ----------
@@ -875,6 +1332,7 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
       if (!emps.length) list.appendChild(el("li", {class:"empty-note", text:"Aucun employé pour l'instant."}));
       emps.forEach(function(e){
         var row = el("li", {class:"emp-row"+(e.active===false?" inactive":"")});
+        if (canEdit()){ row.draggable = true; row.dataset.id = e.id; row.classList.add("draggable-row"); }
         row.appendChild(el("span", {class:"emp-name", text:e.name}));
         row.appendChild(el("button", {class:"icon-btn edit-only", title: e.active===false?"Réactiver":"Mettre en pause",
           onclick: function(){ toggleEmployeeActive(e); }}, [document.createTextNode(e.active===false?"↺":"⏸")]));
@@ -923,7 +1381,18 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
     if (!sorted.length) list.appendChild(el("li", {class:"empty-note", text:"Aucun véhicule pour l'instant."}));
     sorted.forEach(function(v){
       var row = el("li", {class:"emp-row"+(v.active===false?" inactive":"")});
+      if (canEdit()){ row.draggable = true; row.dataset.id = v.id; row.classList.add("draggable-row"); }
       row.appendChild(el("span", {class:"emp-name", text:v.name}));
+      var typeSel = el("select", {class:"veh-type-select edit-only"});
+      typeSel.disabled = !canEdit();
+      typeSel.appendChild(el("option", {value:"", text:"Type…"}));
+      VEHICLE_TYPES.forEach(function(t){
+        var opt = el("option", {value:t, text:t});
+        if (t === v.type) opt.setAttribute("selected","selected");
+        typeSel.appendChild(opt);
+      });
+      typeSel.addEventListener("change", function(){ setVehicleType(v, typeSel.value); });
+      row.appendChild(typeSel);
       row.appendChild(el("button", {class:"icon-btn edit-only", title: v.active===false?"Réactiver":"Mettre hors service",
         onclick: function(){ toggleVehicleActive(v); }}, [document.createTextNode(v.active===false?"↺":"⏸")]));
       row.appendChild(el("button", {class:"icon-btn edit-only", title:"Supprimer",
@@ -944,6 +1413,12 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
     api("saveVehicle", {item:{id:uid("veh"), name:name, active:true, order:Date.now()}})
       .then(function(res){ if (!res.ok) return toast("Ajout impossible"); toast("Véhicule ajouté"); refreshAll(); });
   }
+  function setVehicleType(v, type){
+    if (!canEdit()) return;
+    api("saveVehicle", {item: Object.assign({}, v, {type: type})}).then(function(res){
+      if (!res.ok) return toast("Action impossible"); refreshAll();
+    });
+  }
   function toggleVehicleActive(v){
     if (!canEdit()) return;
     api("saveVehicle", {item: Object.assign({}, v, {active: v.active===false})}).then(function(res){
@@ -963,6 +1438,8 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
       res.users.forEach(function(u){
         var row = el("li", {class:"emp-row"});
         row.appendChild(el("span", {class:"emp-name", text: u.username + "  ·  " + u.role}));
+        row.appendChild(el("button", {class:"icon-btn", title:"Réinitialiser le mot de passe",
+          onclick: function(){ resetUserPassword(u.username); }}, [document.createTextNode("🔑")]));
         if (u.username !== state.username){
           row.appendChild(el("button", {class:"icon-btn", title:"Supprimer",
             onclick: function(ev){ armThenDelete(ev.target, function(){ deleteUser(u.username); }); }}, [document.createTextNode("✕")]));
@@ -982,6 +1459,15 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
       toast("Compte créé"); renderUsers();
     });
   });
+  function resetUserPassword(username){
+    var password = prompt("Nouveau mot de passe pour " + username + " :");
+    if (!password) return;
+    if (password.length < 4) return toast("4 caractères minimum");
+    api("resetPassword", {username:username, password:password}).then(function(res){
+      if (!res.ok) return toast("Réinitialisation impossible");
+      toast("Mot de passe de " + username + " mis à jour");
+    });
+  }
   function deleteUser(username){
     api("deleteUser", {username:username}).then(function(res){
       if (!res.ok) return toast("Suppression impossible");
@@ -989,9 +1475,140 @@ var BACKEND_URL = "https://script.google.com/macros/s/AKfycbybTCyq5AybM4n9wHuNt_
     });
   }
 
+  // ---------- backups ----------
+  function fmtBytes(n){
+    if (n < 1024) return n + " o";
+    if (n < 1024*1024) return (n/1024).toFixed(0) + " Ko";
+    return (n/(1024*1024)).toFixed(1) + " Mo";
+  }
+  function fmtBackupDate(ms){
+    var d = new Date(ms);
+    return String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+d.getFullYear()+" "+
+      String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+  }
+  function renderBackups(){
+    api("listBackups", {}).then(function(res){
+      if (!res.ok) return;
+      var host = $("#backupList"); host.innerHTML = "";
+      if (!res.files.length) { host.appendChild(el("li", {class:"empty-note", text:"Aucune sauvegarde pour l'instant."})); return; }
+      res.files.forEach(function(f){
+        var row = el("li", {class:"emp-row"});
+        row.appendChild(el("span", {class:"emp-name", text: fmtBackupDate(f.mtime) + "  ·  " + fmtBytes(f.size)}));
+        var dl = el("a", {class:"icon-btn", title:"Télécharger", href:"/api/backups/"+encodeURIComponent(f.name)+"/download?token="+encodeURIComponent(state.token)});
+        dl.appendChild(document.createTextNode("⬇"));
+        row.appendChild(dl);
+        host.appendChild(row);
+      });
+    });
+  }
+  var runBackupBtn = $("#runBackupBtn");
+  if (runBackupBtn) runBackupBtn.addEventListener("click", function(){
+    runBackupBtn.disabled = true;
+    api("runBackup", {}).then(function(res){
+      runBackupBtn.disabled = false;
+      if (!res.ok) return toast("Sauvegarde impossible");
+      toast("Sauvegarde créée"); renderBackups();
+    });
+  });
+  var restoreBtn = $("#restoreBtn");
+  if (restoreBtn) restoreBtn.addEventListener("click", function(){
+    var input = $("#restoreFileInput");
+    var file = input.files && input.files[0];
+    if (!file) return toast("Choisissez d'abord un fichier .db");
+    if (!confirm("Restaurer remplacera TOUTES les données actuelles par celles du fichier \""+file.name+"\". Continuer ?")) return;
+    restoreBtn.disabled = true;
+    fetch("/api/backups/restore", {
+      method: "POST",
+      headers: {"X-Auth-Token": state.token, "Content-Type": "application/octet-stream"},
+      body: file
+    }).then(function(r){ return r.json(); }).then(function(res){
+      restoreBtn.disabled = false;
+      if (!res.ok) return toast("Restauration impossible (fichier invalide ?)");
+      toast("Restauration en cours, rechargement dans 5s…");
+      setTimeout(function(){ location.reload(); }, 5000);
+    }).catch(function(){ restoreBtn.disabled = false; toast("Erreur réseau"); });
+  });
+
+  // ---------- drag & drop reordering ----------
+  var NO_DRAG_TAGS = ["INPUT", "SELECT", "TEXTAREA", "BUTTON", "A"];
+  function getDragAfterElement(list, itemSelector, pos, horizontal){
+    var items = [].slice.call(list.querySelectorAll(itemSelector)).filter(function(el){ return !el.classList.contains("dragging"); });
+    var closest = {offset: -Infinity, element: null};
+    items.forEach(function(child){
+      var box = child.getBoundingClientRect();
+      var center = horizontal ? (box.left + box.width/2) : (box.top + box.height/2);
+      var offset = pos - center;
+      if (offset < 0 && offset > closest.offset) closest = {offset: offset, element: child};
+    });
+    return closest.element;
+  }
+  function enableDragReorder(delegateRoot, itemSelector, listSelector, getId, onDrop, horizontal){
+    var dragEl = null, dragList = null;
+    delegateRoot.addEventListener("dragstart", function(e){
+      if (NO_DRAG_TAGS.indexOf(e.target.tagName) !== -1){ e.preventDefault(); return; }
+      var item = e.target.closest(itemSelector);
+      if (!item){ e.preventDefault(); return; }
+      dragEl = item; dragList = item.closest(listSelector);
+      item.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+    });
+    delegateRoot.addEventListener("dragend", function(){
+      if (dragEl) dragEl.classList.remove("dragging");
+      dragEl = null; dragList = null;
+    });
+    delegateRoot.addEventListener("dragover", function(e){
+      if (!dragEl) return;
+      var list = e.target.closest(listSelector);
+      if (!list || list !== dragList) return;
+      e.preventDefault();
+      var pos = horizontal ? e.clientX : e.clientY;
+      var afterEl = getDragAfterElement(list, itemSelector, pos, horizontal);
+      if (afterEl == null) list.appendChild(dragEl);
+      else list.insertBefore(dragEl, afterEl);
+    });
+    delegateRoot.addEventListener("drop", function(e){
+      if (!dragEl || !dragList) return;
+      e.preventDefault();
+      var items = [].slice.call(dragList.querySelectorAll(itemSelector));
+      onDrop(items.map(getId));
+    });
+  }
+  function persistReorder(ids, byId, saveFn, orderKey){
+    ids.forEach(function(id, idx){
+      var item = byId[id];
+      if (!item) return;
+      if ((item[orderKey]||0) === idx) return;
+      var patch = {}; patch[orderKey] = idx;
+      saveFn(item, patch, idx);
+    });
+  }
+  function setupDragReordering(){
+    enableDragReorder($("#dossierList"), ".dossier-card", "#dossierList", function(c){ return c.dataset.id; }, function(ids){
+      var byId = {}; state.dossiers.forEach(function(d){ byId[d.id] = d; });
+      persistReorder(ids, byId, function(item, patch){ saveDossierMeta(item, patch); }, "displayOrder");
+    }, true);
+    enableDragReorder($("#nextDayList"), ".dossier-card", "#nextDayList", function(c){ return c.dataset.id; }, function(ids){
+      var byId = {}; state.dossiers.forEach(function(d){ byId[d.id] = d; });
+      persistReorder(ids, byId, function(item, patch){ saveDossierMeta(item, patch); }, "displayOrder");
+    }, true);
+    enableDragReorder($("#companyGrid"), ".emp-row", "ul.emp-list", function(r){ return r.dataset.id; }, function(ids){
+      var byId = {}; state.employees.forEach(function(e){ byId[e.id] = e; });
+      persistReorder(ids, byId, function(item, patch){
+        api("saveEmployee", {item: Object.assign({}, item, patch)}).then(function(res){ if (res.ok) refreshAll(); });
+      }, "order");
+    }, false);
+    enableDragReorder($("#vehicleGrid"), ".emp-row", "ul.emp-list", function(r){ return r.dataset.id; }, function(ids){
+      var byId = {}; state.vehicles.forEach(function(v){ byId[v.id] = v; });
+      persistReorder(ids, byId, function(item, patch){
+        api("saveVehicle", {item: Object.assign({}, item, patch)}).then(function(res){ if (res.ok) refreshAll(); });
+      }, "order");
+    }, false);
+  }
+
   // ---------- boot ----------
   function boot(){
     renderDow();
+    setupDragReordering();
     if (loadSession()) enterApp();
   }
   boot();

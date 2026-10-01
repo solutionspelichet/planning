@@ -1,0 +1,7 @@
+node_modules/
+data/
+SECRETS.md
+*.db
+*.db-wal
+*.db-shm
+.env

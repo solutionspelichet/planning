@@ -240,8 +240,8 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
 .print-title{font-size:17px;font-weight:800;margin:0 0 14px;color:#111}
 .print-empty{font-style:italic;color:#555}
 .print-page + .print-page{break-before:page}
-.print-grid{display:flex;flex-wrap:nowrap;gap:8px}
-.print-card{border:1px solid #999;border-radius:6px;padding:8px;break-inside:avoid;font-size:10.5px;color:#111;flex:1 1 0;min-width:0;overflow-wrap:break-word}
+.print-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.print-card{border:1px solid #999;border-radius:6px;padding:8px;break-inside:avoid;font-size:10.5px;color:#111;min-width:0;overflow-wrap:break-word}
 .print-card h3{font-size:13px;margin:0 0 6px}
 .print-row{margin-bottom:4px;line-height:1.3}
 .print-label{font-weight:700;text-transform:uppercase;font-size:9px;color:#555;margin-right:4px}
@@ -1129,7 +1129,7 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     card.appendChild(printField("Véhicules", (assignment.vehicleIds||[]).map(vehName).join(", ")));
     return card;
   }
-  var PRINT_PER_PAGE = 5;
+  var PRINT_PER_PAGE = 10; // 5 columns x 2 rows per page
   function printDayDossiers(){
     var d = parseDate(state.selectedDate);
     var dow = ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d.getDay()];

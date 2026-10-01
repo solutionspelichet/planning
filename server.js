@@ -102,6 +102,20 @@ db.exec(`
     arrivalTime TEXT DEFAULT '',
     slot TEXT DEFAULT ''
   );
+  CREATE TABLE IF NOT EXISTS absences (
+    id TEXT PRIMARY KEY,
+    employeeId TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    startDate TEXT NOT NULL,
+    endDate TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS vehicle_downtimes (
+    id TEXT PRIMARY KEY,
+    vehicleId TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    startDate TEXT NOT NULL,
+    endDate TEXT NOT NULL
+  );
 `);
 
 // ---------- migrations for columns added after initial release ----------
@@ -118,6 +132,12 @@ db.exec(`
   }
   if (!cols.includes('sameResourcesAllDays')) {
     db.exec("ALTER TABLE dossiers ADD COLUMN sameResourcesAllDays INTEGER NOT NULL DEFAULT 0");
+  }
+  if (!cols.includes('dossierNumber')) {
+    db.exec("ALTER TABLE dossiers ADD COLUMN dossierNumber TEXT NOT NULL DEFAULT ''");
+  }
+  if (!cols.includes('comment')) {
+    db.exec("ALTER TABLE dossiers ADD COLUMN comment TEXT NOT NULL DEFAULT ''");
   }
 })();
 
@@ -275,9 +295,9 @@ function rowToEmployee(r) { return { id: r.id, company: r.company, name: r.name,
 function rowToVehicle(r) { return { id: r.id, name: r.name, active: !!r.active, order: r.order, type: r.type || '' }; }
 function rowToDossier(r) {
   return {
-    id: r.id, client: r.client, startDate: r.startDate, endDate: r.endDate,
+    id: r.id, client: r.client, dossierNumber: r.dossierNumber || '', startDate: r.startDate, endDate: r.endDate,
     addressFrom: r.addressFrom, addressTo: r.addressTo, volume: r.volume,
-    seller: r.seller, coordinator: r.coordinator, task: r.task, moveType: r.moveType,
+    seller: r.seller, coordinator: r.coordinator, task: r.task, comment: r.comment || '', moveType: r.moveType,
     createdAt: r.createdAt, displayOrder: r.displayOrder || 0,
     sameResourcesAllDays: !!r.sameResourcesAllDays
   };
@@ -290,6 +310,8 @@ function rowToAssignment(r) {
     arrivalTime: r.arrivalTime, slot: r.slot
   };
 }
+function rowToAbsence(r) { return { id: r.id, employeeId: r.employeeId, reason: r.reason, startDate: r.startDate, endDate: r.endDate }; }
+function rowToVehicleDowntime(r) { return { id: r.id, vehicleId: r.vehicleId, reason: r.reason, startDate: r.startDate, endDate: r.endDate }; }
 
 app.get('/api/all', requireAuth, (req, res) => {
   res.json({
@@ -299,7 +321,9 @@ app.get('/api/all', requireAuth, (req, res) => {
     employees: db.prepare('SELECT * FROM employees').all().map(rowToEmployee),
     vehicles: db.prepare('SELECT * FROM vehicles').all().map(rowToVehicle),
     dossiers: db.prepare('SELECT * FROM dossiers').all().map(rowToDossier),
-    assignments: db.prepare('SELECT * FROM assignments').all().map(rowToAssignment)
+    assignments: db.prepare('SELECT * FROM assignments').all().map(rowToAssignment),
+    absences: db.prepare('SELECT * FROM absences').all().map(rowToAbsence),
+    vehicleDowntimes: db.prepare('SELECT * FROM vehicle_downtimes').all().map(rowToVehicleDowntime)
   });
 });
 
@@ -339,17 +363,17 @@ app.post('/api/dossiers', requireAuth, requireWrite, (req, res) => {
   const d = req.body.item || {};
   if (!d.id || !d.startDate || !d.endDate) return res.status(400).json({ ok: false, error: 'bad_request' });
   db.prepare(`
-    INSERT INTO dossiers (id, client, startDate, endDate, addressFrom, addressTo, volume, seller, coordinator, task, moveType, createdAt, displayOrder, sameResourcesAllDays)
-    VALUES (@id, @client, @startDate, @endDate, @addressFrom, @addressTo, @volume, @seller, @coordinator, @task, @moveType, @createdAt, @displayOrder, @sameResourcesAllDays)
+    INSERT INTO dossiers (id, client, dossierNumber, startDate, endDate, addressFrom, addressTo, volume, seller, coordinator, task, comment, moveType, createdAt, displayOrder, sameResourcesAllDays)
+    VALUES (@id, @client, @dossierNumber, @startDate, @endDate, @addressFrom, @addressTo, @volume, @seller, @coordinator, @task, @comment, @moveType, @createdAt, @displayOrder, @sameResourcesAllDays)
     ON CONFLICT(id) DO UPDATE SET
-      client=excluded.client, startDate=excluded.startDate, endDate=excluded.endDate,
+      client=excluded.client, dossierNumber=excluded.dossierNumber, startDate=excluded.startDate, endDate=excluded.endDate,
       addressFrom=excluded.addressFrom, addressTo=excluded.addressTo, volume=excluded.volume,
-      seller=excluded.seller, coordinator=excluded.coordinator, task=excluded.task, moveType=excluded.moveType,
+      seller=excluded.seller, coordinator=excluded.coordinator, task=excluded.task, comment=excluded.comment, moveType=excluded.moveType,
       displayOrder=excluded.displayOrder, sameResourcesAllDays=excluded.sameResourcesAllDays
   `).run({
-    id: d.id, client: d.client || '', startDate: d.startDate, endDate: d.endDate,
+    id: d.id, client: d.client || '', dossierNumber: d.dossierNumber || '', startDate: d.startDate, endDate: d.endDate,
     addressFrom: d.addressFrom || '', addressTo: d.addressTo || '', volume: d.volume || '',
-    seller: d.seller || '', coordinator: d.coordinator || '', task: d.task || '', moveType: d.moveType || '',
+    seller: d.seller || '', coordinator: d.coordinator || '', task: d.task || '', comment: d.comment || '', moveType: d.moveType || '',
     createdAt: d.createdAt || Date.now(), displayOrder: d.displayOrder || 0,
     sameResourcesAllDays: d.sameResourcesAllDays ? 1 : 0
   });
@@ -381,6 +405,38 @@ app.post('/api/assignments', requireAuth, requireWrite, (req, res) => {
     vehicleIdsJson: JSON.stringify(a.vehicleIds || []),
     arrivalTime: a.arrivalTime || '', slot: a.slot || ''
   });
+  broadcast();
+  res.json({ ok: true });
+});
+
+app.post('/api/absences', requireAuth, requireWrite, (req, res) => {
+  const a = req.body.item || {};
+  if (!a.id || !a.employeeId || !a.reason || !a.startDate || !a.endDate) return res.status(400).json({ ok: false, error: 'bad_request' });
+  db.prepare(`
+    INSERT INTO absences (id, employeeId, reason, startDate, endDate) VALUES (@id, @employeeId, @reason, @startDate, @endDate)
+    ON CONFLICT(id) DO UPDATE SET employeeId=excluded.employeeId, reason=excluded.reason, startDate=excluded.startDate, endDate=excluded.endDate
+  `).run({ id: a.id, employeeId: a.employeeId, reason: a.reason, startDate: a.startDate, endDate: a.endDate });
+  broadcast();
+  res.json({ ok: true });
+});
+app.delete('/api/absences/:id', requireAuth, requireWrite, (req, res) => {
+  db.prepare('DELETE FROM absences WHERE id = ?').run(req.params.id);
+  broadcast();
+  res.json({ ok: true });
+});
+
+app.post('/api/vehicle-downtimes', requireAuth, requireWrite, (req, res) => {
+  const v = req.body.item || {};
+  if (!v.id || !v.vehicleId || !v.reason || !v.startDate || !v.endDate) return res.status(400).json({ ok: false, error: 'bad_request' });
+  db.prepare(`
+    INSERT INTO vehicle_downtimes (id, vehicleId, reason, startDate, endDate) VALUES (@id, @vehicleId, @reason, @startDate, @endDate)
+    ON CONFLICT(id) DO UPDATE SET vehicleId=excluded.vehicleId, reason=excluded.reason, startDate=excluded.startDate, endDate=excluded.endDate
+  `).run({ id: v.id, vehicleId: v.vehicleId, reason: v.reason, startDate: v.startDate, endDate: v.endDate });
+  broadcast();
+  res.json({ ok: true });
+});
+app.delete('/api/vehicle-downtimes/:id', requireAuth, requireWrite, (req, res) => {
+  db.prepare('DELETE FROM vehicle_downtimes WHERE id = ?').run(req.params.id);
   broadcast();
   res.json({ ok: true });
 });

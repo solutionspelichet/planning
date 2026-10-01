@@ -11,6 +11,8 @@
   --chip-j:#3467b8; --chip-m:#1f8a70; --chip-a:#7a4fc4;
   --chip-nl:#8b8578; --chip-inter:#c98a1b; --chip-gm:#c1443a;
   --dispo-free:#2f9e5c; --dispo-idle:#ffffff; --dispo-conflict:#c1443a;
+  --reason-conges:#3467b8; --reason-maladie:#c1443a; --reason-recup:#1f8a70;
+  --reason-entretien:#c98a1b; --reason-reparation:#7a4fc4; --reason-accident:#c1443a;
 }
 @media (prefers-color-scheme: dark){
   :root{
@@ -19,6 +21,8 @@
     --chip-j:#5b8fe0; --chip-m:#3cb495; --chip-a:#a284e8;
     --chip-nl:#9a927f; --chip-inter:#e0a940; --chip-gm:#e0685c;
     --dispo-free:#3cb46f; --dispo-idle:#2a2823; --dispo-conflict:#e0685c;
+    --reason-conges:#5b8fe0; --reason-maladie:#e0685c; --reason-recup:#3cb495;
+    --reason-entretien:#e0a940; --reason-reparation:#a284e8; --reason-accident:#e0685c;
   }
 }
 *{box-sizing:border-box}
@@ -76,9 +80,12 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 .quick-expand:hover{color:var(--accent)}
 .quick-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;overflow-y:auto;min-height:0;flex:1 1 auto}
 .quick-list li{font-size:12.5px;padding:2px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.quick-partial-M{color:var(--chip-m);font-weight:700}
+.quick-partial-A{color:var(--chip-a);font-weight:700}
 .quick-empty{flex:none;font-size:12px;color:var(--fg-muted);font-style:italic}
 
-.calendar{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;position:sticky;top:80px}
+.calendar-stack{display:flex;flex-direction:column;gap:18px;position:sticky;top:80px}
+.calendar{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px}
 .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .cal-head button{width:28px;height:28px;border-radius:8px;border:1px solid var(--border);background:var(--bg);
   color:var(--fg);cursor:pointer}
@@ -112,8 +119,15 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 .legend i{width:9px;height:9px;border-radius:3px;display:inline-block}
 
 #dossierList,#nextDayList{display:flex;flex-wrap:nowrap;gap:12px;align-items:start;padding-bottom:6px;overflow-x:auto;min-width:0}
-.dossier-card{border:1px solid var(--border);border-radius:11px;padding:10px 12px;background:var(--bg);
+.dossier-card{border:1px solid var(--border);border-left:4px solid var(--border);border-radius:11px;padding:10px 12px;background:var(--bg);
   flex:0 0 230px;width:230px}
+.dossier-card.type-NL{border-left-color:var(--chip-nl)}
+.dossier-card.type-INTER{border-left-color:var(--chip-inter)}
+.dossier-card.type-GM{border-left-color:var(--chip-gm)}
+.dossier-slot-banner{height:6px;border-radius:9px 9px 0 0;margin:-10px -12px 10px -12px;background:var(--border)}
+.dossier-slot-banner.slot-J{background:var(--chip-j)}
+.dossier-slot-banner.slot-M{background:var(--chip-m)}
+.dossier-slot-banner.slot-A{background:var(--chip-a)}
 .dossier-head{display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap}
 .dossier-head input.client-name{font:inherit;font-weight:700;font-size:14.5px;border:none;background:transparent;
   color:var(--fg);flex:1;min-width:120px;border-radius:6px;padding:2px 4px}
@@ -198,8 +212,9 @@ table.week-table tr.week-sub td.week-metric-label{padding-left:16px;text-transfo
   background:none;border:none;color:var(--fg);cursor:pointer;padding:0 0 10px;width:100%;text-align:left}
 .next-day-toggle:hover{color:var(--accent)}
 .address-stack{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
-.address-stack .info-field textarea{width:100%;font-size:13px;padding:7px 9px;font-family:inherit;
+.address-stack .info-field textarea,.info-field.wide textarea{width:100%;font-size:13px;padding:7px 9px;font-family:inherit;
   border:1px solid var(--border);background:var(--surface);color:var(--fg);border-radius:6px;resize:vertical}
+.info-field.wide{width:100%;margin-bottom:8px}
 .address-field textarea.addr-gm{background:#fde2e1;border-color:#e2534d;color:#7a1f1b}
 .address-field textarea.addr-transit{background:#e1f5e6;border-color:#3fa15a;color:#1d5c32}
 td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
@@ -230,6 +245,22 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
   padding:8px 16px;border-radius:8px;font-size:13px;z-index:70;opacity:0;pointer-events:none;transition:opacity .2s}
 .toast.show{opacity:1}
 
+.search-wrap{position:relative;flex:1 1 220px;max-width:320px}
+.search-wrap input{width:100%;border:1px solid var(--border);background:var(--surface);color:var(--fg);border-radius:8px;padding:7px 10px;font:inherit;font-size:13px}
+.search-results{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  box-shadow:0 10px 28px rgba(0,0,0,.2);max-height:340px;overflow:auto;z-index:55}
+.search-results .opt-group{font-size:10.5px;font-weight:700;color:var(--fg-muted);text-transform:uppercase;padding:6px 10px 2px}
+.search-results .opt{padding:7px 10px;font-size:13px;cursor:pointer}
+.search-results .opt:hover{background:var(--weekend)}
+.search-results .opt .opt-sub{display:block;font-size:11px;color:var(--fg-muted)}
+.search-results .opt-empty{padding:8px 10px;font-size:12px;color:var(--fg-muted)}
+
+.vg-grid{display:flex;flex-wrap:wrap;gap:12px}
+.vg-card{border:1px solid var(--border);border-radius:11px;padding:12px 14px;background:var(--bg);min-width:220px;max-width:280px}
+.vg-card h3{font-size:14px;margin:0 0 6px}
+.vg-reason{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;color:#fff;margin-bottom:8px}
+.vg-dates{font-size:12px;color:var(--fg-muted);line-height:1.5}
+
 #printArea{display:none}
 @page{size:landscape;margin:12mm}
 @media print{
@@ -245,6 +276,8 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
 .print-card h3{font-size:13px;margin:0 0 6px}
 .print-row{margin-bottom:4px;line-height:1.3}
 .print-label{font-weight:700;text-transform:uppercase;font-size:9px;color:#555;margin-right:4px}
+.print-sublist{list-style:none;margin:2px 0 0;padding:0}
+.print-sublist li{font-size:10.5px;line-height:1.3}
 .print-badge{display:inline-block;padding:1px 8px;border-radius:10px;color:#fff;font-weight:700;font-size:10.5px}
 .print-badge.slot-J{background:#3467b8}
 .print-badge.slot-M{background:#1f8a70}
@@ -278,8 +311,13 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
       <button class="tab-btn active" data-tab="planning">Planning</button>
       <button class="tab-btn" data-tab="effectifs">Effectifs</button>
       <button class="tab-btn" data-tab="vehicules">Véhicules</button>
+      <button class="tab-btn" data-tab="vacances">Vacances &amp; Garage</button>
       <button class="tab-btn" data-tab="dashboard">Dashboard</button>
       <button class="tab-btn edit-only" data-tab="admin" id="adminTabBtn">Admin</button>
+    </div>
+    <div class="search-wrap">
+      <input type="text" id="globalSearch" placeholder="Rechercher un dossier, client, adresse, ressource…" autocomplete="off">
+      <div class="search-results" id="searchResults" hidden></div>
     </div>
     <div class="who">
       <span><b id="whoName">—</b></span>
@@ -290,14 +328,25 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
 
   <div class="view" id="view-planning">
     <div class="planning-grid">
-      <div class="calendar">
-        <div class="cal-head">
-          <button id="prevMonth" aria-label="Mois précédent">‹</button>
-          <div class="cal-title" id="calTitle">—</div>
-          <button id="nextMonth" aria-label="Mois suivant">›</button>
+      <div class="calendar-stack">
+        <div class="calendar">
+          <div class="cal-head">
+            <button id="prevMonth" aria-label="Mois précédent">‹</button>
+            <div class="cal-title" id="calTitle">—</div>
+            <button id="nextMonth" aria-label="Mois suivant">›</button>
+          </div>
+          <div class="cal-dow" id="calDow"></div>
+          <div class="cal-days" id="calDays"></div>
         </div>
-        <div class="cal-dow" id="calDow"></div>
-        <div class="cal-days" id="calDays"></div>
+        <div class="calendar">
+          <div class="cal-head">
+            <button id="vgPrevMonth" aria-label="Mois précédent">‹</button>
+            <div class="cal-title" id="vgCalTitle">—</div>
+            <button id="vgNextMonth" aria-label="Mois suivant">›</button>
+          </div>
+          <div class="cal-dow" id="vgCalDow"></div>
+          <div class="cal-days" id="vgCalDays"></div>
+        </div>
       </div>
       <div class="day-panel">
         <div class="day-panel-head">
@@ -342,6 +391,36 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
       <span><i style="background:var(--dispo-conflict)"></i>Sur-réservé (2 fois ou plus)</span>
     </div>
     <div class="grid-wrap"><div id="dispoTableHost" style="min-height:120px"></div></div>
+
+    <h2 style="font-size:15px;margin:26px 0 10px">Absences &amp; Garage — <span id="vgDayTitle">—</span></h2>
+    <div class="vg-grid" id="vgDayPanel"></div>
+  </div>
+
+  <div class="view" id="view-vacances" hidden>
+    <div class="company-grid" style="grid-template-columns:repeat(auto-fill,minmax(420px,1fr))">
+      <div class="company-card">
+        <h3><span>Absences du personnel</span></h3>
+        <ul class="emp-list" id="absenceList"></ul>
+        <div class="add-row edit-only" style="flex-wrap:wrap">
+          <select id="newAbsenceEmp" style="flex:1 1 180px"></select>
+          <select id="newAbsenceReason" style="flex:1 1 120px"></select>
+          <input type="date" id="newAbsenceStart" style="flex:1 1 130px">
+          <input type="date" id="newAbsenceEnd" style="flex:1 1 130px">
+          <button id="addAbsenceBtn">Ajouter</button>
+        </div>
+      </div>
+      <div class="company-card">
+        <h3><span>Immobilisations véhicules</span></h3>
+        <ul class="emp-list" id="downtimeList"></ul>
+        <div class="add-row edit-only" style="flex-wrap:wrap">
+          <select id="newDowntimeVeh" style="flex:1 1 180px"></select>
+          <select id="newDowntimeReason" style="flex:1 1 120px"></select>
+          <input type="date" id="newDowntimeStart" style="flex:1 1 130px">
+          <input type="date" id="newDowntimeEnd" style="flex:1 1 130px">
+          <button id="addDowntimeBtn">Ajouter</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="view" id="view-dashboard" hidden>
@@ -440,6 +519,12 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
   var DAY_SLOTS = ["J","M","A"];
   var MOVE_TYPES = ["NL","INTER","GM"];
   var VEHICLE_TYPES = ["VL","Fourgon","PL"];
+  var ABSENCE_REASONS = ["Congés","Maladie","Récupération"];
+  var VEHICLE_DOWNTIME_REASONS = ["Entretien","Réparation","Accident"];
+  var REASON_COLORS = {
+    "Congés":"var(--reason-conges)", "Maladie":"var(--reason-maladie)", "Récupération":"var(--reason-recup)",
+    "Entretien":"var(--reason-entretien)", "Réparation":"var(--reason-reparation)", "Accident":"var(--reason-accident)"
+  };
   var CODE_LOAD = {J:1, M:0.5, A:0.5};
   var MONTHS_FR = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
   var DOW_FR = ["L","M","M","J","V","S","D"];
@@ -448,14 +533,17 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
 
   var state = {
     token: null, role: null, username: null,
-    employees: [], vehicles: [], dossiers: [], assignments: [],
+    employees: [], vehicles: [], dossiers: [], assignments: [], absences: [], vehicleDowntimes: [],
     collapsedCompanies: {},
     nextDayCollapsed: false,
     cursor: new Date(2026, 9, 1),
     selectedDate: fmtDate(new Date(2026, 9, 6)),
+    vgCursor: new Date(2026, 9, 1),
+    vgSelectedDate: null,
     activeTab: "planning",
     pollTimer: null,
-    eventSource: null
+    eventSource: null,
+    autoDossiersEnsured: {}
   };
 
   function $(sel, root){ return (root||document).querySelector(sel); }
@@ -510,6 +598,10 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
       case "saveDossier": return request("POST", "/api/dossiers", {item: extra.item});
       case "deleteDossier": return request("DELETE", "/api/dossiers/" + encodeURIComponent(extra.id));
       case "saveAssignment": return request("POST", "/api/assignments", {item: extra.item});
+      case "saveAbsence": return request("POST", "/api/absences", {item: extra.item});
+      case "deleteAbsence": return request("DELETE", "/api/absences/" + encodeURIComponent(extra.id));
+      case "saveDowntime": return request("POST", "/api/vehicle-downtimes", {item: extra.item});
+      case "deleteDowntime": return request("DELETE", "/api/vehicle-downtimes/" + encodeURIComponent(extra.id));
       case "listUsers": return request("GET", "/api/users");
       case "createUser": return request("POST", "/api/users", {username: extra.username, password: extra.password, role: extra.role});
       case "deleteUser": return request("DELETE", "/api/users/" + encodeURIComponent(extra.username));
@@ -606,8 +698,12 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
       state.vehicles = res.vehicles || [];
       state.dossiers = res.dossiers || [];
       state.assignments = res.assignments || [];
+      state.absences = res.absences || [];
+      state.vehicleDowntimes = res.vehicleDowntimes || [];
       renderEffectifs(); renderVehicles(); renderCalendar(); renderDayPanel(); renderAvailability();
+      renderVgCalendar(); renderVgDayPanel();
       if (state.activeTab === "dashboard") renderDashboard();
+      if (state.activeTab === "vacances") { renderAbsenceSelects(); renderAbsenceList(); renderDowntimeList(); }
       if (state.role === "admin") { renderUsers(); renderBackups(); }
     });
   }
@@ -619,9 +715,11 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     $("#view-planning").hidden = tab !== "planning";
     $("#view-effectifs").hidden = tab !== "effectifs";
     $("#view-vehicules").hidden = tab !== "vehicules";
+    $("#view-vacances").hidden = tab !== "vacances";
     $("#view-dashboard").hidden = tab !== "dashboard";
     $("#view-admin").hidden = tab !== "admin";
     if (tab === "dashboard") renderDashboard();
+    if (tab === "vacances") { renderAbsenceSelects(); renderAbsenceList(); renderDowntimeList(); }
   }
   $all(".tab-btn").forEach(function(b){ b.addEventListener("click", function(){ setTab(b.dataset.tab); }); });
 
@@ -652,46 +750,97 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     };
   }
 
-  // ---------- quick view (effectifs & véhicules disponibles) ----------
-  function quickAvailability(dateStr){
-    var loads = loadsForDate(dateStr);
-    function unassigned(companyId){
-      return state.employees
-        .filter(function(e){ return e.company===companyId && e.active!==false && !(e.id in loads.empLoad); })
-        .sort(function(a,b){ return (a.order||0)-(b.order||0); })
-        .map(function(e){ return e.name; });
-    }
-    var vehicles = state.vehicles
-      .filter(function(v){ return v.active!==false && !(v.id in loads.vehUse); })
-      .sort(function(a,b){ return (a.order||0)-(b.order||0); })
-      .map(function(v){ return v.name; });
-    return { pel: unassigned("PEL"), sj: unassigned("SJ"), vehicles: vehicles };
+  // ---------- absences & immobilisations véhicules ----------
+  function absencesOn(dateStr){
+    return state.absences.filter(function(a){ return a.startDate <= dateStr && dateStr <= a.endDate; });
   }
-  function renderQuickGroup(label, names){
+  function downtimesOn(dateStr){
+    return state.vehicleDowntimes.filter(function(v){ return v.startDate <= dateStr && dateStr <= v.endDate; });
+  }
+  function isEmployeeAbsentOn(employeeId, dateStr){
+    return state.absences.some(function(a){ return a.employeeId === employeeId && a.startDate <= dateStr && dateStr <= a.endDate; });
+  }
+  function isVehicleDownOn(vehicleId, dateStr){
+    return state.vehicleDowntimes.some(function(v){ return v.vehicleId === vehicleId && v.startDate <= dateStr && dateStr <= v.endDate; });
+  }
+
+  // ---------- quick view (effectifs & véhicules disponibles) ----------
+  // Status per resource per day: 'absent'/'down' (hidden), 'full' (booked
+  // all day — hidden), 'partial' (booked only M or A — shown, colored by
+  // the OPPOSITE slot, i.e. the one it's still free for), or 'free'.
+  function employeeSlotsOn(employeeId, dateStr){
+    var slots = [];
+    activeDossiersOn(dateStr).forEach(function(d){
+      var a = assignmentFor(d.id, dateStr);
+      if ((a.employees||[]).some(function(x){ return x.employeeId === employeeId; })) slots.push(a.slot || "J");
+    });
+    return slots;
+  }
+  function vehicleSlotsOn(vehicleId, dateStr){
+    var slots = [];
+    activeDossiersOn(dateStr).forEach(function(d){
+      var a = assignmentFor(d.id, dateStr);
+      if ((a.vehicleIds||[]).indexOf(vehicleId) !== -1) slots.push(a.slot || "J");
+    });
+    return slots;
+  }
+  function slotsToStatus(slots){
+    if (!slots.length) return {status:"free"};
+    var load = slots.reduce(function(sum, s){ return sum + (CODE_LOAD[s] || 1); }, 0);
+    if (load >= 1) return {status:"full"};
+    return {status:"partial", availSlot: slots[0] === "M" ? "A" : "M"};
+  }
+  function employeeDayStatus(employeeId, dateStr){
+    if (isEmployeeAbsentOn(employeeId, dateStr)) return {status:"absent"};
+    return slotsToStatus(employeeSlotsOn(employeeId, dateStr));
+  }
+  function vehicleDayStatus(vehicleId, dateStr){
+    if (isVehicleDownOn(vehicleId, dateStr)) return {status:"down"};
+    return slotsToStatus(vehicleSlotsOn(vehicleId, dateStr));
+  }
+  function quickAvailability(dateStr){
+    function listFor(items, statusFn){
+      return items
+        .filter(function(it){ return it.active !== false; })
+        .sort(function(a,b){ return (a.order||0)-(b.order||0); })
+        .map(function(it){ return { name: it.name, info: statusFn(it.id, dateStr) }; })
+        .filter(function(it){ return it.info.status === "free" || it.info.status === "partial"; });
+    }
+    var pel = listFor(state.employees.filter(function(e){ return e.company === "PEL"; }), employeeDayStatus);
+    var sj = listFor(state.employees.filter(function(e){ return e.company === "SJ"; }), employeeDayStatus);
+    var vehicles = listFor(state.vehicles, vehicleDayStatus);
+    return { pel: pel, sj: sj, vehicles: vehicles };
+  }
+  function quickItemClass(info){ return info.status === "partial" ? "quick-partial-" + info.availSlot : ""; }
+  function quickItemTitle(it){
+    if (it.info.status !== "partial") return it.name;
+    return it.name + " — disponible " + (it.info.availSlot === "M" ? "le matin" : "l'après-midi") + " seulement";
+  }
+  function renderQuickGroup(label, items){
     var wrap = el("div", {class:"quick-group"});
     var head = el("div", {class:"quick-group-head"});
-    head.appendChild(el("div", {class:"quick-group-label", text: label + " · " + names.length}));
-    if (names.length){
+    head.appendChild(el("div", {class:"quick-group-label", text: label + " · " + items.length}));
+    if (items.length){
       head.appendChild(el("button", {class:"quick-expand", "aria-label":"Voir toute la liste", title:"Voir toute la liste", text:"⤢",
-        onclick: function(ev){ openQuickListPopover(ev.target, label, names); }}));
+        onclick: function(ev){ openQuickListPopover(ev.target, label, items); }}));
     }
     wrap.appendChild(head);
-    if (!names.length){
+    if (!items.length){
       wrap.appendChild(el("div", {class:"quick-empty", text:"Aucun disponible"}));
     } else {
       var ul = el("ul", {class:"quick-list"});
-      names.forEach(function(n){ ul.appendChild(el("li", {text:n, title:n})); });
+      items.forEach(function(it){ ul.appendChild(el("li", {class: quickItemClass(it.info), text: it.name, title: quickItemTitle(it)})); });
       wrap.appendChild(ul);
     }
     return wrap;
   }
-  function openQuickListPopover(anchor, label, names){
+  function openQuickListPopover(anchor, label, items){
     closePopover();
     var rect = anchor.getBoundingClientRect();
     var pop = el("div", {class:"popover"});
     pop.style.top = (rect.bottom+4)+"px"; pop.style.left = Math.min(rect.left, window.innerWidth-246)+"px";
-    pop.appendChild(el("div", {class:"opt-group", text: label + " · " + names.length}));
-    names.forEach(function(n){ pop.appendChild(el("div", {class:"opt", text:n})); });
+    pop.appendChild(el("div", {class:"opt-group", text: label + " · " + items.length}));
+    items.forEach(function(it){ pop.appendChild(el("div", {class:"opt " + quickItemClass(it.info), text: it.name, title: quickItemTitle(it)})); });
     document.body.appendChild(pop);
   }
   // Renders straight into the day-row pane next to the matching jobsite list
@@ -728,7 +877,13 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
   })();
 
   // ---------- calendar ----------
-  function renderDow(){ var host=$("#calDow"); host.innerHTML=""; DOW_FR.forEach(function(d){ host.appendChild(el("div",{text:d})); }); }
+  function renderDow(){
+    [$("#calDow"), $("#vgCalDow")].forEach(function(host){
+      if (!host) return;
+      host.innerHTML = "";
+      DOW_FR.forEach(function(d){ host.appendChild(el("div",{text:d})); });
+    });
+  }
   function renderCalendar(){
     $("#calTitle").textContent = MONTHS_FR[state.cursor.getMonth()] + " " + state.cursor.getFullYear();
     var host = $("#calDays"); host.innerHTML = "";
@@ -767,8 +922,213 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
   $("#prevMonth").addEventListener("click", function(){ shiftMonth(-1); });
   $("#nextMonth").addEventListener("click", function(){ shiftMonth(1); });
 
+  // ---------- vacances & garage: second calendar + day detail ----------
+  function renderVgCalendar(){
+    $("#vgCalTitle").textContent = MONTHS_FR[state.vgCursor.getMonth()] + " " + state.vgCursor.getFullYear();
+    var host = $("#vgCalDays"); if (!host) return;
+    host.innerHTML = "";
+    var year = state.vgCursor.getFullYear(), month = state.vgCursor.getMonth();
+    var firstDow = (new Date(year, month, 1).getDay() + 6) % 7;
+    var nDays = new Date(year, month+1, 0).getDate();
+    var prevDays = new Date(year, month, 0).getDate();
+    var cells = [];
+    for (var i = firstDow; i > 0; i--) cells.push({day: prevDays-i+1, other:true, date:null});
+    for (var d = 1; d <= nDays; d++) cells.push({day:d, other:false, date: fmtDate(new Date(year,month,d))});
+    while (cells.length % 7 !== 0) cells.push({day: cells.length-nDays-firstDow+1, other:true, date:null});
+    cells.forEach(function(c){
+      var dow = c.date ? new Date(c.date).getDay() : null;
+      var isWeekend = dow === 0 || dow === 6;
+      var cls = "cal-day" + (c.other?" other-month":"") + (isWeekend?" weekend":"") + (c.date===state.vgSelectedDate?" selected":"");
+      var cell = el("div", {class:cls});
+      cell.appendChild(el("div", {text:String(c.day)}));
+      if (c.date){
+        var count = absencesOn(c.date).length + downtimesOn(c.date).length;
+        if (count){
+          var row = el("div", {class:"dot-row"});
+          for (var n=0; n<Math.min(count,4); n++) row.appendChild(el("span",{class:"dot"}));
+          cell.appendChild(row);
+        }
+        cell.addEventListener("click", function(dateStr){ return function(){ state.vgSelectedDate=dateStr; renderVgCalendar(); renderVgDayPanel(); }; }(c.date));
+      }
+      host.appendChild(cell);
+    });
+  }
+  function shiftVgMonth(delta){
+    state.vgCursor = new Date(state.vgCursor.getFullYear(), state.vgCursor.getMonth()+delta, 1);
+    renderVgCalendar();
+  }
+  var vgPrevBtn = $("#vgPrevMonth"), vgNextBtn = $("#vgNextMonth");
+  if (vgPrevBtn) vgPrevBtn.addEventListener("click", function(){ shiftVgMonth(-1); });
+  if (vgNextBtn) vgNextBtn.addEventListener("click", function(){ shiftVgMonth(1); });
+
+  function renderVgCard(title, reason, startDate, endDate, onDelete){
+    var card = el("div", {class:"vg-card"});
+    card.appendChild(el("h3", {text: title}));
+    card.appendChild(el("span", {class:"vg-reason", style:"background:"+(REASON_COLORS[reason]||"var(--fg-muted)"), text: reason}));
+    var days = dayCount(startDate, endDate);
+    card.appendChild(el("div", {class:"vg-dates"},[
+      document.createTextNode("Du " + startDate + " au " + endDate),
+      el("br"),
+      document.createTextNode(days + " jour" + (days>1?"s":""))
+    ]));
+    if (canEdit()){
+      var delBtn = el("button", {class:"link-btn", text:"Supprimer", style:"margin-top:8px", onclick: function(ev){
+        if (!ev.target.classList.contains("armed")){
+          ev.target.classList.add("armed"); ev.target.textContent = "Confirmer ?";
+          setTimeout(function(){ ev.target.classList.remove("armed"); ev.target.textContent = "Supprimer"; }, 2200);
+          return;
+        }
+        onDelete();
+      }});
+      card.appendChild(delBtn);
+    }
+    return card;
+  }
+  function renderVgDayPanel(){
+    var host = $("#vgDayPanel"); if (!host) return;
+    var dateStr = state.vgSelectedDate;
+    if (!dateStr){
+      $("#vgDayTitle").textContent = "sélectionnez un jour ci-dessus";
+      host.innerHTML = "";
+      return;
+    }
+    var d = parseDate(dateStr);
+    var dow = ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d.getDay()];
+    $("#vgDayTitle").textContent = dow + " " + d.getDate() + " " + MONTHS_FR[d.getMonth()] + " " + d.getFullYear();
+    host.innerHTML = "";
+    var abs = absencesOn(dateStr), down = downtimesOn(dateStr);
+    if (!abs.length && !down.length){
+      host.appendChild(el("div", {class:"empty-note", text:"Personne d'absent, aucun véhicule immobilisé ce jour-là."}));
+      return;
+    }
+    abs.forEach(function(a){
+      host.appendChild(renderVgCard(empName(a.employeeId), a.reason, a.startDate, a.endDate, function(){
+        api("deleteAbsence", {id:a.id}).then(function(res){ if (!res.ok) return toast("Suppression impossible"); toast("Absence supprimée"); refreshAll(); });
+      }));
+    });
+    down.forEach(function(v){
+      host.appendChild(renderVgCard(vehName(v.vehicleId), v.reason, v.startDate, v.endDate, function(){
+        api("deleteDowntime", {id:v.id}).then(function(res){ if (!res.ok) return toast("Suppression impossible"); toast("Immobilisation supprimée"); refreshAll(); });
+      }));
+    });
+  }
+
+  // ---------- gestion absences / immobilisations (onglet Vacances & Garage) ----------
+  function renderAbsenceSelects(){
+    var sel = $("#newAbsenceEmp"); if (!sel) return;
+    var current = sel.value;
+    sel.innerHTML = "";
+    state.employees.filter(function(e){ return e.active!==false; }).sort(function(a,b){ return (a.order||0)-(b.order||0); })
+      .forEach(function(e){ sel.appendChild(el("option", {value:e.id, text:e.name})); });
+    if (current) sel.value = current;
+    var rsel = $("#newAbsenceReason"); rsel.innerHTML = "";
+    ABSENCE_REASONS.forEach(function(r){ rsel.appendChild(el("option", {value:r, text:r})); });
+
+    var vsel = $("#newDowntimeVeh");
+    var currentV = vsel.value;
+    vsel.innerHTML = "";
+    state.vehicles.filter(function(v){ return v.active!==false; }).sort(function(a,b){ return (a.order||0)-(b.order||0); })
+      .forEach(function(v){ vsel.appendChild(el("option", {value:v.id, text:v.name})); });
+    if (currentV) vsel.value = currentV;
+    var vrsel = $("#newDowntimeReason"); vrsel.innerHTML = "";
+    VEHICLE_DOWNTIME_REASONS.forEach(function(r){ vrsel.appendChild(el("option", {value:r, text:r})); });
+  }
+  function renderAbsenceList(){
+    var host = $("#absenceList"); if (!host) return;
+    host.innerHTML = "";
+    var sorted = state.absences.slice().sort(function(a,b){ return a.startDate < b.startDate ? -1 : (a.startDate > b.startDate ? 1 : 0); });
+    if (!sorted.length) host.appendChild(el("li", {class:"empty-note", text:"Aucune absence enregistrée."}));
+    sorted.forEach(function(a){
+      var days = dayCount(a.startDate, a.endDate);
+      var row = el("li", {class:"emp-row"});
+      row.appendChild(el("span", {class:"emp-name", text: empName(a.employeeId) + " — " + a.reason + " · " + a.startDate + " → " + a.endDate + " (" + days + "j)"}));
+      row.appendChild(el("button", {class:"icon-btn edit-only", title:"Supprimer",
+        onclick: function(ev){ armThenDelete(ev.target, function(){
+          api("deleteAbsence", {id:a.id}).then(function(res){ if (!res.ok) return toast("Suppression impossible"); toast("Absence supprimée"); refreshAll(); });
+        }); }}, [document.createTextNode("✕")]));
+      host.appendChild(row);
+    });
+  }
+  function renderDowntimeList(){
+    var host = $("#downtimeList"); if (!host) return;
+    host.innerHTML = "";
+    var sorted = state.vehicleDowntimes.slice().sort(function(a,b){ return a.startDate < b.startDate ? -1 : (a.startDate > b.startDate ? 1 : 0); });
+    if (!sorted.length) host.appendChild(el("li", {class:"empty-note", text:"Aucune immobilisation enregistrée."}));
+    sorted.forEach(function(v){
+      var days = dayCount(v.startDate, v.endDate);
+      var row = el("li", {class:"emp-row"});
+      row.appendChild(el("span", {class:"emp-name", text: vehName(v.vehicleId) + " — " + v.reason + " · " + v.startDate + " → " + v.endDate + " (" + days + "j)"}));
+      row.appendChild(el("button", {class:"icon-btn edit-only", title:"Supprimer",
+        onclick: function(ev){ armThenDelete(ev.target, function(){
+          api("deleteDowntime", {id:v.id}).then(function(res){ if (!res.ok) return toast("Suppression impossible"); toast("Immobilisation supprimée"); refreshAll(); });
+        }); }}, [document.createTextNode("✕")]));
+      host.appendChild(row);
+    });
+  }
+  var addAbsenceBtn = $("#addAbsenceBtn");
+  if (addAbsenceBtn) addAbsenceBtn.addEventListener("click", function(){
+    if (!canEdit()) return;
+    var empId = $("#newAbsenceEmp").value, reason = $("#newAbsenceReason").value;
+    var start = $("#newAbsenceStart").value, end = $("#newAbsenceEnd").value;
+    if (!empId || !reason || !start || !end) return toast("Remplissez tous les champs");
+    if (end < start) return toast("La date de fin doit suivre le début");
+    api("saveAbsence", {item:{id:uid("abs"), employeeId:empId, reason:reason, startDate:start, endDate:end}}).then(function(res){
+      if (!res.ok) return toast("Ajout impossible");
+      $("#newAbsenceStart").value = ""; $("#newAbsenceEnd").value = "";
+      toast("Absence ajoutée"); refreshAll();
+    });
+  });
+  var addDowntimeBtn = $("#addDowntimeBtn");
+  if (addDowntimeBtn) addDowntimeBtn.addEventListener("click", function(){
+    if (!canEdit()) return;
+    var vehId = $("#newDowntimeVeh").value, reason = $("#newDowntimeReason").value;
+    var start = $("#newDowntimeStart").value, end = $("#newDowntimeEnd").value;
+    if (!vehId || !reason || !start || !end) return toast("Remplissez tous les champs");
+    if (end < start) return toast("La date de fin doit suivre le début");
+    api("saveDowntime", {item:{id:uid("dt"), vehicleId:vehId, reason:reason, startDate:start, endDate:end}}).then(function(res){
+      if (!res.ok) return toast("Ajout impossible");
+      $("#newDowntimeStart").value = ""; $("#newDowntimeEnd").value = "";
+      toast("Immobilisation ajoutée"); refreshAll();
+    });
+  });
+
   // ---------- day panel ----------
+  // ---------- chantiers automatiques (Dépôt / Archivage) ----------
+  // Looked up by name, not a hardcoded id, so this keeps working if the
+  // employee records ever get re-seeded with different ids.
+  function findEmployeeByNameParts(parts){
+    var lower = parts.map(function(p){ return p.toLowerCase(); });
+    return state.employees.find(function(e){
+      var n = e.name.toLowerCase();
+      return lower.every(function(p){ return n.indexOf(p) !== -1; });
+    });
+  }
+  function ensureOneAutoDossier(id, dateStr, clientName, namePartsA, namePartsB){
+    if (!canEdit()) return;
+    if (state.autoDossiersEnsured[id]) return;
+    if (state.dossiers.some(function(d){ return d.id === id; })) { state.autoDossiersEnsured[id] = true; return; }
+    state.autoDossiersEnsured[id] = true; // set before the request lands, so a second render doesn't fire a duplicate POST
+    var empIds = [];
+    var e1 = findEmployeeByNameParts(namePartsA); if (e1) empIds.push(e1.id);
+    if (namePartsB){ var e2 = findEmployeeByNameParts(namePartsB); if (e2) empIds.push(e2.id); }
+    api("saveDossier", {item:{
+      id: id, client: clientName, startDate: dateStr, endDate: dateStr,
+      addressFrom:"", addressTo:"", volume:"", seller:"", coordinator:"", task:"", moveType:"", displayOrder: -1e12
+    }}).then(function(res){
+      if (!res.ok || !empIds.length) { refreshAll(); return; }
+      api("saveAssignment", {item:{
+        id: id + "_" + dateStr, dossierId: id, date: dateStr,
+        employees: empIds.map(function(eid){ return {employeeId: eid}; }), vehicleIds: [], arrivalTime:"", slot:""
+      }}).then(function(){ refreshAll(); });
+    });
+  }
+  function ensureAutoDossiersForDate(dateStr){
+    ensureOneAutoDossier("depot_" + dateStr, dateStr, "Dépôt", ["michaud","dorian"], ["diaz","jaime"]);
+    ensureOneAutoDossier("archivage_" + dateStr, dateStr, "Archivage", ["kamin","morgan"]);
+  }
+
   function renderDayPanel(){
+    ensureAutoDossiersForDate(state.selectedDate);
     var d = parseDate(state.selectedDate);
     var dow = ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d.getDay()];
     $("#dayTitle").textContent = dow + " " + d.getDate() + " " + MONTHS_FR[d.getMonth()] + " " + d.getFullYear();
@@ -797,6 +1157,7 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
   }
   function renderNextDayPanel(){
     var nextDateStr = addDays(state.selectedDate, 1);
+    ensureAutoDossiersForDate(nextDateStr);
     var d = parseDate(nextDateStr);
     var dow = ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d.getDay()];
     $("#nextDayTitle").textContent = "Jour suivant — " + dow + " " + d.getDate() + " " + MONTHS_FR[d.getMonth()] + " " + d.getFullYear();
@@ -829,7 +1190,9 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
   });
 
   function renderDossierCard(dossier, conflicts, dateStr){
-    var card = el("div", {class:"dossier-card"});
+    var assignment = assignmentFor(dossier.id, dateStr);
+    var card = el("div", {class:"dossier-card" + (dossier.moveType ? " type-"+dossier.moveType : "")});
+    card.appendChild(el("div", {class:"dossier-slot-banner" + (assignment.slot ? " slot-"+assignment.slot : "")}));
     if (canEdit()){ card.draggable = true; card.dataset.id = dossier.id; card.classList.add("draggable-row"); }
     var totalDays = dayCount(dossier.startDate, dossier.endDate);
     var idx = dayIndex(dossier.startDate, dateStr);
@@ -841,6 +1204,19 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     head.appendChild(nameInput);
     if (totalDays > 1) head.appendChild(el("span", {class:"day-badge", text:"Jour " + idx + "/" + totalDays}));
     card.appendChild(head);
+
+    var numberField = el("div", {class:"info-field wide", style:"margin-bottom:8px"});
+    numberField.appendChild(el("label", {text:"N° dossier"}));
+    var numberInput = el("input", {value: dossier.dossierNumber || "", placeholder:"N° dossier", style:"text-transform:uppercase"});
+    numberInput.disabled = !canEdit();
+    numberInput.addEventListener("input", function(){
+      var pos = numberInput.selectionStart;
+      numberInput.value = numberInput.value.toUpperCase();
+      try { numberInput.setSelectionRange(pos, pos); } catch(e){}
+    });
+    numberInput.addEventListener("change", function(){ saveDossierMeta(dossier, {dossierNumber: numberInput.value.toUpperCase()}); });
+    numberField.appendChild(numberInput);
+    card.appendChild(numberField);
 
     var range = el("div", {class:"date-range"});
     range.appendChild(el("span", {text:"Du"}));
@@ -918,9 +1294,18 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     infoGrid.appendChild(selectField("Type de déménagement", "moveType", MOVE_TYPES, "type-", dossier,
       function(patch){ saveDossierMeta(dossier, patch); }, true));
     card.appendChild(infoGrid);
-    card.appendChild(infoField("Tâche à réaliser", "task", "Ex. chargement, livraison, garde-meuble…"));
-
-    var assignment = assignmentFor(dossier.id, dateStr);
+    function textareaField(labelText, key, placeholder){
+      var field = el("div", {class:"info-field wide"});
+      field.appendChild(el("label", {text:labelText}));
+      var input = el("textarea", {rows:"2", placeholder: placeholder||""});
+      input.value = dossier[key]||"";
+      input.disabled = !canEdit();
+      input.addEventListener("change", function(){ var patch={}; patch[key]=input.value; saveDossierMeta(dossier, patch); });
+      field.appendChild(input);
+      return field;
+    }
+    card.appendChild(textareaField("Tâche à réaliser (une par ligne)", "task", "Ex. chargement, livraison, garde-meuble…"));
+    card.appendChild(textareaField("Commentaire", "comment", "Notes diverses…"));
 
     var dayFields = el("div", {class:"day-fields"});
     dayFields.appendChild(selectField("Créneau", "slot", DAY_SLOTS, "slot-", assignment,
@@ -1112,21 +1497,41 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     else row.appendChild(document.createTextNode("—"));
     return row;
   }
+  function printListField(label, items){
+    var wrap = el("div", {class:"print-row"});
+    wrap.appendChild(el("div", {class:"print-label", text:label+" :"}));
+    if (!items.length){ wrap.appendChild(document.createTextNode("—")); return wrap; }
+    var ul = el("ul", {class:"print-sublist"});
+    items.forEach(function(n){ ul.appendChild(el("li", {text:n})); });
+    wrap.appendChild(ul);
+    return wrap;
+  }
+  function printMultilineField(label, text){
+    var wrap = el("div", {class:"print-row"});
+    wrap.appendChild(el("div", {class:"print-label", text:label+" :"}));
+    var lines = (text||"").split("\n").map(function(s){ return s.trim(); }).filter(Boolean);
+    if (!lines.length){ wrap.appendChild(document.createTextNode("—")); return wrap; }
+    var ul = el("ul", {class:"print-sublist"});
+    lines.forEach(function(l){ ul.appendChild(el("li", {text:l})); });
+    wrap.appendChild(ul);
+    return wrap;
+  }
   function renderPrintCard(dossier, dateStr){
     var assignment = assignmentFor(dossier.id, dateStr);
     var card = el("div", {class:"print-card"});
-    card.appendChild(el("h3", {text: dossier.client || "Client"}));
+    card.appendChild(el("h3", {text: (dossier.dossierNumber ? dossier.dossierNumber + " — " : "") + (dossier.client || "Client")}));
     card.appendChild(printField("Départ", dossier.addressFrom));
     card.appendChild(printField("Arrivée", dossier.addressTo));
     card.appendChild(printField("Volume", dossier.volume));
     card.appendChild(printBadgeField("Type", dossier.moveType, "type-"));
     card.appendChild(printField("Vendeur", dossier.seller));
     card.appendChild(printField("Coordinatrice", dossier.coordinator));
-    card.appendChild(printField("Tâche", dossier.task));
+    card.appendChild(printMultilineField("Tâche", dossier.task));
+    card.appendChild(printMultilineField("Commentaire", dossier.comment));
     card.appendChild(printBadgeField("Créneau", assignment.slot, "slot-"));
     card.appendChild(printField("Arrivée sur site", assignment.arrivalTime));
-    card.appendChild(printField("Effectif", (assignment.employees||[]).map(function(a){ return empName(a.employeeId); }).join(", ")));
-    card.appendChild(printField("Véhicules", (assignment.vehicleIds||[]).map(vehName).join(", ")));
+    card.appendChild(printListField("Effectif", (assignment.employees||[]).map(function(a){ return empName(a.employeeId); })));
+    card.appendChild(printListField("Véhicules", (assignment.vehicleIds||[]).map(vehName)));
     return card;
   }
   var PRINT_PER_PAGE = 10; // 5 columns x 2 rows per page
@@ -1708,6 +2113,64 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
         api("saveVehicle", {item: Object.assign({}, item, patch)}).then(function(res){ if (res.ok) refreshAll(); });
       }, "order");
     }, false);
+  }
+
+  // ---------- recherche globale ----------
+  function runSearch(q){
+    q = (q||"").trim().toLowerCase();
+    var host = $("#searchResults");
+    if (q.length < 2){ host.hidden = true; host.innerHTML = ""; return; }
+    host.innerHTML = "";
+    var matchedDossiers = state.dossiers.filter(function(d){
+      return (d.client||"").toLowerCase().indexOf(q)!==-1 ||
+             (d.dossierNumber||"").toLowerCase().indexOf(q)!==-1 ||
+             (d.addressFrom||"").toLowerCase().indexOf(q)!==-1 ||
+             (d.addressTo||"").toLowerCase().indexOf(q)!==-1;
+    }).slice(0, 12);
+    var matchedEmployees = state.employees.filter(function(e){ return e.name.toLowerCase().indexOf(q)!==-1; }).slice(0, 8);
+    var matchedVehicles = state.vehicles.filter(function(v){ return v.name.toLowerCase().indexOf(q)!==-1; }).slice(0, 8);
+    var any = false;
+    if (matchedDossiers.length){
+      any = true;
+      host.appendChild(el("div", {class:"opt-group", text:"Dossiers"}));
+      matchedDossiers.forEach(function(d){
+        var opt = el("div", {class:"opt", onclick: function(){ goToDossier(d); }});
+        opt.appendChild(document.createTextNode((d.dossierNumber ? d.dossierNumber+" — " : "") + (d.client||"Client")));
+        opt.appendChild(el("span", {class:"opt-sub", text: d.startDate + (d.endDate!==d.startDate ? " → "+d.endDate : "") + (d.addressFrom ? " · "+d.addressFrom : "")}));
+        host.appendChild(opt);
+      });
+    }
+    if (matchedEmployees.length){
+      any = true;
+      host.appendChild(el("div", {class:"opt-group", text:"Personnel"}));
+      matchedEmployees.forEach(function(e){
+        host.appendChild(el("div", {class:"opt", text:e.name, onclick: function(){ setTab("effectifs"); closeSearch(); }}));
+      });
+    }
+    if (matchedVehicles.length){
+      any = true;
+      host.appendChild(el("div", {class:"opt-group", text:"Véhicules"}));
+      matchedVehicles.forEach(function(v){
+        host.appendChild(el("div", {class:"opt", text:v.name, onclick: function(){ setTab("vehicules"); closeSearch(); }}));
+      });
+    }
+    if (!any) host.appendChild(el("div", {class:"opt-empty", text:"Aucun résultat."}));
+    host.hidden = false;
+  }
+  function closeSearch(){ var host = $("#searchResults"); host.hidden = true; $("#globalSearch").value = ""; }
+  function goToDossier(d){
+    state.selectedDate = d.startDate;
+    state.cursor = new Date(parseDate(d.startDate).getFullYear(), parseDate(d.startDate).getMonth(), 1);
+    setTab("planning");
+    renderCalendar(); renderDayPanel(); renderAvailability();
+    closeSearch();
+  }
+  var globalSearchInput = $("#globalSearch");
+  if (globalSearchInput){
+    globalSearchInput.addEventListener("input", function(){ runSearch(this.value); });
+    document.addEventListener("click", function(ev){
+      if (!ev.target.closest(".search-wrap")) $("#searchResults").hidden = true;
+    });
   }
 
   // ---------- boot ----------

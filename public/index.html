@@ -117,9 +117,29 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 .btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
 .conflict-banner{background:var(--danger-bg);color:var(--danger);border-radius:8px;padding:8px 12px;
   font-size:12.5px;margin-bottom:12px;font-weight:600}
+.capacity-warning{background:var(--danger-bg);color:var(--danger);border-radius:6px;padding:4px 8px;
+  font-size:11.5px;font-weight:700;margin:-2px 0 8px}
 .legend{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;font-size:11.5px;color:var(--fg-muted)}
 .legend span{display:inline-flex;align-items:center;gap:5px}
 .legend i{width:9px;height:9px;border-radius:3px;display:inline-block}
+.view-mode-toggle{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-right:4px}
+.view-mode-btn{font:inherit;font-size:12.5px;font-weight:700;padding:7px 12px;border:none;background:var(--surface);color:var(--fg-muted);cursor:pointer}
+.view-mode-btn.active{background:var(--accent);color:var(--accent-fg)}
+.week-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-top:10px}
+.week-day-col{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px;min-height:150px;
+  display:flex;flex-direction:column;gap:6px}
+.week-day-head{font-size:11px;font-weight:800;text-transform:uppercase;color:var(--fg-muted);display:flex;justify-content:space-between;
+  padding-bottom:6px;margin-bottom:2px;border-bottom:1px solid var(--border);cursor:pointer}
+.week-day-head:hover{color:var(--accent)}
+.week-day-head.weekend{color:var(--danger)}
+.week-day-col.is-today .week-day-head{color:var(--accent)}
+.week-chip{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;border-radius:6px;padding:4px 6px;
+  border-left:3px solid var(--border);background:var(--bg);color:var(--fg);cursor:pointer;overflow:hidden}
+.week-chip:hover{background:var(--weekend)}
+.week-chip-slot{width:6px;height:6px;border-radius:50%;flex:none}
+.week-chip-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.week-chip-more{font-size:10.5px;color:var(--fg-muted);text-align:center;padding:2px;cursor:pointer}
+.week-chip-more:hover{color:var(--accent)}
 .planning-filter{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:12px}
 .planning-filter .filter-label{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--fg-muted)}
 .filter-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 12px 4px 10px;border-radius:20px;
@@ -179,9 +199,10 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 .chip button:hover{background:var(--border);color:var(--fg)}
 .add-chip{border:1px dashed var(--border);background:transparent;color:var(--fg-muted);border-radius:20px;padding:4px 12px;font-size:12.5px;cursor:pointer}
 .add-chip:hover{border-color:var(--accent);color:var(--accent)}
-.dossier-foot{display:flex;justify-content:flex-end;margin-top:8px}
+.dossier-foot{display:flex;justify-content:flex-end;align-items:center;gap:14px;margin-top:8px}
 .link-btn{border:none;background:none;color:var(--fg-muted);font-size:12px;cursor:pointer;text-decoration:underline}
 .link-btn:hover{color:var(--danger)}
+.link-btn.history-btn:hover{color:var(--accent)}
 .empty-note{font-size:13px;color:var(--fg-muted);padding:24px 4px;text-align:center;flex:1 1 100%}
 
 .popover{position:fixed;z-index:60;background:var(--surface);border:1px solid var(--border);border-radius:10px;
@@ -191,6 +212,14 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 .popover .opt{padding:6px 8px;border-radius:6px;font-size:13px;cursor:pointer}
 .popover .opt:hover{background:var(--weekend)}
 .popover .opt-empty{padding:8px;font-size:12px;color:var(--fg-muted)}
+.history-popover{width:320px;max-height:360px}
+.history-row{padding:7px 4px;border-bottom:1px solid var(--border)}
+.history-row:last-child{border-bottom:none}
+.history-field{font-size:10.5px;font-weight:700;color:var(--fg-muted);text-transform:uppercase;letter-spacing:.03em}
+.history-change{font-size:12.5px;margin:2px 0;word-break:break-word}
+.history-old{color:var(--danger);text-decoration:line-through;opacity:.8}
+.history-new{color:var(--fg);font-weight:600}
+.history-meta{font-size:10.5px;color:var(--fg-muted)}
 
 .grid-wrap{overflow-x:auto;overflow-y:auto;max-height:65vh;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
 table.dispo{border-collapse:collapse;width:100%;font-size:12px}
@@ -229,6 +258,8 @@ table.week-table tr.week-sub td.week-metric-label{padding-left:16px;text-transfo
 .type-filter button.active{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
 .veh-type-select{font:inherit;font-size:11.5px;border:1px solid var(--border);background:var(--surface);color:var(--fg);
   border-radius:6px;padding:3px 5px;margin-right:6px}
+.veh-capacity-input{font:inherit;font-size:11.5px;border:1px solid var(--border);background:var(--surface);color:var(--fg);
+  border-radius:6px;padding:3px 5px;margin-right:6px;width:64px}
 .next-day-section{margin-top:22px;padding-top:16px;border-top:1px solid var(--border)}
 .next-day-toggle{display:flex;align-items:center;gap:8px;font:inherit;font-size:14px;font-weight:700;
   background:none;border:none;color:var(--fg);cursor:pointer;padding:0 0 10px;width:100%;text-align:left}
@@ -392,35 +423,46 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
         <div class="day-panel-head">
           <h2 id="dayTitle">—</h2>
           <div class="day-panel-actions">
+            <div class="view-mode-toggle">
+              <button type="button" class="view-mode-btn active" id="viewModeDayBtn">Jour</button>
+              <button type="button" class="view-mode-btn" id="viewModeWeekBtn">Semaine</button>
+            </div>
+            <button class="btn btn-ghost" id="exportCsvBtn">⬇ Export CSV (mois)</button>
             <button class="btn btn-ghost" id="printDayBtn">🖨 Imprimer</button>
             <button class="btn edit-only" id="newDossierBtn">+ Nouveau dossier</button>
           </div>
         </div>
-        <div class="legend">
-          <span><i style="background:var(--chip-j)"></i>Créneau — J Journée</span>
-          <span><i style="background:var(--chip-m)"></i>M Matin</span>
-          <span><i style="background:var(--chip-a)"></i>A Après-midi</span>
-          <span><i style="background:var(--chip-nl)"></i>Type — NL National</span>
-          <span><i style="background:var(--chip-inter)"></i>INTER International</span>
-          <span><i style="background:var(--chip-gm)"></i>GM Grand mouvement</span>
-        </div>
-        <div class="planning-filter" id="planningFilterBar"></div>
-        <div id="conflictBanner"></div>
-        <div class="day-row">
-          <div class="quick-pane" id="quickViewToday"></div>
-          <div id="dossierList"></div>
-        </div>
-
-        <div class="next-day-section">
-          <button class="next-day-toggle" id="nextDayToggle">
-            <span id="nextDayToggleIcon">▾</span>
-            <span id="nextDayTitle">Jour suivant</span>
-          </button>
-          <div id="nextDayConflictBanner"></div>
-          <div class="day-row" id="nextDayRow">
-            <div class="quick-pane" id="quickViewNext"></div>
-            <div id="nextDayList"></div>
+        <div id="dayModeContent">
+          <div class="legend">
+            <span><i style="background:var(--chip-j)"></i>Créneau — J Journée</span>
+            <span><i style="background:var(--chip-m)"></i>M Matin</span>
+            <span><i style="background:var(--chip-a)"></i>A Après-midi</span>
+            <span><i style="background:var(--chip-nl)"></i>Type — NL National</span>
+            <span><i style="background:var(--chip-inter)"></i>INTER International</span>
+            <span><i style="background:var(--chip-gm)"></i>GM Grand mouvement</span>
           </div>
+          <div class="planning-filter" id="planningFilterBar"></div>
+          <div id="conflictBanner"></div>
+          <div class="day-row">
+            <div class="quick-pane" id="quickViewToday"></div>
+            <div id="dossierList"></div>
+          </div>
+
+          <div class="next-day-section">
+            <button class="next-day-toggle" id="nextDayToggle">
+              <span id="nextDayToggleIcon">▾</span>
+              <span id="nextDayTitle">Jour suivant</span>
+            </button>
+            <div id="nextDayConflictBanner"></div>
+            <div class="day-row" id="nextDayRow">
+              <div class="quick-pane" id="quickViewNext"></div>
+              <div id="nextDayList"></div>
+            </div>
+          </div>
+        </div>
+        <div id="weekModeContent" hidden>
+          <div class="planning-filter" id="weekFilterBar"></div>
+          <div class="week-grid" id="weekGrid"></div>
         </div>
       </div>
     </div>
@@ -627,8 +669,19 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     pollTimer: null,
     eventSource: null,
     autoDossiersEnsured: {},
-    planningFilter: []
+    planningFilter: [],
+    planningViewMode: "day"
   };
+  var PLANNING_FILTER_KEY = "pe_planning_filter_v1";
+  (function loadPlanningFilter(){
+    try {
+      var saved = JSON.parse(localStorage.getItem(PLANNING_FILTER_KEY));
+      if (Array.isArray(saved)) state.planningFilter = saved;
+    } catch(e){ /* ignore corrupt/missing value */ }
+  })();
+  function savePlanningFilter(){
+    try { localStorage.setItem(PLANNING_FILTER_KEY, JSON.stringify(state.planningFilter)); } catch(e){ /* storage unavailable — filter still works for this session */ }
+  }
 
   function $(sel, root){ return (root||document).querySelector(sel); }
   function $all(sel, root){ return Array.prototype.slice.call((root||document).querySelectorAll(sel)); }
@@ -681,6 +734,7 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
       case "deleteVehicle": return request("DELETE", "/api/vehicles/" + encodeURIComponent(extra.id));
       case "saveDossier": return request("POST", "/api/dossiers", {item: extra.item});
       case "deleteDossier": return request("DELETE", "/api/dossiers/" + encodeURIComponent(extra.id));
+      case "getDossierHistory": return request("GET", "/api/dossiers/" + encodeURIComponent(extra.id) + "/history");
       case "saveAssignment": return request("POST", "/api/assignments", {item: extra.item});
       case "saveAbsence": return request("POST", "/api/absences", {item: extra.item});
       case "deleteAbsence": return request("DELETE", "/api/absences/" + encodeURIComponent(extra.id));
@@ -1316,19 +1370,21 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     if (!state.planningFilter.length) return true;
     return state.planningFilter.indexOf(planningFilterKey(dossier)) !== -1;
   }
-  function renderPlanningFilterBar(){
-    var host = $("#planningFilterBar"); if (!host) return;
+  function renderPlanningFilterBar(dossiersForCounts, hostId){
+    var host = $("#" + (hostId || "planningFilterBar")); if (!host) return;
     host.innerHTML = "";
     host.appendChild(el("span", {class:"filter-label", text:"Filtrer :"}));
     PLANNING_FILTER_TYPES.forEach(function(t){
       var active = state.planningFilter.indexOf(t.key) !== -1;
+      var count = (dossiersForCounts||[]).filter(function(d){ return planningFilterKey(d) === t.key; }).length;
       var chip = el("button", {type:"button", class:"filter-chip" + (active ? " active" : ""), style:"--fc:" + t.color}, [
         el("i", {style:"background:" + t.color}),
-        el("span", {text:t.label})
+        el("span", {text:t.label + (count ? " (" + count + ")" : "")})
       ]);
       chip.addEventListener("click", function(){
         var i = state.planningFilter.indexOf(t.key);
         if (i === -1) state.planningFilter.push(t.key); else state.planningFilter.splice(i, 1);
+        savePlanningFilter();
         renderDayPanel();
       });
       host.appendChild(chip);
@@ -1337,6 +1393,7 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
       var clearBtn = el("button", {type:"button", class:"filter-chip filter-clear", text:"✕ Réinitialiser"});
       clearBtn.addEventListener("click", function(){
         state.planningFilter = [];
+        savePlanningFilter();
         renderDayPanel();
       });
       host.appendChild(clearBtn);
@@ -1344,12 +1401,17 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
   }
 
   function renderDayPanel(){
+    $("#dayModeContent").hidden = state.planningViewMode === "week";
+    $("#weekModeContent").hidden = state.planningViewMode !== "week";
+    $("#viewModeDayBtn").classList.toggle("active", state.planningViewMode !== "week");
+    $("#viewModeWeekBtn").classList.toggle("active", state.planningViewMode === "week");
+    if (state.planningViewMode === "week") return renderWeekView();
     ensureAutoDossiersForDate(state.selectedDate);
-    renderPlanningFilterBar();
     var d = parseDate(state.selectedDate);
     var dow = ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d.getDay()];
     $("#dayTitle").textContent = dow + " " + d.getDate() + " " + MONTHS_FR[d.getMonth()] + " " + d.getFullYear();
     var dossiersToday = activeDossiersOn(state.selectedDate).sort(function(a,b){ return (a.displayOrder||0)-(b.displayOrder||0); });
+    renderPlanningFilterBar(dossiersToday);
     var conflicts = computeConflicts(state.selectedDate);
     var banner = $("#conflictBanner"); banner.innerHTML = "";
     if (conflicts.employees.length || conflicts.vehicles.length){
@@ -1412,10 +1474,91 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     renderNextDayPanel();
   });
 
+  function startOfWeek(dateStr){
+    var d = parseDate(dateStr);
+    var diff = d.getDay() === 0 ? -6 : 1 - d.getDay(); // lundi = premier jour
+    d.setDate(d.getDate() + diff);
+    return d;
+  }
+  function goToDayFromWeek(dateStr){
+    state.selectedDate = dateStr; state.vgSelectedDate = dateStr; state.planningViewMode = "day";
+    renderCalendar(); renderDayPanel(); renderVgCalendar(); renderVgDayPanel();
+  }
+  var WEEK_CHIP_MAX = 6;
+  function renderWeekView(){
+    var host = $("#weekGrid"); if (!host) return;
+    host.innerHTML = "";
+    var monday = startOfWeek(state.selectedDate);
+    var dowShort = ["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
+    var days = [];
+    for (var i = 0; i < 7; i++){
+      var d = new Date(monday); d.setDate(monday.getDate() + i);
+      var dateStr = fmtDate(d);
+      ensureAutoDossiersForDate(dateStr);
+      days.push({date: d, dateStr: dateStr, dossiers: activeDossiersOn(dateStr).sort(function(a,b){ return (a.displayOrder||0)-(b.displayOrder||0); })});
+    }
+    var allWeekDossiers = days.reduce(function(acc, day){ return acc.concat(day.dossiers); }, []);
+    renderPlanningFilterBar(allWeekDossiers, "weekFilterBar");
+    days.forEach(function(day){
+      var isWeekend = day.date.getDay() === 0 || day.date.getDay() === 6;
+      var col = el("div", {class:"week-day-col" + (day.dateStr === state.selectedDate ? " is-today" : "")});
+      var head = el("div", {class:"week-day-head" + (isWeekend ? " weekend" : "")}, [
+        el("span", {text: dowShort[(day.date.getDay() + 6) % 7] + " " + day.date.getDate()})
+      ]);
+      head.addEventListener("click", function(dateStr){ return function(){ goToDayFromWeek(dateStr); }; }(day.dateStr));
+      col.appendChild(head);
+      var filtered = day.dossiers.filter(matchesPlanningFilter);
+      if (!filtered.length){
+        col.appendChild(el("div", {class:"empty-note", style:"padding:10px 2px;font-size:11px", text: day.dossiers.length ? "Filtré" : "—"}));
+      } else {
+        filtered.slice(0, WEEK_CHIP_MAX).forEach(function(dossier){
+          var autoKind = autoDossierKind(dossier);
+          var borderColor = autoKind === "DEPOT" ? "var(--type-depot)" : autoKind === "ARCHIVAGE" ? "var(--type-archivage)" :
+            dossier.moveType ? "var(--chip-" + dossier.moveType.toLowerCase() + ")" : "var(--border)";
+          var assignment = assignmentFor(dossier.id, day.dateStr);
+          var slotColor = assignment.slot ? "var(--chip-" + assignment.slot.toLowerCase() + ")" : "var(--border)";
+          var chip = el("div", {class:"week-chip", style:"border-left-color:" + borderColor, title: dossier.client || "Client"}, [
+            el("span", {class:"week-chip-slot", style:"background:" + slotColor}),
+            el("span", {class:"week-chip-name", text: dossier.client || "(sans nom)"})
+          ]);
+          chip.addEventListener("click", function(dateStr){ return function(){ goToDayFromWeek(dateStr); }; }(day.dateStr));
+          col.appendChild(chip);
+        });
+        if (filtered.length > WEEK_CHIP_MAX){
+          var moreBtn = el("div", {class:"week-chip-more", text: "+" + (filtered.length - WEEK_CHIP_MAX) + " autres"});
+          moreBtn.addEventListener("click", function(dateStr){ return function(){ goToDayFromWeek(dateStr); }; }(day.dateStr));
+          col.appendChild(moreBtn);
+        }
+      }
+      host.appendChild(col);
+    });
+  }
+  $("#viewModeDayBtn").addEventListener("click", function(){ state.planningViewMode = "day"; renderDayPanel(); });
+  $("#viewModeWeekBtn").addEventListener("click", function(){ state.planningViewMode = "week"; renderDayPanel(); });
+
   function autoDossierKind(dossier){
     if (dossier.id.indexOf("depot_") === 0) return "DEPOT";
     if (dossier.id.indexOf("archivage_") === 0) return "ARCHIVAGE";
     return null;
+  }
+  function parseNum(v){
+    var n = parseFloat((v||"").toString().replace(",", "."));
+    return isNaN(n) ? null : n;
+  }
+  function capacityWarning(dossier, assignment){
+    var volume = parseNum(dossier.volume);
+    var vehicleIds = assignment.vehicleIds || [];
+    if (volume === null || !vehicleIds.length) return null;
+    var total = 0;
+    for (var i=0; i<vehicleIds.length; i++){
+      var v = state.vehicles.find(function(x){ return x.id === vehicleIds[i]; });
+      var cap = v ? parseNum(v.capacity) : null;
+      if (cap === null) return null; // capacité inconnue pour un véhicule assigné : pas d'alerte (évite les faux positifs)
+      total += cap;
+    }
+    if (volume <= total) return null;
+    var totalLabel = (Math.round(total*10)/10).toString().replace(".", ",");
+    return "Volume " + dossier.volume + " m³ > capacité des véhicules assignés (" + totalLabel + " m³)";
   }
   function renderDossierCard(dossier, conflicts, dateStr, orderIndex){
     var assignment = assignmentFor(dossier.id, dateStr);
@@ -1448,6 +1591,8 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     head.appendChild(nameInput);
     if (totalDays > 1) head.appendChild(el("span", {class:"day-badge", text:"Jour " + idx + "/" + totalDays}));
     card.appendChild(head);
+    var capWarn = capacityWarning(dossier, assignment);
+    if (capWarn) card.appendChild(el("div", {class:"capacity-warning", text:"⚠ " + capWarn}));
 
     var numberField = el("div", {class:"info-field wide", style:"margin-bottom:8px"});
     numberField.appendChild(el("label", {text:"N° dossier"}));
@@ -1608,6 +1753,7 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     card.appendChild(vehChips);
 
     var foot = el("div", {class:"dossier-foot"});
+    foot.appendChild(el("button", {class:"link-btn history-btn", text:"Historique", onclick: function(ev){ openHistoryPopover(ev.target, dossier); }}));
     var delLabel = totalDays>1 ? "Supprimer tout le dossier ("+totalDays+" jours)" : "Supprimer ce dossier";
     var delBtn = el("button", {class:"link-btn edit-only", text: delLabel, onclick: function(ev){
       if (!ev.target.classList.contains("armed")){
@@ -1624,7 +1770,7 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
 
   function closePopover(){ var p = $(".popover"); if (p) p.remove(); }
   document.addEventListener("click", function(ev){
-    if (!ev.target.closest(".popover") && !ev.target.closest(".add-chip") && !ev.target.closest(".quick-expand")) closePopover();
+    if (!ev.target.closest(".popover") && !ev.target.closest(".add-chip") && !ev.target.closest(".quick-expand") && !ev.target.closest(".history-btn")) closePopover();
   });
   function openEmployeePicker(anchor, assignment){
     if (!canEdit()) return;
@@ -1654,6 +1800,39 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     }
     search.addEventListener("input", function(){ draw(search.value); });
     draw(""); document.body.appendChild(pop); search.focus();
+  }
+  var DOSSIER_FIELD_LABELS = {
+    client:"Client", dossierNumber:"N° dossier", startDate:"Date de début", endDate:"Date de fin",
+    addressFrom:"Adresse de départ", addressTo:"Adresse d'arrivée", volume:"Volume",
+    seller:"Vendeur", coordinator:"Coordinatrice", task:"Tâche", comment:"Commentaire", moveType:"Type de déménagement"
+  };
+  function openHistoryPopover(anchor, dossier){
+    closePopover();
+    var rect = anchor.getBoundingClientRect();
+    var pop = el("div", {class:"popover history-popover"});
+    pop.style.top = (rect.bottom+4)+"px"; pop.style.left = Math.min(rect.left, window.innerWidth-336)+"px";
+    pop.appendChild(el("div", {class:"opt-empty", text:"Chargement…"}));
+    document.body.appendChild(pop);
+    api("getDossierHistory", {id: dossier.id}).then(function(res){
+      pop.innerHTML = "";
+      if (!res.ok || !res.history || !res.history.length){
+        pop.appendChild(el("div", {class:"opt-empty", text:"Aucune modification enregistrée."}));
+        return;
+      }
+      res.history.forEach(function(h){
+        var d = new Date(h.changedAt);
+        var when = d.toLocaleDateString("fr-CH") + " " + d.toLocaleTimeString("fr-CH", {hour:"2-digit", minute:"2-digit"});
+        var row = el("div", {class:"history-row"});
+        row.appendChild(el("div", {class:"history-field", text: DOSSIER_FIELD_LABELS[h.field] || h.field}));
+        row.appendChild(el("div", {class:"history-change"}, [
+          el("span", {class:"history-old", text: h.oldValue || "(vide)"}),
+          document.createTextNode(" → "),
+          el("span", {class:"history-new", text: h.newValue || "(vide)"})
+        ]));
+        row.appendChild(el("div", {class:"history-meta", text: (h.changedBy || "?") + " — " + when}));
+        pop.appendChild(row);
+      });
+    });
   }
   function openVehiclePicker(anchor, assignment){
     if (!canEdit()) return;
@@ -1784,7 +1963,10 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     var d = parseDate(state.selectedDate);
     var dow = ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d.getDay()];
     var titleText = "Chantiers — " + dow + " " + d.getDate() + " " + MONTHS_FR[d.getMonth()] + " " + d.getFullYear();
-    var dossiersToday = activeDossiersOn(state.selectedDate).sort(function(a,b){ return (a.displayOrder||0)-(b.displayOrder||0); });
+    if (state.planningFilter.length) titleText += " (filtré : " + state.planningFilter.map(function(k){
+      var t = PLANNING_FILTER_TYPES.find(function(x){ return x.key===k; }); return t ? t.label : k;
+    }).join(", ") + ")";
+    var dossiersToday = activeDossiersOn(state.selectedDate).filter(matchesPlanningFilter).sort(function(a,b){ return (a.displayOrder||0)-(b.displayOrder||0); });
     var area = $("#printArea"); area.innerHTML = "";
     if (!dossiersToday.length){
       area.appendChild(el("div", {class:"print-title", text:titleText}));
@@ -1803,6 +1985,40 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     window.print();
   }
   $("#printDayBtn").addEventListener("click", printDayDossiers);
+
+  function csvCell(v){
+    var s = String(v==null ? "" : v);
+    return /[",;\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+  function exportMonthCsv(){
+    var year = state.cursor.getFullYear(), month = state.cursor.getMonth();
+    var nDays = new Date(year, month+1, 0).getDate();
+    var dowNames = ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"];
+    var rows = [["Date","Jour","Créneau","Type","N° dossier","Client","Adresse départ","Adresse arrivée","Volume","Effectif","Véhicules"]];
+    for (var day = 1; day <= nDays; day++){
+      var dateStr = fmtDate(new Date(year, month, day));
+      var dossiersOfDay = activeDossiersOn(dateStr).filter(matchesPlanningFilter).sort(function(a,b){ return (a.displayOrder||0)-(b.displayOrder||0); });
+      dossiersOfDay.forEach(function(dossier){
+        var assignment = assignmentFor(dossier.id, dateStr);
+        var autoKind = autoDossierKind(dossier);
+        var typeLabel = autoKind ? (autoKind === "DEPOT" ? "Dépôt" : "Archivage") : (dossier.moveType || "");
+        rows.push([
+          dateStr, dowNames[new Date(year, month, day).getDay()], assignment.slot || "", typeLabel,
+          dossier.dossierNumber || "", dossier.client || "", dossier.addressFrom || "", dossier.addressTo || "",
+          dossier.volume || "",
+          (assignment.employees || []).map(function(a){ return empName(a.employeeId); }).join(" / "),
+          (assignment.vehicleIds || []).map(vehName).join(" / ")
+        ]);
+      });
+    }
+    var csv = rows.map(function(r){ return r.map(csvCell).join(";"); }).join("\r\n");
+    var blob = new Blob(["﻿" + csv], {type:"text/csv;charset=utf-8;"});
+    var url = URL.createObjectURL(blob);
+    var a = el("a", {href:url, download:"planning-" + MONTHS_FR[month].toLowerCase() + "-" + year + ".csv"});
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+  }
+  $("#exportCsvBtn").addEventListener("click", exportMonthCsv);
 
   // ---------- Disponibilités ----------
   function renderAvailability(){
@@ -2149,6 +2365,11 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
       });
       typeSel.addEventListener("change", function(){ setVehicleType(v, typeSel.value); });
       row.appendChild(typeSel);
+      var capInput = el("input", {class:"veh-capacity-input edit-only", type:"number", step:"0.1", min:"0",
+        placeholder:"m³", title:"Capacité (m³)", value: v.capacity || ""});
+      capInput.disabled = !canEdit();
+      capInput.addEventListener("change", function(){ setVehicleCapacity(v, capInput.value); });
+      row.appendChild(capInput);
       row.appendChild(el("button", {class:"icon-btn edit-only", title: v.active===false?"Réactiver":"Mettre hors service",
         onclick: function(){ toggleVehicleActive(v); }}, [document.createTextNode(v.active===false?"↺":"⏸")]));
       row.appendChild(el("button", {class:"icon-btn edit-only", title:"Supprimer",
@@ -2172,6 +2393,12 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
   function setVehicleType(v, type){
     if (!canEdit()) return;
     api("saveVehicle", {item: Object.assign({}, v, {type: type})}).then(function(res){
+      if (!res.ok) return toast("Action impossible"); refreshAll();
+    });
+  }
+  function setVehicleCapacity(v, capacity){
+    if (!canEdit()) return;
+    api("saveVehicle", {item: Object.assign({}, v, {capacity: capacity})}).then(function(res){
       if (!res.ok) return toast("Action impossible"); refreshAll();
     });
   }

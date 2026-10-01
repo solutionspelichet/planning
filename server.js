@@ -120,6 +120,15 @@ db.exec(`
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS dossier_history (
+    id TEXT PRIMARY KEY,
+    dossierId TEXT NOT NULL,
+    field TEXT NOT NULL,
+    oldValue TEXT DEFAULT '',
+    newValue TEXT DEFAULT '',
+    changedBy TEXT DEFAULT '',
+    changedAt INTEGER NOT NULL
+  );
 `);
 
 // ---------- migrations for columns added after initial release ----------
@@ -127,6 +136,9 @@ db.exec(`
   const cols = db.prepare("PRAGMA table_info(vehicles)").all().map(c => c.name);
   if (!cols.includes('type')) {
     db.exec("ALTER TABLE vehicles ADD COLUMN type TEXT NOT NULL DEFAULT ''");
+  }
+  if (!cols.includes('capacity')) {
+    db.exec("ALTER TABLE vehicles ADD COLUMN capacity TEXT NOT NULL DEFAULT ''");
   }
 })();
 (function migrateDossierDisplayOrder() {
@@ -296,7 +308,7 @@ app.post('/api/login', (req, res) => {
 
 // ---------- data ----------
 function rowToEmployee(r) { return { id: r.id, company: r.company, name: r.name, active: !!r.active, order: r.order }; }
-function rowToVehicle(r) { return { id: r.id, name: r.name, active: !!r.active, order: r.order, type: r.type || '' }; }
+function rowToVehicle(r) { return { id: r.id, name: r.name, active: !!r.active, order: r.order, type: r.type || '', capacity: r.capacity || '' }; }
 function rowToDossier(r) {
   return {
     id: r.id, client: r.client, dossierNumber: r.dossierNumber || '', startDate: r.startDate, endDate: r.endDate,
@@ -316,6 +328,28 @@ function rowToAssignment(r) {
 }
 function rowToAbsence(r) { return { id: r.id, employeeId: r.employeeId, reason: r.reason, startDate: r.startDate, endDate: r.endDate }; }
 function rowToVehicleDowntime(r) { return { id: r.id, vehicleId: r.vehicleId, reason: r.reason, startDate: r.startDate, endDate: r.endDate }; }
+function rowToHistory(r) { return { id: r.id, dossierId: r.dossierId, field: r.field, oldValue: r.oldValue || '', newValue: r.newValue || '', changedBy: r.changedBy || '', changedAt: r.changedAt }; }
+
+// Fields tracked in the dossier change history — labels live client-side.
+const DOSSIER_HISTORY_FIELDS = [
+  'client', 'dossierNumber', 'startDate', 'endDate', 'addressFrom', 'addressTo',
+  'volume', 'seller', 'coordinator', 'task', 'comment', 'moveType'
+];
+function recordDossierHistory(oldRow, newValues, changedBy) {
+  const changes = DOSSIER_HISTORY_FIELDS
+    .map(field => ({ field, oldValue: (oldRow ? oldRow[field] : '') || '', newValue: newValues[field] || '' }))
+    .filter(c => c.oldValue !== c.newValue);
+  if (!changes.length) return;
+  const insert = db.prepare(`
+    INSERT INTO dossier_history (id, dossierId, field, oldValue, newValue, changedBy, changedAt)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `);
+  const now = Date.now();
+  const tx = db.transaction(() => {
+    changes.forEach(c => insert.run(crypto.randomUUID(), newValues.id, c.field, c.oldValue, c.newValue, changedBy, now));
+  });
+  tx();
+}
 
 app.get('/api/all', requireAuth, (req, res) => {
   res.json({
@@ -361,9 +395,9 @@ app.post('/api/vehicles', requireAuth, requireWrite, (req, res) => {
   const v = req.body.item || {};
   if (!v.id || !v.name) return res.status(400).json({ ok: false, error: 'bad_request' });
   db.prepare(`
-    INSERT INTO vehicles (id, name, active, "order", type) VALUES (?, ?, ?, ?, ?)
-    ON CONFLICT(id) DO UPDATE SET name=excluded.name, active=excluded.active, "order"=excluded."order", type=excluded.type
-  `).run(v.id, v.name, v.active === false ? 0 : 1, v.order || 0, v.type || '');
+    INSERT INTO vehicles (id, name, active, "order", type, capacity) VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET name=excluded.name, active=excluded.active, "order"=excluded."order", type=excluded.type, capacity=excluded.capacity
+  `).run(v.id, v.name, v.active === false ? 0 : 1, v.order || 0, v.type || '', v.capacity || '');
   broadcast();
   res.json({ ok: true });
 });
@@ -376,6 +410,7 @@ app.delete('/api/vehicles/:id', requireAuth, requireWrite, (req, res) => {
 app.post('/api/dossiers', requireAuth, requireWrite, (req, res) => {
   const d = req.body.item || {};
   if (!d.id || !d.startDate || !d.endDate) return res.status(400).json({ ok: false, error: 'bad_request' });
+  const oldRow = db.prepare('SELECT * FROM dossiers WHERE id = ?').get(d.id);
   db.prepare(`
     INSERT INTO dossiers (id, client, dossierNumber, startDate, endDate, addressFrom, addressTo, volume, seller, coordinator, task, comment, moveType, createdAt, displayOrder, sameResourcesAllDays)
     VALUES (@id, @client, @dossierNumber, @startDate, @endDate, @addressFrom, @addressTo, @volume, @seller, @coordinator, @task, @comment, @moveType, @createdAt, @displayOrder, @sameResourcesAllDays)
@@ -391,6 +426,7 @@ app.post('/api/dossiers', requireAuth, requireWrite, (req, res) => {
     createdAt: d.createdAt || Date.now(), displayOrder: d.displayOrder || 0,
     sameResourcesAllDays: d.sameResourcesAllDays ? 1 : 0
   });
+  recordDossierHistory(oldRow, d, req.session.username);
   broadcast();
   res.json({ ok: true });
 });
@@ -398,10 +434,17 @@ app.delete('/api/dossiers/:id', requireAuth, requireWrite, (req, res) => {
   const tx = db.transaction((id) => {
     db.prepare('DELETE FROM dossiers WHERE id = ?').run(id);
     db.prepare('DELETE FROM assignments WHERE dossierId = ?').run(id);
+    db.prepare('DELETE FROM dossier_history WHERE dossierId = ?').run(id);
   });
   tx(req.params.id);
   broadcast();
   res.json({ ok: true });
+});
+app.get('/api/dossiers/:id/history', requireAuth, (req, res) => {
+  res.json({
+    ok: true,
+    history: db.prepare('SELECT * FROM dossier_history WHERE dossierId = ? ORDER BY changedAt DESC').all(req.params.id).map(rowToHistory)
+  });
 });
 
 app.post('/api/assignments', requireAuth, requireWrite, (req, res) => {

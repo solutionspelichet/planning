@@ -3441,13 +3441,29 @@ body.has-top-banner .topbar{top:40px}
     $("#arcBest").textContent = String(arc.best);
     arcResetLevel(true);
     arcDraw();
-    arc.canvas.addEventListener("mousemove", function(ev){
+    function movePaddleTo(clientX){
       var rect = arc.canvas.getBoundingClientRect();
       var scale = arc.canvas.width / rect.width;
-      var x = (ev.clientX - rect.left) * scale;
+      var x = (clientX - rect.left) * scale;
       arc.paddle.x = Math.min(arc.canvas.width - arc.paddle.w, Math.max(0, x - arc.paddle.w/2));
-    });
+    }
+    arc.canvas.addEventListener("mousemove", function(ev){ movePaddleTo(ev.clientX); });
     arc.canvas.addEventListener("click", arcLaunch);
+    // Touch (mobile/tablette) : le doigt déplace la raquette, et comme il n'y
+    // a pas de survol possible au toucher, le premier contact lance aussi la
+    // balle si elle ne l'est pas déjà. preventDefault évite que la page
+    // scrolle/zoome pendant qu'on joue.
+    arc.canvas.addEventListener("touchstart", function(ev){
+      ev.preventDefault();
+      var t = ev.touches[0]; if (!t) return;
+      movePaddleTo(t.clientX);
+      arcLaunch();
+    }, {passive:false});
+    arc.canvas.addEventListener("touchmove", function(ev){
+      ev.preventDefault();
+      var t = ev.touches[0]; if (!t) return;
+      movePaddleTo(t.clientX);
+    }, {passive:false});
     document.addEventListener("keydown", function(ev){
       if (state.activeTab !== "detente") return;
       if (ev.key === "ArrowLeft") arc.keys.left = true;

@@ -366,7 +366,7 @@ table.week-table tr.week-row-emp td{background:color-mix(in srgb, var(--dispo-fr
 table.week-table tr.week-row-emp td.week-metric-label{border-left:4px solid var(--dispo-free)}
 table.week-table tr.week-row-veh td{background:color-mix(in srgb, var(--chip-a) 10%, var(--surface))}
 table.week-table tr.week-row-veh td.week-metric-label{border-left:4px solid var(--chip-a)}
-.type-filter{display:flex;gap:6px;margin-bottom:10px}
+.type-filter{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
 .type-filter button{border:1px solid var(--border);background:var(--bg);color:var(--fg-muted);font:inherit;font-size:11px;font-weight:700;
   padding:4px 10px;border-radius:20px;cursor:pointer}
 .type-filter button.active{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
@@ -630,7 +630,7 @@ body.has-top-banner .topbar{top:40px}
       </div>
     </div>
     <div class="grid-wrap" style="margin-bottom:18px"><div id="vacAvailabilityHost" style="min-height:60px"></div></div>
-    <div class="company-grid" style="grid-template-columns:repeat(auto-fill,minmax(420px,1fr))">
+    <div class="company-grid" style="grid-template-columns:repeat(auto-fill,minmax(min(420px,100%),1fr))">
       <div class="company-card">
         <h3><span>Absences du personnel</span></h3>
         <ul class="emp-list" id="absenceList"></ul>
@@ -700,7 +700,7 @@ body.has-top-banner .topbar{top:40px}
 
     <h2 style="font-size:15px;margin:28px 0 12px">Cette semaine</h2>
     <div class="chart-card">
-      <div id="dashWeekTable"></div>
+      <div style="overflow-x:auto"><div id="dashWeekTable"></div></div>
     </div>
 
     <h2 style="font-size:15px;margin:28px 0 4px">Évolution sur l'année</h2>

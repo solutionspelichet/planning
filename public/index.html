@@ -381,6 +381,11 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
 .company-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
 .company-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;min-width:0}
 .company-card h3{font-size:14px;display:flex;align-items:center;gap:8px}
+.company-name-input{font:inherit;font-weight:700;font-size:14px;border:none;background:transparent;color:var(--fg);
+  border-radius:6px;padding:2px 4px;min-width:0;flex:1}
+.company-name-input:focus{background:var(--bg);outline:1px solid var(--accent)}
+input.emp-name{font:inherit;border:none;background:transparent;color:var(--fg);border-radius:6px;padding:2px 4px;min-width:0}
+input.emp-name:focus{background:var(--bg);outline:1px solid var(--accent)}
 .company-dot{width:9px;height:9px;border-radius:50%;flex:none}
 .company-count{margin-left:auto;font-size:12px;font-weight:600;color:var(--fg-muted)}
 .emp-list{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:2px}
@@ -786,7 +791,11 @@ body.has-top-banner .topbar{top:40px}
 (function(){
   "use strict";
 
-  var COMPANIES = [
+  // Default list, used until an admin customizes it — once they do, the
+  // customized list is persisted server-side under the "companies" setting
+  // (a generic key/value store, so it's stored as a JSON string) and always
+  // takes over via getCompanies() below.
+  var DEFAULT_COMPANIES = [
     {id:"PEL", name:"Pelichet", color:"#3467b8"},
     {id:"SJ",  name:"SwissJob", color:"#1f8a70"},
     {id:"AMD", name:"AMD Déménagement", color:"#7a4fc4"},
@@ -796,6 +805,21 @@ body.has-top-banner .topbar{top:40px}
     {id:"MRE", name:"Master Relocation", color:"#8b6b45"},
     {id:"OJ",  name:"OK Job", color:"#5a6b8c"}
   ];
+  var NEW_COMPANY_COLORS = ["#3467b8","#1f8a70","#7a4fc4","#c98a1b","#c1443a","#2f7f7f","#8b6b45","#5a6b8c"];
+  function getCompanies(){
+    try {
+      var raw = state.settings && state.settings.companies;
+      if (raw) { var parsed = JSON.parse(raw); if (Array.isArray(parsed) && parsed.length) return parsed; }
+    } catch(e){ /* fall through to defaults */ }
+    return DEFAULT_COMPANIES;
+  }
+  function saveCompanies(list){
+    if (!canEdit()) return;
+    api("saveSettings", {values: {companies: JSON.stringify(list)}}).then(function(res){
+      if (!res.ok) return toast("Enregistrement impossible");
+      refreshAll();
+    });
+  }
   var MOVE_TYPES = ["NL","INTER","GM"];
   var PLANNING_FILTER_TYPES = [
     {key:"NL", label:"NL", color:"var(--chip-nl)"},
@@ -2318,7 +2342,7 @@ body.has-top-banner .topbar{top:40px}
     var already = (assignment.employees||[]).map(function(x){ return x.employeeId; });
     function draw(q){
       list.innerHTML = ""; var qq=(q||"").toLowerCase(); var any=false;
-      COMPANIES.forEach(function(co){
+      getCompanies().forEach(function(co){
         var emps = state.employees.filter(function(e){
           return e.company===co.id && e.active!==false && already.indexOf(e.id)===-1 && e.name.toLowerCase().indexOf(qq)!==-1;
         });
@@ -2824,7 +2848,7 @@ body.has-top-banner .topbar{top:40px}
         tbody.appendChild(row);
       });
     }
-    COMPANIES.forEach(function(co){
+    getCompanies().forEach(function(co){
       var emps = state.employees.filter(function(e){ return e.company===co.id && e.active!==false; }).sort(function(a,b){ return (a.order||0)-(b.order||0); });
       addSection(co.name, emps, "emp", "co-"+co.id);
     });
@@ -2952,7 +2976,7 @@ body.has-top-banner .topbar{top:40px}
     var groups = [{label:"Chantiers", fn:function(ds){ return dossierCountOn(ds); }, sub:false}];
     MOVE_TYPES.forEach(function(t){ groups.push({label:"— "+t, fn:function(ds){ return dossierCountOn(ds, t); }, sub:true}); });
     groups.push({label:"Effectif mobilisé", fn:function(ds){ return empCountOn(ds, empCompanyMap); }, sub:false});
-    COMPANIES.forEach(function(co){ groups.push({label:"— "+co.name, fn:function(ds){ return empCountOn(ds, empCompanyMap, co.id); }, sub:true}); });
+    getCompanies().forEach(function(co){ groups.push({label:"— "+co.name, fn:function(ds){ return empCountOn(ds, empCompanyMap, co.id); }, sub:true}); });
     groups.push({label:"Véhicules mobilisés", fn:function(ds){ return vehCountOn(ds, vehTypeMap); }, sub:false});
     VEHICLE_TYPES.forEach(function(t){ groups.push({label:"— "+t, fn:function(ds){ return vehCountOn(ds, vehTypeMap, t); }, sub:true}); });
     groups.forEach(function(r){
@@ -3016,7 +3040,7 @@ body.has-top-banner .topbar{top:40px}
     return [{id:"", label:"Tous"}].concat(MOVE_TYPES.map(function(t){ return {id:t, label:t}; }));
   }
   function companyFilterOptions(){
-    return [{id:"", label:"Toutes"}].concat(COMPANIES.map(function(co){ return {id:co.id, label:co.name}; }));
+    return [{id:"", label:"Toutes"}].concat(getCompanies().map(function(co){ return {id:co.id, label:co.name}; }));
   }
   function vehicleFilterOptions(){
     return [{id:"", label:"Tous"}].concat(VEHICLE_TYPES.map(function(t){ return {id:t, label:t}; }));
@@ -3082,16 +3106,63 @@ body.has-top-banner .topbar{top:40px}
   // ---------- Effectifs ----------
   function renderEffectifs(){
     var host = $("#companyGrid"); host.innerHTML = "";
-    COMPANIES.forEach(function(co){
-      var emps = state.employees.filter(function(e){ return e.company===co.id; }).sort(function(a,b){ return (a.order||0)-(b.order||0); });
+    var companies = getCompanies();
+    if (canEdit()){
+      var newCoRow = el("div", {class:"company-card add-company-row"});
+      newCoRow.appendChild(el("h3", {text:"Ajouter un type d'effectif"}));
+      var addRow = el("div", {class:"add-row"});
+      var coInput = el("input", {placeholder:"Ex. Pelichet, SwissJob…"});
+      addRow.appendChild(coInput);
+      function addCompany(){
+        var name = coInput.value.trim(); if (!name) return; coInput.value = "";
+        var list = companies.concat([{id: uid("co"), name: name, color: NEW_COMPANY_COLORS[companies.length % NEW_COMPANY_COLORS.length]}]);
+        saveCompanies(list);
+      }
+      addRow.appendChild(el("button", {text:"Ajouter", onclick: addCompany}));
+      coInput.addEventListener("keydown", function(ev){ if (ev.key==="Enter") addCompany(); });
+      newCoRow.appendChild(addRow);
+      host.appendChild(newCoRow);
+    }
+    companies.forEach(function(co){
+      var emps = state.employees.filter(function(e){ return e.company===co.id && !e.deleted; }).sort(function(a,b){ return (a.order||0)-(b.order||0); });
       var card = el("div", {class:"company-card"});
-      card.appendChild(el("h3", {}, [el("span",{class:"company-dot",style:"background:"+co.color}), el("span",{text:co.name}), el("span",{class:"company-count",text:emps.length})]));
+      var h3 = el("h3", {}, [el("span",{class:"company-dot",style:"background:"+co.color})]);
+      if (canEdit()){
+        var nameInput = el("input", {class:"company-name-input", value: co.name});
+        nameInput.addEventListener("change", function(){
+          var name = nameInput.value.trim(); if (!name) { nameInput.value = co.name; return; }
+          saveCompanies(companies.map(function(c){ return c.id===co.id ? Object.assign({}, c, {name:name}) : c; }));
+        });
+        h3.appendChild(nameInput);
+      } else {
+        h3.appendChild(el("span",{text:co.name}));
+      }
+      h3.appendChild(el("span", {class:"company-count",text:emps.length}));
+      if (canEdit()){
+        h3.appendChild(el("button", {class:"icon-btn", title: emps.length ? "Déplacez ou supprimez d'abord les employés de ce type" : "Supprimer ce type",
+          onclick: function(ev){
+            if (emps.length) return toast("Ce type contient encore des employés");
+            armThenDelete(ev.target, function(){ saveCompanies(companies.filter(function(c){ return c.id!==co.id; })); });
+          }}, [document.createTextNode("✕")]));
+      }
+      card.appendChild(h3);
       var list = el("ul", {class:"emp-list"});
       if (!emps.length) list.appendChild(el("li", {class:"empty-note", text:"Aucun employé pour l'instant."}));
       emps.forEach(function(e){
         var row = el("li", {class:"emp-row"+(e.active===false?" inactive":"")});
         if (canEdit()){ row.draggable = true; row.dataset.id = e.id; row.classList.add("draggable-row"); }
-        row.appendChild(el("span", {class:"emp-name", text:e.name}));
+        if (canEdit()){
+          var nmInput = el("input", {class:"emp-name", value:e.name});
+          nmInput.addEventListener("change", function(){
+            var name = nmInput.value.trim(); if (!name) { nmInput.value = e.name; return; }
+            api("saveEmployee", {item: Object.assign({}, e, {name:name})}).then(function(res){
+              if (!res.ok) return toast("Renommage impossible"); refreshAll();
+            });
+          });
+          row.appendChild(nmInput);
+        } else {
+          row.appendChild(el("span", {class:"emp-name", text:e.name}));
+        }
         row.appendChild(el("button", {class:"icon-btn edit-only", title: e.active===false?"Réactiver":"Mettre en pause",
           onclick: function(){ toggleEmployeeActive(e); }}, [document.createTextNode(e.active===false?"↺":"⏸")]));
         row.appendChild(el("button", {class:"icon-btn edit-only", title:"Supprimer",
@@ -3099,11 +3170,11 @@ body.has-top-banner .topbar{top:40px}
         list.appendChild(row);
       });
       card.appendChild(list);
-      var addRow = el("div", {class:"add-row edit-only"});
+      var addEmpRow = el("div", {class:"add-row edit-only"});
       var input = el("input", {placeholder:"Nom Prénom…"});
-      addRow.appendChild(input);
-      addRow.appendChild(el("button", {text:"Ajouter", onclick: function(){ addEmployee(co.id, input); }}));
-      card.appendChild(addRow);
+      addEmpRow.appendChild(input);
+      addEmpRow.appendChild(el("button", {text:"Ajouter", onclick: function(){ addEmployee(co.id, input); }}));
+      card.appendChild(addEmpRow);
       input.addEventListener("keydown", function(ev){ if (ev.key==="Enter") addEmployee(co.id, input); });
       host.appendChild(card);
     });
@@ -3124,9 +3195,16 @@ body.has-top-banner .topbar{top:40px}
       if (!res.ok) return toast("Action impossible"); refreshAll();
     });
   }
+  // A soft delete: the row (and its name) stays in the database so past and
+  // future jobsite cards that already reference this employee keep showing
+  // their real name instead of "(supprimé)" — only active:false/deleted:true
+  // are set, which already hides them from every roster/assignment list
+  // that filters on active state.
   function removeEmployee(e){
     if (!canEdit()) return;
-    api("deleteEmployee", {id:e.id}).then(function(res){ if (!res.ok) return toast("Suppression impossible"); toast("Employé supprimé"); refreshAll(); });
+    api("saveEmployee", {item: Object.assign({}, e, {active:false, deleted:true})}).then(function(res){
+      if (!res.ok) return toast("Suppression impossible"); toast("Employé supprimé"); refreshAll();
+    });
   }
 
   // ---------- Véhicules ----------

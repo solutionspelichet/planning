@@ -173,6 +173,12 @@ db.exec(`
     db.exec("ALTER TABLE dossiers ADD COLUMN workWeekends INTEGER NOT NULL DEFAULT 0");
   }
 })();
+(function migrateEmployeeDeleted() {
+  const cols = db.prepare("PRAGMA table_info(employees)").all().map(c => c.name);
+  if (!cols.includes('deleted')) {
+    db.exec("ALTER TABLE employees ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0");
+  }
+})();
 
 // ---------- backups ----------
 // A hot, consistent snapshot via SQLite's own VACUUM INTO (safe even while
@@ -324,7 +330,7 @@ app.post('/api/login', (req, res) => {
 });
 
 // ---------- data ----------
-function rowToEmployee(r) { return { id: r.id, company: r.company, name: r.name, active: !!r.active, order: r.order }; }
+function rowToEmployee(r) { return { id: r.id, company: r.company, name: r.name, active: !!r.active, order: r.order, deleted: !!r.deleted }; }
 function rowToVehicle(r) { return { id: r.id, name: r.name, active: !!r.active, order: r.order, type: r.type || '', capacity: r.capacity || '' }; }
 function rowToDossier(r) {
   return {
@@ -410,9 +416,9 @@ function recordAction(entityType, entityId, action, before, after, performedBy) 
 
 function saveEmployeeRow(e) {
   db.prepare(`
-    INSERT INTO employees (id, company, name, active, "order") VALUES (?, ?, ?, ?, ?)
-    ON CONFLICT(id) DO UPDATE SET company=excluded.company, name=excluded.name, active=excluded.active, "order"=excluded."order"
-  `).run(e.id, e.company, e.name, e.active === false ? 0 : 1, e.order || 0);
+    INSERT INTO employees (id, company, name, active, "order", deleted) VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET company=excluded.company, name=excluded.name, active=excluded.active, "order"=excluded."order", deleted=excluded.deleted
+  `).run(e.id, e.company, e.name, e.active === false ? 0 : 1, e.order || 0, e.deleted ? 1 : 0);
 }
 function removeEmployeeRow(id) { db.prepare('DELETE FROM employees WHERE id = ?').run(id); }
 

@@ -641,7 +641,14 @@ body.has-top-banner .topbar{top:40px}
   </div>
 
   <div class="view" id="view-dashboard" hidden>
-    <h2 style="font-size:15px;margin:6px 0 12px">Aujourd'hui — <span id="dashDate">—</span></h2>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin:6px 0 12px">
+      <h2 style="font-size:15px;margin:0"><span id="dashPeriodLabel">Aujourd'hui</span> — <span id="dashDate">—</span></h2>
+      <div class="view-mode-toggle">
+        <button type="button" class="view-mode-btn active" id="dashViewDayBtn">Jour</button>
+        <button type="button" class="view-mode-btn" id="dashViewWeekBtn">Semaine</button>
+        <button type="button" class="view-mode-btn" id="dashViewMonthBtn">Mois</button>
+      </div>
+    </div>
     <div class="stat-grid">
       <div class="stat-card">
         <div class="stat-value" id="dashDossiers">0</div>
@@ -900,6 +907,7 @@ body.has-top-banner .topbar{top:40px}
     autoDossiersEnsured: {},
     planningFilter: [],
     planningViewMode: "day",
+    dashboardViewMode: "day",
     offlineQueue: []
   };
   var PLANNING_FILTER_KEY = "pe_planning_filter_v1";
@@ -2063,6 +2071,9 @@ body.has-top-banner .topbar{top:40px}
   }
   $("#viewModeDayBtn").addEventListener("click", function(){ state.planningViewMode = "day"; renderDayPanel(); });
   $("#viewModeWeekBtn").addEventListener("click", function(){ state.planningViewMode = "week"; renderDayPanel(); });
+  $("#dashViewDayBtn").addEventListener("click", function(){ state.dashboardViewMode = "day"; renderDashboard(); });
+  $("#dashViewWeekBtn").addEventListener("click", function(){ state.dashboardViewMode = "week"; renderDashboard(); });
+  $("#dashViewMonthBtn").addEventListener("click", function(){ state.dashboardViewMode = "month"; renderDashboard(); });
   var goTodayBtn = $("#goTodayBtn");
   if (goTodayBtn) goTodayBtn.addEventListener("click", function(){
     var now = new Date();
@@ -2944,6 +2955,47 @@ body.has-top-banner .topbar{top:40px}
       vehicles: Object.keys(loads.vehUse).length
     };
   }
+  // Union across several days: a dossier/employee/vehicle counts once even
+  // if it's active on more than one of those days — used by the dashboard's
+  // Semaine/Mois stat tiles (Jour alone is todayStats() above).
+  function rangeStats(dateStrs){
+    var dossierSet = {}, empSet = {}, vehSet = {};
+    dateStrs.forEach(function(ds){
+      activeDossiersOn(ds).forEach(function(d){ dossierSet[d.id] = 1; });
+      var loads = loadsForDate(ds);
+      Object.keys(loads.empLoad).forEach(function(id){ empSet[id] = 1; });
+      Object.keys(loads.vehUse).forEach(function(id){ vehSet[id] = 1; });
+    });
+    return {
+      dossiers: Object.keys(dossierSet).length,
+      employees: Object.keys(empSet).length,
+      vehicles: Object.keys(vehSet).length
+    };
+  }
+  function getMonthDates(dateStr){
+    var d = parseDate(dateStr);
+    var year = d.getFullYear(), month = d.getMonth();
+    var nDays = new Date(year, month+1, 0).getDate();
+    var out = [];
+    for (var day=1; day<=nDays; day++) out.push(fmtDate(new Date(year, month, day)));
+    return out;
+  }
+  function dashboardStats(){
+    var dateStr = state.selectedDate;
+    if (state.dashboardViewMode === "week"){
+      var weekDates = getWeekDates(dateStr);
+      var ws = rangeStats(weekDates);
+      ws.dateStr = weekDates[0] + " → " + weekDates[6];
+      return ws;
+    }
+    if (state.dashboardViewMode === "month"){
+      var monthDates = getMonthDates(dateStr);
+      var ms = rangeStats(monthDates);
+      ms.dateStr = MONTHS_FR[parseDate(dateStr).getMonth()] + " " + parseDate(dateStr).getFullYear();
+      return ms;
+    }
+    return todayStats();
+  }
   var MONTHS_SHORT_FR = ["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
   function getWeekDates(dateStr){
     var d = parseDate(dateStr);
@@ -3102,11 +3154,16 @@ body.has-top-banner .topbar{top:40px}
   }
   function renderDashboard(){
     var d = computeDashboardData(dashFilters.dossiers, dashFilters.employees, dashFilters.vehicles);
-    var t = todayStats();
+    var t = dashboardStats();
+    var periodLabels = {day:"Aujourd'hui", week:"Cette semaine", month:"Ce mois"};
+    $("#dashPeriodLabel").textContent = periodLabels[state.dashboardViewMode] || periodLabels.day;
     $("#dashDate").textContent = t.dateStr;
     $("#dashDossiers").textContent = t.dossiers;
     $("#dashEmployees").textContent = t.employees;
     $("#dashVehicles").textContent = t.vehicles;
+    $("#dashViewDayBtn").classList.toggle("active", state.dashboardViewMode === "day");
+    $("#dashViewWeekBtn").classList.toggle("active", state.dashboardViewMode === "week");
+    $("#dashViewMonthBtn").classList.toggle("active", state.dashboardViewMode === "month");
     renderWeekTable();
     renderTypeDistribution();
     $("#dashYearLabels").textContent = "Cette année (" + d.thisYear + ") comparée à l'année précédente (" + d.lastYear + ")";

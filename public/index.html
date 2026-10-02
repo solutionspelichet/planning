@@ -170,9 +170,8 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 
 .day-panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;min-width:0}
 .day-panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
-  position:sticky;top:100px;z-index:20;background:var(--surface);
+  position:sticky;top:var(--topbar-h,100px);z-index:20;background:var(--surface);
   margin:-16px -16px 14px -16px;padding:16px 16px 10px;border-radius:12px 12px 0 0;border-bottom:1px solid var(--border)}
-body.has-top-banner .day-panel-head{top:140px}
 .day-panel-head h2{font-size:16px;text-transform:capitalize}
 .day-panel-actions{display:flex;gap:8px;flex-wrap:wrap}
 .btn{border:none;background:var(--accent);color:var(--accent-fg);border-radius:8px;padding:8px 14px;
@@ -852,12 +851,12 @@ body.has-top-banner .topbar{top:40px}
     "Entretien":"var(--reason-entretien)", "Réparation":"var(--reason-reparation)", "Accident":"var(--reason-accident)"
   };
   var SETTINGS_SCHEMA = [
-    {group:"Créneaux (bandeau en haut des chantiers)", items:[
+    {group:"Créneaux (bordure des chantiers)", items:[
       {key:"chip-j", label:"J — Journée", type:"color", def:"#3467b8"},
       {key:"chip-m", label:"M — Matin", type:"color", def:"#1f8a70"},
       {key:"chip-a", label:"A — Après-midi", type:"color", def:"#7a4fc4"}
     ]},
-    {group:"Types de déménagement (bordure des chantiers)", items:[
+    {group:"Types de déménagement (bandeau en haut des chantiers)", items:[
       {key:"chip-nl", label:"NL — National", type:"color", def:"#8b8578"},
       {key:"chip-inter", label:"INTER — International", type:"color", def:"#c98a1b"},
       {key:"chip-gm", label:"GM — Grand mouvement", type:"color", def:"#c1443a"},
@@ -1180,6 +1179,7 @@ body.has-top-banner .topbar{top:40px}
   function enterApp(){
     $("#loginScreen").hidden = true;
     $("#mainApp").hidden = false;
+    syncTopbarHeight();
     $("#whoName").textContent = state.username;
     $("#whoRole").textContent = state.role;
     document.body.classList.toggle("view-only", !canEdit());
@@ -3893,7 +3893,18 @@ body.has-top-banner .topbar{top:40px}
     var updateBar = $("#updateBanner"), offlineBar = $("#offlineBanner");
     var anyVisible = (updateBar && !updateBar.hidden) || (offlineBar && !offlineBar.hidden);
     document.body.classList.toggle("has-top-banner", !!anyVisible);
+    syncTopbarHeight();
   }
+  // The day-panel-head sticks right below the topbar, but the topbar's own
+  // height varies (it wraps onto more rows on narrow/mobile widths, and
+  // shifts when an update/offline banner shows) — so its real rendered
+  // bottom edge is measured here instead of a single guessed breakpoint
+  // constant, which broke badly on mobile.
+  function syncTopbarHeight(){
+    var tb = $(".topbar"); if (!tb) return;
+    document.documentElement.style.setProperty("--topbar-h", tb.getBoundingClientRect().bottom + "px");
+  }
+  window.addEventListener("resize", syncTopbarHeight);
   function showUpdateBanner(reg){
     var bar = $("#updateBanner"); if (!bar) return;
     bar.hidden = false;
@@ -3954,6 +3965,7 @@ body.has-top-banner .topbar{top:40px}
   function boot(){
     renderDow();
     setupDragReordering();
+    syncTopbarHeight();
     if ("onLine" in navigator && !navigator.onLine) setOfflineBanner(true);
     if (loadSession()) enterApp();
   }

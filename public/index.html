@@ -159,6 +159,9 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 .cal-day.weekend{background:var(--weekend)}
 .cal-day.other-month{opacity:.35}
 .cal-day:hover{border-color:var(--accent)}
+.cal-day.cal-heat-green{background:#e1f5e6}
+.cal-day.cal-heat-yellow{background:#fdf0d5}
+.cal-day.cal-heat-red{background:#fde2e1}
 .cal-day.selected{background:var(--accent);color:var(--accent-fg)}
 .cal-day .dot-row{display:flex;gap:2px}
 .cal-day .dot{width:4px;height:4px;border-radius:50%;background:var(--accent)}
@@ -869,6 +872,11 @@ body.has-top-banner .topbar{top:40px}
         ["type", "Type de déménagement"],
         ["slot", "Créneau (J/A/M)"]
       ]}
+    ]},
+    {group:"Charge du calendrier mois (nombre de personnes ce jour-là)", items:[
+      {key:"cal-heat-green", label:"Vert à partir de", type:"number", def:5, min:1, max:500, unit:"pers."},
+      {key:"cal-heat-yellow", label:"Jaune à partir de", type:"number", def:30, min:1, max:500, unit:"pers."},
+      {key:"cal-heat-red", label:"Rouge à partir de", type:"number", def:60, min:1, max:500, unit:"pers."}
     ]}
   ];
   var CODE_LOAD = {J:1, M:0.5, A:0.5};
@@ -1451,6 +1459,19 @@ body.has-top-banner .topbar{top:40px}
       DOW_FR.forEach(function(d){ host.appendChild(el("div",{text:d})); });
     });
   }
+  // Headcount tint for a month-calendar day cell: how many distinct
+  // employees are assigned across all jobsites that day, bucketed against
+  // the Settings-adjustable thresholds (normal below green's).
+  function calHeatClass(dateStr){
+    var count = empCountOn(dateStr, null, null);
+    var green = settingValue(state.settings, {key:"cal-heat-green", type:"number", def:5});
+    var yellow = settingValue(state.settings, {key:"cal-heat-yellow", type:"number", def:30});
+    var red = settingValue(state.settings, {key:"cal-heat-red", type:"number", def:60});
+    if (count >= red) return " cal-heat-red";
+    if (count >= yellow) return " cal-heat-yellow";
+    if (count >= green) return " cal-heat-green";
+    return "";
+  }
   function renderCalendar(){
     $("#calTitle").textContent = MONTHS_FR[state.cursor.getMonth()] + " " + state.cursor.getFullYear();
     var host = $("#calDays"); host.innerHTML = "";
@@ -1465,7 +1486,7 @@ body.has-top-banner .topbar{top:40px}
     cells.forEach(function(c){
       var dow = c.date ? new Date(c.date).getDay() : null;
       var isWeekend = dow === 0 || dow === 6;
-      var cls = "cal-day" + (c.other?" other-month":"") + (isWeekend?" weekend":"") + (c.date===state.selectedDate?" selected":"");
+      var cls = "cal-day" + (c.other?" other-month":"") + (isWeekend?" weekend":"") + (c.date?calHeatClass(c.date):"") + (c.date===state.selectedDate?" selected":"");
       var cell = el("div", {class:cls});
       cell.appendChild(el("div", {text:String(c.day)}));
       if (c.date){
@@ -1761,7 +1782,7 @@ body.has-top-banner .topbar{top:40px}
             renderSettingsPreview();
           });
           wrap.appendChild(input);
-          wrap.appendChild(el("span", {text:"px"}));
+          wrap.appendChild(el("span", {text: it.unit || "px"}));
           row.appendChild(wrap);
         }
         card.appendChild(row);

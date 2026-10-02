@@ -838,6 +838,13 @@ body.has-top-banner .topbar{top:40px}
     {group:"Épaisseurs", items:[
       {key:"type-border-width", label:"Bordure type de déménagement", type:"number", def:10, min:2, max:24},
       {key:"slot-header-pad", label:"Bandeau créneau", type:"number", def:10, min:4, max:30}
+    ]},
+    {group:"Fond des cartes de chantier", items:[
+      {key:"card-bg-mode", label:"Synchroniser le fond avec", type:"select", def:"none", options:[
+        ["none", "Aucun (fond neutre)"],
+        ["type", "Type de déménagement"],
+        ["slot", "Créneau (J/A/M)"]
+      ]}
     ]}
   ];
   var CODE_LOAD = {J:1, M:0.5, A:0.5};
@@ -1577,10 +1584,29 @@ body.has-top-banner .topbar{top:40px}
     values = values || {};
     SETTINGS_SCHEMA.forEach(function(g){
       g.items.forEach(function(it){
+        if (it.type === "select") return; // not a CSS var — read directly via settingValue where needed
         var v = settingValue(values, it);
         document.documentElement.style.setProperty("--" + it.key, it.type === "number" ? (v + "px") : v);
       });
     });
+  }
+  // Resolves the card-bg-mode setting to the CSS color variable the card's
+  // background should be tinted with, or null for the plain neutral
+  // background (no move type / no slot set, or the setting is off).
+  function dossierBgColorVar(dossier, assignment, autoKind){
+    var mode = settingValue(state.settings, {key:"card-bg-mode", def:"none"});
+    if (mode === "type"){
+      if (autoKind) return "var(--type-" + autoKind.toLowerCase() + ")";
+      return dossier.moveType ? "var(--chip-" + dossier.moveType.toLowerCase() + ")" : null;
+    }
+    if (mode === "slot"){
+      return assignment.slot ? "var(--chip-" + assignment.slot.toLowerCase() + ")" : null;
+    }
+    return null;
+  }
+  function applyDossierBg(card, dossier, assignment, autoKind){
+    var colorVar = dossierBgColorVar(dossier, assignment, autoKind);
+    card.style.background = colorVar ? "color-mix(in srgb, " + colorVar + " 16%, var(--bg))" : "";
   }
   function renderSettingsPreview(){
     var host = $("#settingsPreview"); if (!host) return;
@@ -1595,8 +1621,11 @@ body.has-top-banner .topbar{top:40px}
       host.appendChild(el("span", {class:"settings-swatch", style:"background:var(--type-"+k.toLowerCase()+")", text: k==="DEPOT"?"Dépôt":"Archivage"}));
     });
     var card = el("div", {class:"dossier-card settings-mini-card type-GM"});
+    var previewMode = settingValue(state.settingsDraft, {key:"card-bg-mode", def:"none"});
+    var previewColorVar = previewMode === "type" ? "var(--chip-gm)" : previewMode === "slot" ? "var(--chip-m)" : null;
+    if (previewColorVar) card.style.background = "color-mix(in srgb, " + previewColorVar + " 16%, var(--bg))";
     card.appendChild(el("div", {class:"dossier-slot-header slot-M", text:"M — MATIN"}));
-    card.appendChild(el("div", {style:"font-weight:700;font-size:13px", text:"Aperçu chantier"}));
+    card.appendChild(el("div", {style:"font-weight:700;font-size:13px", text:"Aperçu chantier (type GM, créneau M)"}));
     host.appendChild(card);
   }
   // presetDraft lets the reset button hand over fresh defaults without this
@@ -1621,6 +1650,19 @@ body.has-top-banner .topbar{top:40px}
           input.addEventListener("input", function(){
             state.settingsDraft[it.key] = input.value;
             applySettingsToRoot(state.settingsDraft);
+            renderSettingsPreview();
+          });
+          row.appendChild(input);
+        } else if (it.type === "select"){
+          input = el("select", {});
+          input.disabled = !canEdit();
+          it.options.forEach(function(pair){
+            var opt = el("option", {value:pair[0], text:pair[1]});
+            if (pair[0] === settingValue(state.settingsDraft, it)) opt.setAttribute("selected","selected");
+            input.appendChild(opt);
+          });
+          input.addEventListener("change", function(){
+            state.settingsDraft[it.key] = input.value;
             renderSettingsPreview();
           });
           row.appendChild(input);
@@ -1963,6 +2005,7 @@ body.has-top-banner .topbar{top:40px}
     var autoKind = autoDossierKind(dossier);
     var typeClass = autoKind ? " auto-"+autoKind : (dossier.moveType ? " type-"+dossier.moveType : "");
     var card = el("div", {class:"dossier-card" + typeClass});
+    applyDossierBg(card, dossier, assignment, autoKind);
     var slotWrap = el("div", {class:"dossier-slot-wrap"});
     var slotHeader = el("select", {class:"dossier-slot-header" + (assignment.slot ? " slot-"+assignment.slot : "")});
     slotHeader.disabled = !canEdit();
@@ -1973,6 +2016,7 @@ body.has-top-banner .topbar{top:40px}
     });
     slotHeader.addEventListener("change", function(){
       slotHeader.className = "dossier-slot-header" + (slotHeader.value ? " slot-"+slotHeader.value : "");
+      applyDossierBg(card, dossier, Object.assign({}, assignment, {slot: slotHeader.value}), autoKind);
       saveAssignment(assignment, {slot: slotHeader.value});
     });
     slotWrap.appendChild(slotHeader);

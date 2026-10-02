@@ -30,6 +30,13 @@ raccourcis clavier.
       par-compte déjà en place)
 - [x] Raccourci clavier Ctrl/Cmd+K pour la recherche globale (les
       raccourcis flèches/N existaient déjà pour la vue Planning jour)
+- [x] Point de santé public `/api/health` + surveillance externe (toutes
+      les ~10 min) avec alertes Telegram sur changement d'état : app
+      injoignable, espace disque faible, échec de synchro Drive (voir
+      section "Alertes Telegram" du README pour la mise en place)
+- [x] Correction d'une collision de déploiements concurrents (deux pushes
+      rapprochés faisaient échouer la sauvegarde pré-déploiement) —
+      déploiements désormais sérialisés
 
 ## Volontairement pas fait (à confirmer avant de s'y lancer)
 

@@ -615,6 +615,8 @@ body.has-top-banner .topbar{top:40px}
       <div class="cal-dow" id="vacCalDow"></div>
       <div class="cal-days" id="vacCalDays"></div>
     </div>
+    <h3 style="margin:0 0 8px">Vue tableau du mois</h3>
+    <div class="grid-wrap" style="margin-bottom:18px"><div id="vacAvailabilityHost" style="min-height:60px"></div></div>
     <div class="company-grid" style="grid-template-columns:repeat(auto-fill,minmax(420px,1fr))">
       <div class="company-card">
         <h3><span>Absences du personnel</span></h3>
@@ -1275,7 +1277,7 @@ body.has-top-banner .topbar{top:40px}
     renderEffectifs(); renderVehicles(); renderCalendar(); renderDayPanel(); renderAvailability();
     renderVgCalendar(); renderVgDayPanel();
     if (state.activeTab === "dashboard") renderDashboard();
-    if (state.activeTab === "vacances") { renderAbsenceSelects(); renderAbsenceList(); renderDowntimeList(); }
+    if (state.activeTab === "vacances") { renderAbsenceSelects(); renderAbsenceList(); renderDowntimeList(); renderVacAvailability(); }
     if (state.activeTab === "settings") renderSettingsTab();
     if (state.role === "admin") { renderUsers(); renderBackups(); }
   }
@@ -1317,7 +1319,7 @@ body.has-top-banner .topbar{top:40px}
     $("#view-detente").hidden = tab !== "detente";
     if (tab === "dashboard") renderDashboard();
     if (tab === "admin") renderFullActionLog();
-    if (tab === "vacances") { renderAbsenceSelects(); renderAbsenceList(); renderDowntimeList(); }
+    if (tab === "vacances") { renderAbsenceSelects(); renderAbsenceList(); renderDowntimeList(); renderVacAvailability(); }
     if (tab === "settings") renderSettingsTab();
     else applySettingsToRoot(state.settings); // leaving Settings: drop any unsaved live-preview changes
     if (tab === "zen") renderZenPatternSelect();
@@ -1616,7 +1618,7 @@ body.has-top-banner .topbar{top:40px}
   function shiftVgMonth(delta){
     state.vgCursor = new Date(state.vgCursor.getFullYear(), state.vgCursor.getMonth()+delta, 1);
     renderVgCalendar();
-    if (state.activeTab === "vacances") { renderAbsenceList(); renderDowntimeList(); }
+    if (state.activeTab === "vacances") { renderAbsenceList(); renderDowntimeList(); renderVacAvailability(); }
   }
   var vacPrevBtn = $("#vacPrevMonth"), vacNextBtn = $("#vacNextMonth");
   if (vacPrevBtn) vacPrevBtn.addEventListener("click", function(){ shiftVgMonth(-1); });
@@ -1708,6 +1710,70 @@ body.has-top-banner .topbar{top:40px}
   function renderVacMonthHeader(){
     var el2 = $("#vacMonthTitle"); if (!el2) return;
     el2.textContent = MONTHS_FR[state.vgCursor.getMonth()] + " " + state.vgCursor.getFullYear();
+  }
+  // Gantt-style table: one row per person/vehicle with at least one
+  // absence/immobilisation this month, one column per day, cells colored
+  // by reason on the days they're actually out. Complements the day-grid
+  // calendar above (which shows all events at once but not who's involved
+  // at a glance) and the lists below (which don't show *which* days).
+  function renderVacAvailability(){
+    var host = $("#vacAvailabilityHost"); if (!host) return;
+    var year = state.vgCursor.getFullYear(), month = state.vgCursor.getMonth();
+    var nDays = new Date(year, month+1, 0).getDate();
+
+    function reasonOnDate(ranges, idKey, id, dateStr){
+      var hit = ranges.filter(function(r){ return r[idKey]===id && r.startDate<=dateStr && dateStr<=r.endDate; });
+      return hit.length ? hit[0].reason : null;
+    }
+
+    var empsWithEvents = state.employees.filter(function(e){
+      return e.active!==false && state.absences.some(function(a){ return a.employeeId===e.id && monthOverlapsRange(state.vgCursor, a.startDate, a.endDate); });
+    }).sort(function(a,b){ return (a.order||0)-(b.order||0); });
+    var vehsWithEvents = state.vehicles.filter(function(v){
+      return v.active!==false && state.vehicleDowntimes.some(function(d){ return d.vehicleId===v.id && monthOverlapsRange(state.vgCursor, d.startDate, d.endDate); });
+    }).sort(function(a,b){ return (a.order||0)-(b.order||0); });
+
+    host.innerHTML = "";
+    if (!empsWithEvents.length && !vehsWithEvents.length){
+      host.appendChild(el("p", {class:"empty-note", text:"Personne n'est absent ni aucun véhicule immobilisé ce mois-ci."}));
+      return;
+    }
+
+    var table = el("table", {class:"dispo"});
+    var thead = el("thead"); var headRow = el("tr");
+    headRow.appendChild(el("th", {class:"dispo-name-col", text: MONTHS_FR[month]+" "+year}));
+    for (var d=1; d<=nDays; d++){
+      var dow = new Date(year,month,d).getDay(); var isWeekend = dow===0||dow===6;
+      var th = el("th", {class:"dispo-daycol"+(isWeekend?" weekend":"")});
+      th.appendChild(el("div", {text:String(d)})); headRow.appendChild(th);
+    }
+    thead.appendChild(headRow); table.appendChild(thead);
+    var tbody = el("tbody");
+
+    function addSection(label, items, ranges, idKey){
+      if (!items.length) return;
+      var sepTd = el("td", {colspan:String(nDays+1), text: label + " · " + items.length});
+      tbody.appendChild(el("tr", {class:"dispo-sep"}, [sepTd]));
+      items.forEach(function(item){
+        var row = el("tr");
+        row.appendChild(el("td", {class:"dispo-name-col", text:item.name}));
+        for (var dd=1; dd<=nDays; dd++){
+          var dateStr = fmtDate(new Date(year,month,dd));
+          var dow2 = new Date(year,month,dd).getDay(); var isWeekend2 = dow2===0||dow2===6;
+          var reason = reasonOnDate(ranges, idKey, item.id, dateStr);
+          var td = el("td", {class:"dispo-cell"+(isWeekend2?" weekend":""), title:item.name+" — "+dateStr+(reason?" ("+reason+")":"")});
+          if (reason) td.appendChild(el("span", {class:"dispo-swatch", style:"background:"+(REASON_COLORS[reason]||"var(--accent)")}));
+          td.addEventListener("click", function(dateStr){ return function(){ state.vgSelectedDate=dateStr; renderVgCalendar(); renderVgDayPanel(); }; }(dateStr));
+          row.appendChild(td);
+        }
+        tbody.appendChild(row);
+      });
+    }
+    addSection("Personnel", empsWithEvents, state.absences, "employeeId");
+    addSection("Véhicules", vehsWithEvents, state.vehicleDowntimes, "vehicleId");
+
+    table.appendChild(tbody);
+    host.appendChild(table);
   }
   function renderAbsenceList(){
     var host = $("#absenceList"); if (!host) return;

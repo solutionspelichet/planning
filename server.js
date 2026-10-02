@@ -172,6 +172,11 @@ db.exec(`
   if (!cols.includes('workWeekends')) {
     db.exec("ALTER TABLE dossiers ADD COLUMN workWeekends INTEGER NOT NULL DEFAULT 0");
   }
+  ['plannedEmployees', 'plannedFourgon', 'plannedPL', 'plannedVL'].forEach((col) => {
+    if (!cols.includes(col)) {
+      db.exec(`ALTER TABLE dossiers ADD COLUMN ${col} INTEGER NOT NULL DEFAULT 0`);
+    }
+  });
 })();
 (function migrateEmployeeDeleted() {
   const cols = db.prepare("PRAGMA table_info(employees)").all().map(c => c.name);
@@ -338,7 +343,9 @@ function rowToDossier(r) {
     addressFrom: r.addressFrom, addressTo: r.addressTo, volume: r.volume,
     seller: r.seller, coordinator: r.coordinator, task: r.task, comment: r.comment || '', moveType: r.moveType,
     createdAt: r.createdAt, displayOrder: r.displayOrder || 0,
-    sameResourcesAllDays: !!r.sameResourcesAllDays, workWeekends: !!r.workWeekends
+    sameResourcesAllDays: !!r.sameResourcesAllDays, workWeekends: !!r.workWeekends,
+    plannedEmployees: r.plannedEmployees || 0, plannedFourgon: r.plannedFourgon || 0,
+    plannedPL: r.plannedPL || 0, plannedVL: r.plannedVL || 0
   };
 }
 function rowToAssignment(r) {
@@ -432,19 +439,22 @@ function removeVehicleRow(id) { db.prepare('DELETE FROM vehicles WHERE id = ?').
 
 function saveDossierRow(d) {
   db.prepare(`
-    INSERT INTO dossiers (id, client, dossierNumber, startDate, endDate, addressFrom, addressTo, volume, seller, coordinator, task, comment, moveType, createdAt, displayOrder, sameResourcesAllDays, workWeekends)
-    VALUES (@id, @client, @dossierNumber, @startDate, @endDate, @addressFrom, @addressTo, @volume, @seller, @coordinator, @task, @comment, @moveType, @createdAt, @displayOrder, @sameResourcesAllDays, @workWeekends)
+    INSERT INTO dossiers (id, client, dossierNumber, startDate, endDate, addressFrom, addressTo, volume, seller, coordinator, task, comment, moveType, createdAt, displayOrder, sameResourcesAllDays, workWeekends, plannedEmployees, plannedFourgon, plannedPL, plannedVL)
+    VALUES (@id, @client, @dossierNumber, @startDate, @endDate, @addressFrom, @addressTo, @volume, @seller, @coordinator, @task, @comment, @moveType, @createdAt, @displayOrder, @sameResourcesAllDays, @workWeekends, @plannedEmployees, @plannedFourgon, @plannedPL, @plannedVL)
     ON CONFLICT(id) DO UPDATE SET
       client=excluded.client, dossierNumber=excluded.dossierNumber, startDate=excluded.startDate, endDate=excluded.endDate,
       addressFrom=excluded.addressFrom, addressTo=excluded.addressTo, volume=excluded.volume,
       seller=excluded.seller, coordinator=excluded.coordinator, task=excluded.task, comment=excluded.comment, moveType=excluded.moveType,
-      displayOrder=excluded.displayOrder, sameResourcesAllDays=excluded.sameResourcesAllDays, workWeekends=excluded.workWeekends
+      displayOrder=excluded.displayOrder, sameResourcesAllDays=excluded.sameResourcesAllDays, workWeekends=excluded.workWeekends,
+      plannedEmployees=excluded.plannedEmployees, plannedFourgon=excluded.plannedFourgon, plannedPL=excluded.plannedPL, plannedVL=excluded.plannedVL
   `).run({
     id: d.id, client: d.client || '', dossierNumber: d.dossierNumber || '', startDate: d.startDate, endDate: d.endDate,
     addressFrom: d.addressFrom || '', addressTo: d.addressTo || '', volume: d.volume || '',
     seller: d.seller || '', coordinator: d.coordinator || '', task: d.task || '', comment: d.comment || '', moveType: d.moveType || '',
     createdAt: d.createdAt || Date.now(), displayOrder: d.displayOrder || 0,
-    sameResourcesAllDays: d.sameResourcesAllDays ? 1 : 0, workWeekends: d.workWeekends ? 1 : 0
+    sameResourcesAllDays: d.sameResourcesAllDays ? 1 : 0, workWeekends: d.workWeekends ? 1 : 0,
+    plannedEmployees: d.plannedEmployees || 0, plannedFourgon: d.plannedFourgon || 0,
+    plannedPL: d.plannedPL || 0, plannedVL: d.plannedVL || 0
   });
 }
 function removeDossierRow(id) {

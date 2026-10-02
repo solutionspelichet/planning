@@ -2186,6 +2186,31 @@ body.has-top-banner .topbar{top:40px}
     var n = parseFloat((v||"").toString().replace(",", "."));
     return isNaN(n) ? null : n;
   }
+  // Compares planned (forecast) resource counts against what's actually
+  // allocated on this dossier, one message per mismatched category —
+  // under- AND over-allocation both get flagged, since both are a problem
+  // (short a truck, or one tied up here that's needed elsewhere).
+  function resourceMismatchWarnings(dossier, assignment){
+    var warnings = [];
+    var plannedEmp = dossier.plannedEmployees || 0;
+    if (plannedEmp > 0){
+      var allocEmp = (assignment.employees||[]).length;
+      if (allocEmp !== plannedEmp) warnings.push("Effectif : " + allocEmp + " alloué(s) / " + plannedEmp + " prévu(s)");
+    }
+    var vehTypeCount = {};
+    (assignment.vehicleIds||[]).forEach(function(vid){
+      var v = state.vehicles.find(function(x){ return x.id === vid; });
+      if (v && v.type) vehTypeCount[v.type] = (vehTypeCount[v.type]||0) + 1;
+    });
+    [["Fourgon","plannedFourgon"], ["PL","plannedPL"], ["VL","plannedVL"]].forEach(function(pair){
+      var planned = dossier[pair[1]] || 0;
+      if (planned > 0){
+        var alloc = vehTypeCount[pair[0]] || 0;
+        if (alloc !== planned) warnings.push(pair[0] + " : " + alloc + " alloué(s) / " + planned + " prévu(s)");
+      }
+    });
+    return warnings;
+  }
   function capacityWarning(dossier, assignment){
     var volume = parseNum(dossier.volume);
     var vehicleIds = assignment.vehicleIds || [];
@@ -2241,6 +2266,9 @@ body.has-top-banner .topbar{top:40px}
     card.appendChild(head);
     var capWarn = capacityWarning(dossier, assignment);
     if (capWarn) card.appendChild(el("div", {class:"capacity-warning", text:"⚠ " + capWarn}));
+    resourceMismatchWarnings(dossier, assignment).forEach(function(msg){
+      card.appendChild(el("div", {class:"capacity-warning", text:"⚠ " + msg}));
+    });
 
     var numberField = el("div", {class:"info-field wide", style:"margin-bottom:8px"});
     numberField.appendChild(el("label", {text:"N° dossier"}));
@@ -2314,6 +2342,18 @@ body.has-top-banner .topbar{top:40px}
       field.appendChild(input);
       return field;
     }
+    function plannedField(labelText, key){
+      var field = el("div", {class:"info-field narrow"});
+      field.appendChild(el("label", {text:labelText}));
+      var input = el("input", {type:"number", min:"0", value: dossier[key] ? String(dossier[key]) : ""});
+      input.disabled = !canEdit();
+      input.addEventListener("change", function(){
+        var patch={}; patch[key] = Math.max(0, parseInt(input.value,10) || 0);
+        saveDossierMeta(dossier, patch);
+      });
+      field.appendChild(input);
+      return field;
+    }
     function addressField(labelText, key){
       var field = el("div", {class:"info-field address-field"});
       field.appendChild(el("label", {text:labelText}));
@@ -2340,6 +2380,10 @@ body.has-top-banner .topbar{top:40px}
     infoGrid.appendChild(infoField("Volume", "volume", "m³", true));
     infoGrid.appendChild(infoField("Vendeur", "seller", "Initiales", true));
     infoGrid.appendChild(infoField("Coordinatrice", "coordinator", "Initiales", true));
+    infoGrid.appendChild(plannedField("Effectif prévu", "plannedEmployees"));
+    infoGrid.appendChild(plannedField("Fourgons prévus", "plannedFourgon"));
+    infoGrid.appendChild(plannedField("PL prévus", "plannedPL"));
+    infoGrid.appendChild(plannedField("VL prévus", "plannedVL"));
     card.appendChild(infoGrid);
     function autoGrow(ta){ ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; }
     function textareaField(labelText, key, placeholder){

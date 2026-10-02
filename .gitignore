@@ -1,0 +1,10 @@
+node_modules/
+data/
+SECRETS.md
+*.db
+*.db-wal
+*.db-shm
+.env
+tests/.tmp-data/
+test-results/
+playwright-report/

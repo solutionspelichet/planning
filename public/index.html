@@ -749,6 +749,7 @@ body.has-top-banner .topbar{top:40px}
       <div class="company-card">
         <h3><span>Sauvegardes</span></h3>
         <p class="chart-sub" style="margin:0 0 10px">Automatiques à 10h, 14h, 16h, 20h et 22h · conservées 7 jours sur le serveur · copiées sur Google Drive (sauvegarde ultime).</p>
+        <div id="driveSyncStatus" style="margin-bottom:12px"></div>
         <button class="btn edit-only" id="runBackupBtn" style="margin-bottom:12px">Sauvegarder maintenant</button>
         <ul class="emp-list" id="backupList"></ul>
         <div class="add-row edit-only" style="flex-wrap:wrap;margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
@@ -1292,7 +1293,7 @@ body.has-top-banner .topbar{top:40px}
     if (state.activeTab === "dashboard") renderDashboard();
     if (state.activeTab === "vacances") { renderAbsenceSelects(); renderAbsenceList(); renderDowntimeList(); renderVacAvailability(); }
     if (state.activeTab === "settings") renderSettingsTab();
-    if (state.role === "admin") { renderUsers(); renderBackups(); }
+    if (state.role === "admin") { renderUsers(); renderBackups(); renderDriveSyncStatus(); }
   }
   function refreshAll(){
     var prevConflictCount = computeTodayConflictCount();
@@ -3788,6 +3789,30 @@ body.has-top-banner .topbar{top:40px}
     var d = new Date(ms);
     return String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+d.getFullYear()+" "+
       String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+  }
+  // Longest normal gap between scheduled backup attempts is overnight
+  // (22h → 10h = 12h); past that with no successful sync, something's wrong
+  // (expired Drive auth, network issue, backups not running at all) and it's
+  // worth a visible warning rather than only ever reaching a server log.
+  var DRIVE_SYNC_STALE_HOURS = 15;
+  function renderDriveSyncStatus(){
+    var host = $("#driveSyncStatus"); if (!host) return;
+    host.innerHTML = "";
+    var raw = state.settings.driveSyncStatus;
+    if (!raw){
+      host.appendChild(el("p", {class:"chart-sub", style:"margin:0", text:"Aucune synchronisation Google Drive enregistrée pour l'instant."}));
+      return;
+    }
+    var status; try { status = JSON.parse(raw); } catch(e){ return; }
+    var ageHours = (Date.now() - status.at) / 3600000;
+    var whenText = fmtBackupDate(status.at);
+    if (status.ok && ageHours < DRIVE_SYNC_STALE_HOURS){
+      host.appendChild(el("p", {class:"chart-sub", style:"margin:0", text:"✅ Dernière synchro Google Drive réussie : " + whenText}));
+    } else if (!status.ok){
+      host.appendChild(el("div", {class:"capacity-warning", text:"⚠ Échec de la dernière synchro Google Drive (" + whenText + ")" + (status.error ? " : " + status.error : "")}));
+    } else {
+      host.appendChild(el("div", {class:"capacity-warning", text:"⚠ Pas de synchro Google Drive réussie depuis le " + whenText + " (plus de " + DRIVE_SYNC_STALE_HOURS + "h) — vérifiez que les sauvegardes automatiques tournent toujours."}));
+    }
   }
   function renderBackups(){
     api("listBackups", {}).then(function(res){

@@ -204,10 +204,25 @@ function pruneOldBackups() {
   }
 }
 const RCLONE_CONFIG = '/etc/rclone/rclone.conf';
+// Recorded in the settings table (same key/value store the frontend already
+// polls via /api/all) so a silent, unattended rclone failure — an expired
+// Drive auth token, a network blip that never recovers — shows up in the
+// Admin tab instead of only ever reaching a log file nobody is watching.
+function recordDriveSyncStatus(ok, error) {
+  const value = JSON.stringify({ ok, at: Date.now(), error: error ? String(error).slice(0, 300) : undefined });
+  db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value')
+    .run('driveSyncStatus', value);
+  broadcast();
+}
 function uploadToDrive(filePath) {
   execFile('rclone', ['--config', RCLONE_CONFIG, 'copy', filePath, RCLONE_REMOTE], (err, stdout, stderr) => {
-    if (err) console.error('rclone upload failed for', filePath, '-', stderr || err.message);
-    else console.log('Uploaded to Google Drive:', path.basename(filePath));
+    if (err) {
+      console.error('rclone upload failed for', filePath, '-', stderr || err.message);
+      recordDriveSyncStatus(false, stderr || err.message);
+    } else {
+      console.log('Uploaded to Google Drive:', path.basename(filePath));
+      recordDriveSyncStatus(true);
+    }
   });
 }
 function runBackup() {

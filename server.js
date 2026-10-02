@@ -800,7 +800,7 @@ app.delete('/api/users/:username', requireAuth, requireAdmin, (req, res) => {
 });
 
 // ---------- backups API (admin only) ----------
-const BACKUP_FILENAME_RE = /^planning-[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}h[0-9]{2}\.db$|^avant-restauration-[0-9-]+\.db$|^avant-deploiement-[0-9-]+_[0-9]{2}h[0-9]{2}\.db$/;
+const BACKUP_FILENAME_RE = /^planning-[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}h[0-9]{2}\.db$|^avant-restauration-[0-9-]+\.db$|^avant-deploiement-[0-9-]+_[0-9]{2}h[0-9]{2}m[0-9]{2}s\.db$/;
 
 app.get('/api/backups', requireAuth, requireAdmin, (req, res) => {
   const files = fs.readdirSync(BACKUP_DIR)

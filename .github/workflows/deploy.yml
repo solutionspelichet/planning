@@ -4,6 +4,15 @@ on:
   push:
     branches: [main-63nl54]
 
+# Two deploys were landing close together (e.g. two commits pushed at once)
+# and running their "deploy" jobs concurrently — their pre-deploy backups
+# collided on the same same-minute filename, and overlapping file-copy +
+# restart steps against the same VPS is its own latent risk. Serialize
+# deploys instead of letting pushes race each other.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -49,7 +58,8 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             if [ -f /opt/planning-app/data/planning.db ]; then
-              sqlite3 /opt/planning-app/data/planning.db "VACUUM INTO '/opt/planning-app/data/backups/avant-deploiement-$(date +%Y-%m-%d_%Hh%M).db'"
+              sqlite3 /opt/planning-app/data/planning.db "VACUUM INTO '/opt/planning-app/data/backups/avant-deploiement-$(date +%Y-%m-%d_%Hh%Mm%Ss).db'" \
+                || echo "Pre-deploy backup failed or was skipped (non-fatal — the scheduled backups and avant-restauration-* snapshots still apply) — continuing with the deploy."
             else
               echo "No existing database yet (first deploy) — skipping pre-deploy backup."
             fi

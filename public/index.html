@@ -600,6 +600,11 @@ body.has-top-banner .topbar{top:40px}
   </div>
 
   <div class="view" id="view-vacances" hidden>
+    <div class="cal-head" style="max-width:260px;margin-bottom:14px">
+      <button id="vacPrevMonth" aria-label="Mois précédent">‹</button>
+      <div class="cal-title" id="vacMonthTitle">—</div>
+      <button id="vacNextMonth" aria-label="Mois suivant">›</button>
+    </div>
     <div class="company-grid" style="grid-template-columns:repeat(auto-fill,minmax(420px,1fr))">
       <div class="company-card">
         <h3><span>Absences du personnel</span></h3>
@@ -1552,7 +1557,11 @@ body.has-top-banner .topbar{top:40px}
   function shiftVgMonth(delta){
     state.vgCursor = new Date(state.vgCursor.getFullYear(), state.vgCursor.getMonth()+delta, 1);
     renderVgCalendar();
+    if (state.activeTab === "vacances") { renderAbsenceList(); renderDowntimeList(); }
   }
+  var vacPrevBtn = $("#vacPrevMonth"), vacNextBtn = $("#vacNextMonth");
+  if (vacPrevBtn) vacPrevBtn.addEventListener("click", function(){ shiftVgMonth(-1); });
+  if (vacNextBtn) vacNextBtn.addEventListener("click", function(){ shiftVgMonth(1); });
   var vgPrevBtn = $("#vgPrevMonth"), vgNextBtn = $("#vgNextMonth");
   if (vgPrevBtn) vgPrevBtn.addEventListener("click", function(){ shiftVgMonth(-1); });
   if (vgNextBtn) vgNextBtn.addEventListener("click", function(){ shiftVgMonth(1); });
@@ -1629,11 +1638,26 @@ body.has-top-banner .topbar{top:40px}
     var vrsel = $("#newDowntimeReason"); vrsel.innerHTML = "";
     VEHICLE_DOWNTIME_REASONS.forEach(function(r){ vrsel.appendChild(el("option", {value:r, text:r})); });
   }
+  // Vacances & Garage tab: both lists are scoped to this cursor's month,
+  // navigated with vacPrevMonth/vacNextMonth (shared with the sidebar
+  // mini-calendar's state.vgCursor so the two stay in sync).
+  function monthOverlapsRange(cursor, startDate, endDate){
+    var monthStart = fmtDate(new Date(cursor.getFullYear(), cursor.getMonth(), 1));
+    var monthEnd = fmtDate(new Date(cursor.getFullYear(), cursor.getMonth()+1, 0));
+    return startDate <= monthEnd && endDate >= monthStart;
+  }
+  function renderVacMonthHeader(){
+    var el2 = $("#vacMonthTitle"); if (!el2) return;
+    el2.textContent = MONTHS_FR[state.vgCursor.getMonth()] + " " + state.vgCursor.getFullYear();
+  }
   function renderAbsenceList(){
     var host = $("#absenceList"); if (!host) return;
+    renderVacMonthHeader();
     host.innerHTML = "";
-    var sorted = state.absences.slice().sort(function(a,b){ return a.startDate < b.startDate ? -1 : (a.startDate > b.startDate ? 1 : 0); });
-    if (!sorted.length) host.appendChild(el("li", {class:"empty-note", text:"Aucune absence enregistrée."}));
+    var sorted = state.absences.slice()
+      .filter(function(a){ return monthOverlapsRange(state.vgCursor, a.startDate, a.endDate); })
+      .sort(function(a,b){ return a.startDate < b.startDate ? -1 : (a.startDate > b.startDate ? 1 : 0); });
+    if (!sorted.length) host.appendChild(el("li", {class:"empty-note", text:"Aucune absence ce mois-ci."}));
     sorted.forEach(function(a){
       var days = dayCount(a.startDate, a.endDate);
       var row = el("li", {class:"emp-row"});
@@ -1648,8 +1672,10 @@ body.has-top-banner .topbar{top:40px}
   function renderDowntimeList(){
     var host = $("#downtimeList"); if (!host) return;
     host.innerHTML = "";
-    var sorted = state.vehicleDowntimes.slice().sort(function(a,b){ return a.startDate < b.startDate ? -1 : (a.startDate > b.startDate ? 1 : 0); });
-    if (!sorted.length) host.appendChild(el("li", {class:"empty-note", text:"Aucune immobilisation enregistrée."}));
+    var sorted = state.vehicleDowntimes.slice()
+      .filter(function(v){ return monthOverlapsRange(state.vgCursor, v.startDate, v.endDate); })
+      .sort(function(a,b){ return a.startDate < b.startDate ? -1 : (a.startDate > b.startDate ? 1 : 0); });
+    if (!sorted.length) host.appendChild(el("li", {class:"empty-note", text:"Aucune immobilisation ce mois-ci."}));
     sorted.forEach(function(v){
       var days = dayCount(v.startDate, v.endDate);
       var row = el("li", {class:"emp-row"});

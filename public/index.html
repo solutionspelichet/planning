@@ -673,6 +673,10 @@ body.has-top-banner .topbar{top:40px}
         <div class="stat-value" id="dashVehicles">0</div>
         <div class="stat-label">Véhicules monopolisés</div>
       </div>
+      <div class="stat-card">
+        <div class="stat-value" id="dashVolume">0</div>
+        <div class="stat-label">Volume total (m³)</div>
+      </div>
     </div>
 
     <h2 style="font-size:15px;margin:28px 0 12px">Cette semaine</h2>
@@ -3030,28 +3034,34 @@ body.has-top-banner .topbar{top:40px}
   function todayStats(){
     var dateStr = state.selectedDate;
     var loads = loadsForDate(dateStr);
+    var volume = activeDossiersOn(dateStr).reduce(function(sum, d){ return sum + (parseFloat(d.volume) || 0); }, 0);
     return {
       dateStr: dateStr,
       dossiers: activeDossiersOn(dateStr).length,
       employees: Object.keys(loads.empLoad).length,
-      vehicles: Object.keys(loads.vehUse).length
+      vehicles: Object.keys(loads.vehUse).length,
+      volume: volume
     };
   }
   // Union across several days: a dossier/employee/vehicle counts once even
   // if it's active on more than one of those days — used by the dashboard's
-  // Semaine/Mois stat tiles (Jour alone is todayStats() above).
+  // Semaine/Mois stat tiles (Jour alone is todayStats() above). Volume is
+  // summed per unique dossier too, so a multi-day job's volume isn't
+  // counted again for every day it spans.
   function rangeStats(dateStrs){
     var dossierSet = {}, empSet = {}, vehSet = {};
     dateStrs.forEach(function(ds){
-      activeDossiersOn(ds).forEach(function(d){ dossierSet[d.id] = 1; });
+      activeDossiersOn(ds).forEach(function(d){ dossierSet[d.id] = d; });
       var loads = loadsForDate(ds);
       Object.keys(loads.empLoad).forEach(function(id){ empSet[id] = 1; });
       Object.keys(loads.vehUse).forEach(function(id){ vehSet[id] = 1; });
     });
+    var volume = Object.keys(dossierSet).reduce(function(sum, id){ return sum + (parseFloat(dossierSet[id].volume) || 0); }, 0);
     return {
       dossiers: Object.keys(dossierSet).length,
       employees: Object.keys(empSet).length,
-      vehicles: Object.keys(vehSet).length
+      vehicles: Object.keys(vehSet).length,
+      volume: volume
     };
   }
   function getMonthDates(dateStr){
@@ -3243,6 +3253,7 @@ body.has-top-banner .topbar{top:40px}
     $("#dashDossiers").textContent = t.dossiers;
     $("#dashEmployees").textContent = t.employees;
     $("#dashVehicles").textContent = t.vehicles;
+    $("#dashVolume").textContent = (Math.round(t.volume * 10) / 10) + "";
     $("#dashViewDayBtn").classList.toggle("active", state.dashboardViewMode === "day");
     $("#dashViewWeekBtn").classList.toggle("active", state.dashboardViewMode === "week");
     $("#dashViewMonthBtn").classList.toggle("active", state.dashboardViewMode === "month");

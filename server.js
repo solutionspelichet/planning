@@ -204,10 +204,25 @@ function pruneOldBackups() {
   }
 }
 const RCLONE_CONFIG = '/etc/rclone/rclone.conf';
+// Recorded in the settings table (same key/value store the frontend already
+// polls via /api/all) so a silent, unattended rclone failure — an expired
+// Drive auth token, a network blip that never recovers — shows up in the
+// Admin tab instead of only ever reaching a log file nobody is watching.
+function recordDriveSyncStatus(ok, error) {
+  const value = JSON.stringify({ ok, at: Date.now(), error: error ? String(error).slice(0, 300) : undefined });
+  db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value')
+    .run('driveSyncStatus', value);
+  broadcast();
+}
 function uploadToDrive(filePath) {
   execFile('rclone', ['--config', RCLONE_CONFIG, 'copy', filePath, RCLONE_REMOTE], (err, stdout, stderr) => {
-    if (err) console.error('rclone upload failed for', filePath, '-', stderr || err.message);
-    else console.log('Uploaded to Google Drive:', path.basename(filePath));
+    if (err) {
+      console.error('rclone upload failed for', filePath, '-', stderr || err.message);
+      recordDriveSyncStatus(false, stderr || err.message);
+    } else {
+      console.log('Uploaded to Google Drive:', path.basename(filePath));
+      recordDriveSyncStatus(true);
+    }
   });
 }
 function runBackup() {
@@ -235,8 +250,68 @@ function scheduleBackups() {
 scheduleBackups();
 
 // ---------- password / sessions ----------
+// Passwords are hashed with scrypt (salted, deliberately slow — unlike a
+// single SHA-256 pass, which a GPU can brute-force at billions/sec if the
+// database ever leaks). Old accounts created before this still have a bare
+// hex SHA-256 hash in `hash`; verifyPassword() recognizes both, and a
+// successful login against an old hash immediately re-hashes it with
+// scrypt (see /api/login) — a lazy migration with no forced reset needed.
 function sha256(text) { return crypto.createHash('sha256').update(text, 'utf8').digest('hex'); }
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = 'scrypt:' + crypto.scryptSync(password, salt, 64).toString('hex');
+  return { salt, hash };
+}
+function verifyPassword(password, salt, storedHash) {
+  if (storedHash.startsWith('scrypt:')) {
+    const expected = Buffer.from(storedHash.slice(7), 'hex');
+    const actual = crypto.scryptSync(password, salt, expected.length);
+    return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+  }
+  const expected = Buffer.from(storedHash, 'hex');
+  const actual = Buffer.from(sha256(salt + password), 'hex');
+  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+}
 function randomToken() { return crypto.randomBytes(24).toString('hex'); }
+
+// ---------- login rate limiting ----------
+// Two independent buckets per failed attempt: one keyed by username (slows
+// down guessing one specific account's password, from any/many IPs) and one
+// keyed by source IP (slows down one source hammering the endpoint at all,
+// regardless of which account it's trying). In-memory only, like `sessions`
+// below — fine for a single-process app, and resets on restart same as
+// everything else here.
+const rateLimitBuckets = new Map(); // "kind:key" -> {count, lockedUntil, lastAttemptAt}
+const LOGIN_USER_MAX_ATTEMPTS = 5, LOGIN_USER_LOCKOUT_MS = 5 * 60 * 1000;
+const LOGIN_IP_MAX_ATTEMPTS = 20, LOGIN_IP_LOCKOUT_MS = 10 * 60 * 1000;
+const RATE_LIMIT_FORGET_MS = 15 * 60 * 1000; // drop stale entries so probing many fake usernames/IPs can't grow this forever
+function rateLimitKey(kind, key) { return kind + ':' + String(key || '').toLowerCase(); }
+function pruneRateLimits() {
+  const now = Date.now();
+  for (const [k, entry] of rateLimitBuckets) {
+    if (entry.lockedUntil < now && now - entry.lastAttemptAt > RATE_LIMIT_FORGET_MS) rateLimitBuckets.delete(k);
+  }
+}
+function isRateLimited(kind, key) {
+  pruneRateLimits();
+  const entry = rateLimitBuckets.get(rateLimitKey(kind, key));
+  return !!(entry && entry.lockedUntil > Date.now());
+}
+function recordRateLimitFailure(kind, key, maxAttempts, lockoutMs) {
+  const k = rateLimitKey(kind, key);
+  const now = Date.now();
+  const entry = rateLimitBuckets.get(k) || { count: 0, lockedUntil: 0, lastAttemptAt: now };
+  entry.count += 1;
+  entry.lastAttemptAt = now;
+  if (entry.count >= maxAttempts) {
+    entry.lockedUntil = now + lockoutMs;
+    entry.count = 0;
+  }
+  rateLimitBuckets.set(k, entry);
+}
+function clearRateLimit(kind, key) {
+  rateLimitBuckets.delete(rateLimitKey(kind, key));
+}
 
 const sessions = new Map(); // token -> {username, role, expires}
 
@@ -273,8 +348,7 @@ function requireAdmin(req, res, next) {
   if (count > 0) return;
   const username = process.env.SEED_ADMIN_USER || 'Pelichet';
   const password = process.env.SEED_ADMIN_PASSWORD || crypto.randomBytes(9).toString('base64url');
-  const salt = crypto.randomBytes(16).toString('hex');
-  const hash = sha256(salt + password);
+  const { salt, hash } = hashPassword(password);
   db.prepare('INSERT INTO users (username, salt, hash, role) VALUES (?, ?, ?, ?)').run(username, salt, hash, 'admin');
   console.log('=============================================');
   console.log('First run: created admin account');
@@ -311,8 +385,32 @@ function broadcast() {
 }
 
 const app = express();
+// Exactly one reverse proxy in front in production (Nginx Proxy Manager —
+// see README), so req.ip resolves to the real client IP from the single
+// X-Forwarded-For hop it adds, instead of always reporting the proxy's own
+// Docker-gateway address for every visitor.
+app.set('trust proxy', 1);
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Unauthenticated on purpose — an external uptime monitor (see
+// .github/workflows/healthcheck.yml) needs to reach this with no
+// credentials, same as a load balancer's /healthz. Reports infra signals
+// only (disk space, last Drive sync result), never business data.
+app.get('/api/health', (req, res) => {
+  let diskFreeBytes = null, diskFreePercent = null;
+  try {
+    const s = fs.statfsSync(DATA_DIR);
+    diskFreeBytes = s.bavail * s.bsize;
+    diskFreePercent = Math.round((s.bavail / s.blocks) * 1000) / 10;
+  } catch (err) { /* statfsSync unavailable on this platform/Node version — report null, not fatal */ }
+  let driveSyncStatus = null;
+  try {
+    const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('driveSyncStatus');
+    if (row) driveSyncStatus = JSON.parse(row.value);
+  } catch (err) { /* malformed or absent — report null */ }
+  res.json({ ok: true, serverTime: Date.now(), diskFreeBytes, diskFreePercent, driveSyncStatus });
+});
 
 app.get('/api/events', requireAuth, (req, res) => {
   res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
@@ -325,9 +423,19 @@ app.get('/api/events', requireAuth, (req, res) => {
 // ---------- auth ----------
 app.post('/api/login', (req, res) => {
   const { username, password } = req.body || {};
+  if (isRateLimited('user', username) || isRateLimited('ip', req.ip)) {
+    return res.json({ ok: false, error: 'too_many_attempts' });
+  }
   const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username || '');
-  if (!user || sha256(user.salt + (password || '')) !== user.hash) {
+  if (!user || !verifyPassword(password || '', user.salt, user.hash)) {
+    recordRateLimitFailure('user', username, LOGIN_USER_MAX_ATTEMPTS, LOGIN_USER_LOCKOUT_MS);
+    recordRateLimitFailure('ip', req.ip, LOGIN_IP_MAX_ATTEMPTS, LOGIN_IP_LOCKOUT_MS);
     return res.json({ ok: false, error: 'invalid_credentials' });
+  }
+  clearRateLimit('user', username);
+  if (!user.hash.startsWith('scrypt:')) {
+    const { salt, hash } = hashPassword(password);
+    db.prepare('UPDATE users SET salt = ?, hash = ? WHERE username = ?').run(salt, hash, user.username);
   }
   const token = randomToken();
   sessions.set(token, { username: user.username, role: user.role, expires: Date.now() + SESSION_TTL_MS });
@@ -381,19 +489,59 @@ function recordDossierHistory(oldRow, newValues, changedBy) {
   tx();
 }
 
+// Dossiers (and their assignments) that ended more than this long ago are
+// left out of the main payload — every screen only ever looks at the
+// current/near-future window, so there's no reason to keep re-sending years
+// of closed jobsites on every load as the database grows. They're never
+// deleted, just not in the hot path; /api/dossiers/archive looks them up
+// on demand (Admin tab).
+const ARCHIVE_CUTOFF_MONTHS = 18;
+function archiveCutoffDate() {
+  const d = new Date();
+  d.setMonth(d.getMonth() - ARCHIVE_CUTOFF_MONTHS);
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
 app.get('/api/all', requireAuth, (req, res) => {
+  const cutoff = archiveCutoffDate();
   res.json({
     ok: true,
     role: req.session.role,
     username: req.session.username,
     employees: db.prepare('SELECT * FROM employees').all().map(rowToEmployee),
     vehicles: db.prepare('SELECT * FROM vehicles').all().map(rowToVehicle),
-    dossiers: db.prepare('SELECT * FROM dossiers').all().map(rowToDossier),
-    assignments: db.prepare('SELECT * FROM assignments').all().map(rowToAssignment),
+    dossiers: db.prepare('SELECT * FROM dossiers WHERE endDate >= ?').all(cutoff).map(rowToDossier),
+    assignments: db.prepare(`
+      SELECT a.* FROM assignments a JOIN dossiers d ON d.id = a.dossierId WHERE d.endDate >= ?
+    `).all(cutoff).map(rowToAssignment),
     absences: db.prepare('SELECT * FROM absences').all().map(rowToAbsence),
     vehicleDowntimes: db.prepare('SELECT * FROM vehicle_downtimes').all().map(rowToVehicleDowntime),
     settings: Object.fromEntries(db.prepare('SELECT key, value FROM settings').all().map(r => [r.key, r.value]))
   });
+});
+
+const ARCHIVE_SEARCH_LIMIT = 100;
+app.get('/api/dossiers/archive', requireAuth, (req, res) => {
+  const q = String(req.query.q || '').trim();
+  if (q.length < 2) return res.json({ ok: true, dossiers: [], assignmentsByDossier: {} });
+  const cutoff = archiveCutoffDate();
+  const like = '%' + q + '%';
+  const dossiers = db.prepare(`
+    SELECT * FROM dossiers
+    WHERE endDate < ?
+      AND (client LIKE ? COLLATE NOCASE OR dossierNumber LIKE ? COLLATE NOCASE
+           OR addressFrom LIKE ? COLLATE NOCASE OR addressTo LIKE ? COLLATE NOCASE)
+    ORDER BY endDate DESC
+    LIMIT ?
+  `).all(cutoff, like, like, like, like, ARCHIVE_SEARCH_LIMIT).map(rowToDossier);
+  const assignmentsByDossier = {};
+  if (dossiers.length) {
+    const placeholders = dossiers.map(() => '?').join(',');
+    db.prepare(`SELECT * FROM assignments WHERE dossierId IN (${placeholders})`)
+      .all(...dossiers.map(d => d.id)).map(rowToAssignment)
+      .forEach(a => { (assignmentsByDossier[a.dossierId] = assignmentsByDossier[a.dossierId] || []).push(a); });
+  }
+  res.json({ ok: true, dossiers, assignmentsByDossier });
 });
 
 app.post('/api/settings', requireAuth, requireWrite, (req, res) => {
@@ -648,8 +796,7 @@ app.post('/api/users', requireAuth, requireAdmin, (req, res) => {
   }
   const exists = db.prepare('SELECT 1 FROM users WHERE username = ?').get(username);
   if (exists) return res.json({ ok: false, error: 'username_taken' });
-  const salt = crypto.randomBytes(16).toString('hex');
-  const hash = sha256(salt + password);
+  const { salt, hash } = hashPassword(password);
   db.prepare('INSERT INTO users (username, salt, hash, role) VALUES (?, ?, ?, ?)').run(username, salt, hash, role);
   res.json({ ok: true });
 });
@@ -658,9 +805,11 @@ app.post('/api/users/:username/reset-password', requireAuth, requireAdmin, (req,
   if (!password || password.length < 4) return res.status(400).json({ ok: false, error: 'bad_request' });
   const exists = db.prepare('SELECT 1 FROM users WHERE username = ?').get(req.params.username);
   if (!exists) return res.json({ ok: false, error: 'not_found' });
-  const salt = crypto.randomBytes(16).toString('hex');
-  const hash = sha256(salt + password);
+  const { salt, hash } = hashPassword(password);
   db.prepare('UPDATE users SET salt = ?, hash = ? WHERE username = ?').run(salt, hash, req.params.username);
+  // An admin resetting the password is an authorized override — don't leave
+  // the account locked out from whatever failed attempts led to the reset.
+  clearRateLimit('user', req.params.username);
   res.json({ ok: true });
 });
 app.delete('/api/users/:username', requireAuth, requireAdmin, (req, res) => {
@@ -670,7 +819,7 @@ app.delete('/api/users/:username', requireAuth, requireAdmin, (req, res) => {
 });
 
 // ---------- backups API (admin only) ----------
-const BACKUP_FILENAME_RE = /^planning-[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}h[0-9]{2}\.db$|^avant-restauration-[0-9-]+\.db$/;
+const BACKUP_FILENAME_RE = /^planning-[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}h[0-9]{2}\.db$|^avant-restauration-[0-9-]+\.db$|^avant-deploiement-[0-9-]+_[0-9]{2}h[0-9]{2}m[0-9]{2}s\.db$/;
 
 app.get('/api/backups', requireAuth, requireAdmin, (req, res) => {
   const files = fs.readdirSync(BACKUP_DIR)

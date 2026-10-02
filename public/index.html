@@ -203,9 +203,10 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 .week-day-head.weekend{color:var(--danger)}
 .week-day-col.is-today .week-day-head{color:var(--accent)}
 .week-day-col.drag-over{border-color:var(--accent);background:var(--danger-bg);box-shadow:0 0 0 2px var(--accent) inset}
-.week-day-vehcount{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:2px}
-.week-day-vehcount-item{font-size:10px;font-weight:700;color:var(--fg-muted);background:var(--weekend);border-radius:10px;padding:1px 6px}
-.week-day-vehcount-item.over{color:#fff;background:var(--danger)}
+.week-day-empcount,.week-day-vehcount{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:2px}
+.week-day-empcount-item{font-size:10px;font-weight:700;color:#fff;background:var(--dispo-free);border-radius:10px;padding:1px 6px}
+.week-day-vehcount-item{font-size:10px;font-weight:700;color:#fff;background:var(--chip-a);border-radius:10px;padding:1px 6px}
+.week-day-vehcount-item.over{background:var(--danger)}
 .week-chip{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;border-radius:6px;padding:5px 7px;
   border-left:4px solid var(--border);background:var(--bg);color:var(--fg);cursor:pointer;overflow:hidden}
 .week-chip:hover{background:var(--weekend)}
@@ -359,6 +360,12 @@ table.week-table th.week-today,table.week-table td.week-today{background:var(--b
 table.week-table td.week-daynum{font-size:10.5px;color:var(--fg-muted);font-weight:400}
 table.week-table tr.week-sub td{color:var(--fg-muted);font-size:11.5px;font-weight:400}
 table.week-table tr.week-sub td.week-metric-label{padding-left:16px;text-transform:none;font-weight:400}
+table.week-table tr.week-row-dossiers td{background:color-mix(in srgb, var(--chip-j) 10%, var(--surface))}
+table.week-table tr.week-row-dossiers td.week-metric-label{border-left:4px solid var(--chip-j)}
+table.week-table tr.week-row-emp td{background:color-mix(in srgb, var(--dispo-free) 10%, var(--surface))}
+table.week-table tr.week-row-emp td.week-metric-label{border-left:4px solid var(--dispo-free)}
+table.week-table tr.week-row-veh td{background:color-mix(in srgb, var(--chip-a) 10%, var(--surface))}
+table.week-table tr.week-row-veh td.week-metric-label{border-left:4px solid var(--chip-a)}
 .type-filter{display:flex;gap:6px;margin-bottom:10px}
 .type-filter button{border:1px solid var(--border);background:var(--bg);color:var(--fg-muted);font:inherit;font-size:11px;font-weight:700;
   padding:4px 10px;border-radius:20px;cursor:pointer}
@@ -2286,6 +2293,13 @@ body.has-top-banner .topbar{top:40px}
       ]);
       head.addEventListener("click", function(dateStr){ return function(){ goToDayFromWeek(dateStr); }; }(day.dateStr));
       col.appendChild(head);
+      var empMobilized = empCountOn(day.dateStr, null, null);
+      if (empMobilized){
+        var empRow = el("div", {class:"week-day-empcount"}, [
+          el("span", {class:"week-day-empcount-item", text: empMobilized + " pers."})
+        ]);
+        col.appendChild(empRow);
+      }
       var vehRow = el("div", {class:"week-day-vehcount"});
       VEHICLE_TYPES.forEach(function(t){
         if (!vehTotalsByType[t]) return; // skip types with no fleet at all
@@ -2880,9 +2894,17 @@ body.has-top-banner .topbar{top:40px}
   if (themeToggleBtn) themeToggleBtn.addEventListener("click", cycleTheme);
 
   // ---------- notifications Windows natives + badge sur l'icône ----------
+  function computeTodayAbsenceConflictCount(){
+    var dateStr = fmtDate(new Date());
+    var count = 0;
+    activeDossiersOn(dateStr).forEach(function(d){
+      count += assignedAbsenceWarnings(assignmentFor(d.id, dateStr), dateStr).length;
+    });
+    return count;
+  }
   function computeTodayConflictCount(){
     var c = computeConflicts(fmtDate(new Date()));
-    return c.employees.length + c.vehicles.length;
+    return c.employees.length + c.vehicles.length + computeTodayAbsenceConflictCount();
   }
   function renderNotifStatus(){
     var statusText = $("#notifStatusText"), btn = $("#notifEnableBtn");
@@ -2917,7 +2939,7 @@ body.has-top-banner .topbar{top:40px}
     if (now - notifyState.lastNotifyAt < 15000) return;
     var newCount = computeTodayConflictCount();
     var body = newCount > prevConflictCount
-      ? "⚠ Nouveau conflit de double réservation aujourd'hui."
+      ? "⚠ Nouveau conflit aujourd'hui (double réservation ou absence/immobilisation) — vérifiez le planning."
       : "Le planning a été mis à jour par un collègue.";
     notifyState.lastNotifyAt = now;
     try {
@@ -3390,14 +3412,14 @@ body.has-top-banner .topbar{top:40px}
     });
     thead.appendChild(headRow); table.appendChild(thead);
     var tbody = el("tbody");
-    var groups = [{label:"Chantiers", fn:function(ds){ return dossierCountOn(ds); }, sub:false}];
+    var groups = [{label:"Chantiers", fn:function(ds){ return dossierCountOn(ds); }, sub:false, kind:"dossiers"}];
     MOVE_TYPES.forEach(function(t){ groups.push({label:"— "+t, fn:function(ds){ return dossierCountOn(ds, t); }, sub:true}); });
-    groups.push({label:"Effectif mobilisé", fn:function(ds){ return empCountOn(ds, empCompanyMap); }, sub:false});
+    groups.push({label:"Effectif mobilisé", fn:function(ds){ return empCountOn(ds, empCompanyMap); }, sub:false, kind:"emp"});
     getCompanies().forEach(function(co){ groups.push({label:"— "+co.name, fn:function(ds){ return empCountOn(ds, empCompanyMap, co.id); }, sub:true}); });
-    groups.push({label:"Véhicules mobilisés", fn:function(ds){ return vehCountOn(ds, vehTypeMap); }, sub:false});
+    groups.push({label:"Véhicules mobilisés", fn:function(ds){ return vehCountOn(ds, vehTypeMap); }, sub:false, kind:"veh"});
     VEHICLE_TYPES.forEach(function(t){ groups.push({label:"— "+t, fn:function(ds){ return vehCountOn(ds, vehTypeMap, t); }, sub:true}); });
     groups.forEach(function(r){
-      var row = el("tr", {class: r.sub ? "week-sub" : ""});
+      var row = el("tr", {class: (r.sub ? "week-sub" : "week-main") + (r.kind ? " week-row-"+r.kind : "")});
       row.appendChild(el("td", {class:"week-metric-label", text:r.label}));
       weekDates.forEach(function(ds){
         var td = el("td", {class: ds===todayStr ? "week-today" : "", text:String(r.fn(ds))});

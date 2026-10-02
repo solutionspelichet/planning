@@ -5,3 +5,6 @@ SECRETS.md
 *.db-wal
 *.db-shm
 .env
+tests/.tmp-data/
+test-results/
+playwright-report/

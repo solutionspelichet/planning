@@ -81,6 +81,20 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 
 .day-row{display:grid;grid-template-columns:460px 1fr;gap:18px;align-items:start;margin-top:14px}
 @media (max-width:700px){ .day-row{grid-template-columns:1fr} .quick-pane{flex-wrap:nowrap;height:220px} .quick-group{flex-basis:90px} }
+@media (max-width:860px){
+  .zen-wrap{grid-template-columns:1fr}
+  .week-grid{display:flex;overflow-x:auto;gap:8px}
+  .week-day-col{min-width:130px;flex:none}
+  .full-history-controls{flex-direction:column}
+  .full-history-controls input, .full-history-controls select{flex:1 1 100%;width:100%}
+}
+@media (max-width:600px){
+  .topbar{padding-top:12px;padding-bottom:10px;gap:10px}
+  .tabs{max-width:100%;overflow-x:auto}
+  .tab-btn{white-space:nowrap}
+  .search-wrap{order:10;flex:1 1 100%;max-width:none}
+  .brand h1{font-size:16px}
+}
 
 .quick-pane{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;flex-wrap:wrap;gap:10px;min-height:0;overflow:hidden}
 .quick-group{flex:1 1 130px;min-width:0;display:flex;flex-direction:column;min-height:0;border-left:1px solid var(--border);padding-left:10px}
@@ -125,6 +139,11 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 .btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
 .conflict-banner{background:var(--danger-bg);color:var(--danger);border-radius:8px;padding:8px 12px;
   font-size:12.5px;margin-bottom:12px;font-weight:600}
+.conflict-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:4px 0}
+.conflict-name{font-weight:700;margin-right:2px}
+.conflict-fix-chip{font:inherit;font-size:11.5px;font-weight:700;padding:3px 10px;border-radius:14px;
+  border:1.5px solid var(--danger);background:#fff;color:var(--danger);cursor:pointer}
+.conflict-fix-chip:hover{background:var(--danger);color:#fff}
 .capacity-warning{background:var(--danger-bg);color:var(--danger);border-radius:6px;padding:4px 8px;
   font-size:11.5px;font-weight:700;margin:-2px 0 8px}
 .legend{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;font-size:11.5px;color:var(--fg-muted)}
@@ -236,6 +255,12 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 .history-old{color:var(--danger);text-decoration:line-through;opacity:.8}
 .history-new{color:var(--fg);font-weight:600}
 .history-meta{font-size:10.5px;color:var(--fg-muted)}
+.full-history-controls{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.full-history-controls input{flex:1 1 220px;border:1px solid var(--border);background:var(--bg);color:var(--fg);
+  border-radius:8px;padding:7px 10px;font:inherit;font-size:13px}
+.full-history-controls select{border:1px solid var(--border);background:var(--bg);color:var(--fg);
+  border-radius:8px;padding:7px 10px;font:inherit;font-size:13px}
+.full-history-list{max-height:520px;overflow:auto;border:1px solid var(--border);border-radius:10px;padding:2px 12px}
 
 .grid-wrap{overflow-x:auto;overflow-y:auto;max-height:65vh;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
 table.dispo{border-collapse:collapse;width:100%;font-size:12px}
@@ -275,7 +300,7 @@ td.dispo-cell{cursor:pointer}
 .arcade-wrap{max-width:740px}
 .arcade-hud{display:flex;gap:20px;align-items:center;margin-bottom:10px;font-size:13px}
 .arcade-hud button{margin-left:auto}
-#arcCanvas{background:#0f1115;border-radius:12px;border:1px solid var(--border);display:block;max-width:100%;touch-action:none}
+#arcCanvas{background:#0f1115;border-radius:12px;border:1px solid var(--border);display:block;max-width:100%;height:auto;touch-action:none}
 .chart-card h3{font-size:12.5px;font-weight:700;margin:0 0 10px;color:var(--fg-muted);text-transform:uppercase;letter-spacing:.03em}
 .chart-legend{display:flex;gap:14px;font-size:11.5px;color:var(--fg-muted);margin-top:6px}
 .chart-legend span{display:flex;align-items:center;gap:5px}
@@ -334,6 +359,10 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
 .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--fg);color:var(--bg);
   padding:8px 16px;border-radius:8px;font-size:13px;z-index:70;opacity:0;pointer-events:none;transition:opacity .2s}
 .toast.show{opacity:1}
+.update-banner{position:fixed;top:0;left:0;right:0;z-index:80;background:var(--accent);color:var(--accent-fg);
+  display:flex;align-items:center;justify-content:center;gap:14px;padding:9px 14px;font-size:13px;font-weight:600;
+  box-shadow:0 2px 10px rgba(0,0,0,.15)}
+.update-banner .btn{background:#fff;color:var(--accent);padding:5px 14px;font-weight:700}
 
 .search-wrap{position:relative;flex:1 1 220px;max-width:320px}
 .search-wrap input{width:100%;border:1px solid var(--border);background:var(--surface);color:var(--fg);border-radius:8px;padding:7px 10px;font:inherit;font-size:13px}
@@ -631,6 +660,22 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
         </div>
       </div>
     </div>
+    <div class="chart-card" style="margin-top:16px">
+      <h3 style="margin-bottom:10px">Historique complet des actions (200 dernières)</h3>
+      <div class="full-history-controls">
+        <input type="text" id="fullActionLogSearch" placeholder="Rechercher (nom, auteur…)">
+        <select id="fullActionLogType">
+          <option value="">Tous les types</option>
+          <option value="dossier">Dossiers</option>
+          <option value="assignment">Affectations</option>
+          <option value="employee">Employés</option>
+          <option value="vehicle">Véhicules</option>
+          <option value="absence">Absences</option>
+          <option value="downtime">Immobilisations</option>
+        </select>
+      </div>
+      <div class="full-history-list" id="fullActionLogList"></div>
+    </div>
   </div>
 
   <div class="view" id="view-zen" hidden>
@@ -679,6 +724,10 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
 </div>
 
 <div class="toast" id="toast"></div>
+<div class="update-banner" id="updateBanner" hidden>
+  <span>🔄 Nouvelle version disponible.</span>
+  <button class="btn" id="updateReloadBtn">Recharger</button>
+</div>
 <div id="printArea"></div>
 
 <script>
@@ -955,6 +1004,7 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     $("#view-zen").hidden = tab !== "zen";
     $("#view-detente").hidden = tab !== "detente";
     if (tab === "dashboard") renderDashboard();
+    if (tab === "admin") renderFullActionLog();
     if (tab === "vacances") { renderAbsenceSelects(); renderAbsenceList(); renderDowntimeList(); }
     if (tab === "settings") renderSettingsTab();
     else applySettingsToRoot(state.settings); // leaving Settings: drop any unsaved live-preview changes
@@ -990,6 +1040,38 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
       employees: Object.keys(loads.empLoad).filter(function(id){ return loads.empLoad[id] > 1; }),
       vehicles: Object.keys(loads.vehUse).filter(function(id){ return loads.vehUse[id] > 1; })
     };
+  }
+  function dossiersUsingResource(dateStr, kind, resourceId){
+    return activeDossiersOn(dateStr).map(function(dossier){
+      return {dossier: dossier, assignment: assignmentFor(dossier.id, dateStr)};
+    }).filter(function(pair){
+      return kind === "emp"
+        ? (pair.assignment.employees||[]).some(function(a){ return a.employeeId === resourceId; })
+        : (pair.assignment.vehicleIds||[]).indexOf(resourceId) !== -1;
+    });
+  }
+  function removeResourceFromAssignment(kind, resourceId, assignment){
+    if (kind === "emp") saveAssignment(assignment, {employees:(assignment.employees||[]).filter(function(a){ return a.employeeId !== resourceId; })});
+    else saveAssignment(assignment, {vehicleIds:(assignment.vehicleIds||[]).filter(function(id){ return id !== resourceId; })});
+  }
+  function renderConflictBanner(host, conflicts, dateStr){
+    host.innerHTML = "";
+    if (!conflicts.employees.length && !conflicts.vehicles.length) return;
+    var banner = el("div", {class:"conflict-banner"});
+    banner.appendChild(el("div", {text:"⚠ Double réservation ce jour-là — retirez la ressource d'un des chantiers :", style:"margin-bottom:4px"}));
+    function addResourceRow(kind, id, label){
+      var row = el("div", {class:"conflict-row"});
+      row.appendChild(el("span", {class:"conflict-name", text:label}));
+      dossiersUsingResource(dateStr, kind, id).forEach(function(pair){
+        var chip = el("button", {type:"button", class:"conflict-fix-chip", text:"Retirer de « " + (pair.dossier.client || "sans nom") + " »"});
+        chip.addEventListener("click", function(){ removeResourceFromAssignment(kind, id, pair.assignment); });
+        row.appendChild(chip);
+      });
+      banner.appendChild(row);
+    }
+    conflicts.employees.forEach(function(id){ addResourceRow("emp", id, empName(id)); });
+    conflicts.vehicles.forEach(function(id){ addResourceRow("veh", id, vehName(id)); });
+    host.appendChild(banner);
   }
 
   // ---------- absences & immobilisations véhicules ----------
@@ -1510,11 +1592,7 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     var dossiersToday = activeDossiersOn(state.selectedDate).sort(function(a,b){ return (a.displayOrder||0)-(b.displayOrder||0); });
     renderPlanningFilterBar(dossiersToday);
     var conflicts = computeConflicts(state.selectedDate);
-    var banner = $("#conflictBanner"); banner.innerHTML = "";
-    if (conflicts.employees.length || conflicts.vehicles.length){
-      var names = conflicts.employees.map(empName).concat(conflicts.vehicles.map(vehName));
-      banner.appendChild(el("div", {class:"conflict-banner", text:"⚠ Double réservation ce jour-là : " + names.join(", ")}));
-    }
+    renderConflictBanner($("#conflictBanner"), conflicts, state.selectedDate);
     renderQuickPane("#quickViewToday", state.selectedDate);
     var host = $("#dossierList"); host.innerHTML = "";
     var filteredToday = dossiersToday.filter(matchesPlanningFilter);
@@ -1548,11 +1626,7 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     renderQuickPane("#quickViewNext", nextDateStr);
     var dossiersNext = activeDossiersOn(nextDateStr).sort(function(a,b){ return (a.displayOrder||0)-(b.displayOrder||0); });
     var conflictsNext = computeConflicts(nextDateStr);
-    bannerHost.innerHTML = "";
-    if (conflictsNext.employees.length || conflictsNext.vehicles.length){
-      var names = conflictsNext.employees.map(empName).concat(conflictsNext.vehicles.map(vehName));
-      bannerHost.appendChild(el("div", {class:"conflict-banner", text:"⚠ Double réservation ce jour-là : " + names.join(", ")}));
-    }
+    renderConflictBanner(bannerHost, conflictsNext, nextDateStr);
     var listHost = $("#nextDayList");
     listHost.innerHTML = "";
     var filteredNext = dossiersNext.filter(matchesPlanningFilter);
@@ -1998,6 +2072,27 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
       default: return a.entityId;
     }
   }
+  function buildActionLogRow(a, onUndone){
+    var when = new Date(a.performedAt);
+    var whenLabel = when.toLocaleDateString("fr-CH") + " " + when.toLocaleTimeString("fr-CH", {hour:"2-digit", minute:"2-digit"});
+    var row = el("div", {class:"history-row"});
+    row.appendChild(el("div", {class:"history-field", text: (ACTION_VERB_LABELS[a.action] || a.action) + " — " + (ACTION_ENTITY_LABELS[a.entityType] || a.entityType)}));
+    row.appendChild(el("div", {class:"history-change", text: actionSubjectLabel(a)}));
+    row.appendChild(el("div", {class:"history-meta", text: (a.performedBy || "?") + " — " + whenLabel + (a.undone ? " — annulé" : "")}));
+    if (!a.undone && canEdit()){
+      var undoBtn = el("button", {class:"link-btn history-btn", text:"Annuler cette action"});
+      undoBtn.addEventListener("click", function(){
+        undoBtn.disabled = true; undoBtn.textContent = "Annulation…";
+        api("undoAction", {id: a.id}).then(function(r){
+          if (!r.ok){ toast("Annulation impossible"); undoBtn.disabled = false; undoBtn.textContent = "Annuler cette action"; return; }
+          toast("Action annulée"); refreshAll();
+          if (onUndone) onUndone();
+        });
+      });
+      row.appendChild(undoBtn);
+    }
+    return row;
+  }
   function renderActionLogList(host){
     host.innerHTML = "";
     host.appendChild(el("div", {class:"opt-empty", text:"Chargement…"}));
@@ -2007,28 +2102,40 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
         host.appendChild(el("div", {class:"opt-empty", text:"Aucune action récente."}));
         return;
       }
-      res.actions.forEach(function(a){
-        var when = new Date(a.performedAt);
-        var whenLabel = when.toLocaleDateString("fr-CH") + " " + when.toLocaleTimeString("fr-CH", {hour:"2-digit", minute:"2-digit"});
-        var row = el("div", {class:"history-row"});
-        row.appendChild(el("div", {class:"history-field", text: (ACTION_VERB_LABELS[a.action] || a.action) + " — " + (ACTION_ENTITY_LABELS[a.entityType] || a.entityType)}));
-        row.appendChild(el("div", {class:"history-change", text: actionSubjectLabel(a)}));
-        row.appendChild(el("div", {class:"history-meta", text: (a.performedBy || "?") + " — " + whenLabel + (a.undone ? " — annulé" : "")}));
-        if (!a.undone && canEdit()){
-          var undoBtn = el("button", {class:"link-btn history-btn", text:"Annuler cette action"});
-          undoBtn.addEventListener("click", function(){
-            undoBtn.disabled = true; undoBtn.textContent = "Annulation…";
-            api("undoAction", {id: a.id}).then(function(r){
-              if (!r.ok){ toast("Annulation impossible"); undoBtn.disabled = false; undoBtn.textContent = "Annuler cette action"; return; }
-              toast("Action annulée"); closePopover(); refreshAll();
-            });
-          });
-          row.appendChild(undoBtn);
-        }
-        host.appendChild(row);
-      });
+      res.actions.forEach(function(a){ host.appendChild(buildActionLogRow(a, function(){ closePopover(); })); });
     });
   }
+  var fullActionLogCache = [];
+  function drawFullActionLog(){
+    var host = $("#fullActionLogList"); if (!host) return;
+    host.innerHTML = "";
+    var q = (($("#fullActionLogSearch") || {}).value || "").toLowerCase();
+    var typeFilter = ($("#fullActionLogType") || {}).value || "";
+    var filtered = fullActionLogCache.filter(function(a){
+      if (typeFilter && a.entityType !== typeFilter) return false;
+      if (!q) return true;
+      var hay = ((ACTION_ENTITY_LABELS[a.entityType]||"") + " " + (ACTION_VERB_LABELS[a.action]||"") + " " + actionSubjectLabel(a) + " " + (a.performedBy||"")).toLowerCase();
+      return hay.indexOf(q) !== -1;
+    });
+    if (!filtered.length){
+      host.appendChild(el("div", {class:"opt-empty", text:"Aucune action ne correspond."}));
+      return;
+    }
+    filtered.forEach(function(a){ host.appendChild(buildActionLogRow(a, renderFullActionLog)); });
+  }
+  function renderFullActionLog(){
+    var host = $("#fullActionLogList"); if (!host) return;
+    host.innerHTML = "";
+    host.appendChild(el("div", {class:"opt-empty", text:"Chargement…"}));
+    api("getActionLog", {limit:200}).then(function(res){
+      fullActionLogCache = (res.ok && res.actions) ? res.actions : [];
+      drawFullActionLog();
+    });
+  }
+  var fullActionLogSearch = $("#fullActionLogSearch");
+  if (fullActionLogSearch) fullActionLogSearch.addEventListener("input", drawFullActionLog);
+  var fullActionLogType = $("#fullActionLogType");
+  if (fullActionLogType) fullActionLogType.addEventListener("change", drawFullActionLog);
   function openActionLogPopover(anchor){
     if (!canEdit()) return;
     closePopover();
@@ -3173,7 +3280,31 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
   });
 
   if ("serviceWorker" in navigator){
-    window.addEventListener("load", function(){ navigator.serviceWorker.register("sw.js").catch(function(){ /* PWA install just won't be offered — app still works normally */ }); });
+    window.addEventListener("load", function(){
+      navigator.serviceWorker.register("sw.js").then(function(reg){
+        if (reg.waiting && reg.active) showUpdateBanner(reg); // an update was already waiting from a previous visit
+        reg.addEventListener("updatefound", function(){
+          var newWorker = reg.installing;
+          if (!newWorker) return;
+          newWorker.addEventListener("statechange", function(){
+            if (newWorker.state === "installed" && navigator.serviceWorker.controller) showUpdateBanner(reg);
+          });
+        });
+      }).catch(function(){ /* PWA install just won't be offered — app still works normally */ });
+      var reloadingForUpdate = false;
+      navigator.serviceWorker.addEventListener("controllerchange", function(){
+        if (reloadingForUpdate) return;
+        reloadingForUpdate = true;
+        window.location.reload();
+      });
+    });
+  }
+  function showUpdateBanner(reg){
+    var bar = $("#updateBanner"); if (!bar) return;
+    bar.hidden = false;
+    $("#updateReloadBtn").addEventListener("click", function(){
+      if (reg.waiting) reg.waiting.postMessage({type:"SKIP_WAITING"});
+    });
   }
 
   function boot(){

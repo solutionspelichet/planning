@@ -15,7 +15,9 @@ const { execFile } = require('child_process');
 const Database = require('better-sqlite3');
 
 const PORT = process.env.PORT || 3000;
-const DATA_DIR = path.join(__dirname, 'data');
+// Overridable so the automated test suite can point at a disposable
+// directory instead of touching real dev/production data.
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const DB_PATH = path.join(DATA_DIR, 'planning.db');
 const BACKUP_DIR = path.join(DATA_DIR, 'backups');
 const RESTORE_PENDING_PATH = path.join(DATA_DIR, 'restore-pending.db');
@@ -494,7 +496,7 @@ function rowToActionLog(r) {
   };
 }
 app.get('/api/action-log', requireAuth, (req, res) => {
-  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 10));
+  const limit = Math.min(ACTION_LOG_LIMIT, Math.max(1, parseInt(req.query.limit, 10) || 10));
   res.json({ ok: true, actions: db.prepare('SELECT * FROM action_log ORDER BY performedAt DESC LIMIT ?').all(limit).map(rowToActionLog) });
 });
 app.post('/api/action-log/:id/undo', requireAuth, requireWrite, (req, res) => {

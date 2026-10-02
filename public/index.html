@@ -56,6 +56,21 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 
 .topbar{position:sticky;top:0;z-index:30;background:var(--bg);padding-top:16px;padding-bottom:12px;
   border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;align-items:center;gap:14px;justify-content:space-between}
+@media (display-mode: window-controls-overlay){
+  /* When installed on Windows with its title bar merged into the app (Window
+     Controls Overlay), let the topbar double as that title bar: draggable by
+     default, with its interactive bits opted back out, and padded so content
+     doesn't sit under the native minimize/maximize/close buttons. */
+  .topbar{
+    -webkit-app-region: drag; app-region: drag;
+    min-height: env(titlebar-area-height, 40px);
+    padding-left: env(titlebar-area-x, 16px);
+    padding-right: calc(100% - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100%));
+  }
+  .topbar button, .topbar input, .topbar select, .topbar a{
+    -webkit-app-region: no-drag; app-region: no-drag;
+  }
+}
 .brand{display:flex;align-items:center;gap:10px}
 .brand-mark{width:34px;height:34px;border-radius:9px;background:var(--accent);color:var(--accent-fg);
   display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex:none}
@@ -387,6 +402,9 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
   display:flex;align-items:center;justify-content:center;gap:14px;padding:9px 14px;font-size:13px;font-weight:600;
   box-shadow:0 2px 10px rgba(0,0,0,.15)}
 .update-banner .btn{background:#fff;color:var(--accent);padding:5px 14px;font-weight:700}
+.offline-banner{background:var(--fg-muted);color:var(--bg)}
+body.has-top-banner{padding-top:40px}
+body.has-top-banner .topbar{top:40px}
 
 .search-wrap{position:relative;flex:1 1 220px;max-width:320px}
 .search-wrap input{width:100%;border:1px solid var(--border);background:var(--surface);color:var(--fg);border-radius:8px;padding:7px 10px;font:inherit;font-size:13px}
@@ -601,6 +619,11 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
   </div>
 
   <div class="view" id="view-settings" hidden>
+    <div class="chart-card">
+      <h3 style="margin-bottom:8px">Notifications</h3>
+      <p class="chart-sub" id="notifStatusText" style="margin-bottom:10px">—</p>
+      <button class="btn btn-ghost" id="notifEnableBtn">🔔 Activer les notifications</button>
+    </div>
     <div class="settings-preview" id="settingsPreview"></div>
     <div class="company-grid" id="settingsGroups" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr))"></div>
     <div class="day-panel-actions edit-only" style="margin-top:16px">
@@ -753,6 +776,9 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
 <div class="update-banner" id="updateBanner" hidden>
   <span>🔄 Nouvelle version disponible.</span>
   <button class="btn" id="updateReloadBtn">Recharger</button>
+</div>
+<div class="update-banner offline-banner" id="offlineBanner" hidden>
+  <span id="offlineBannerText">📡 Hors ligne — lecture seule</span>
 </div>
 <div id="printArea"></div>
 
@@ -1010,11 +1036,15 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
   }
 
   function refreshAll(){
+    var prevConflictCount = computeTodayConflictCount();
     return api("getAll", {}).then(function(res){
       if (!res.ok){
         if (res.error === "not_authenticated") { toast("Session expirée, reconnectez-vous."); logout(); }
+        if (res.error === "network") setOfflineBanner(true);
         return;
       }
+      setOfflineBanner(false);
+      state.lastSyncAt = new Date();
       state.employees = res.employees || [];
       state.vehicles = res.vehicles || [];
       state.dossiers = res.dossiers || [];
@@ -1029,6 +1059,8 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
       if (state.activeTab === "vacances") { renderAbsenceSelects(); renderAbsenceList(); renderDowntimeList(); }
       if (state.activeTab === "settings") renderSettingsTab();
       if (state.role === "admin") { renderUsers(); renderBackups(); }
+      updateAppBadge();
+      maybeNotifyUpdate(prevConflictCount);
     });
   }
 
@@ -1493,6 +1525,7 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
   // presetDraft lets the reset button hand over fresh defaults without this
   // function immediately clobbering them with the still-saved state.settings.
   function renderSettingsTab(presetDraft){
+    renderNotifStatus();
     state.settingsDraft = presetDraft || Object.assign({}, state.settings);
     applySettingsToRoot(state.settingsDraft);
     renderSettingsPreview();
@@ -2249,6 +2282,59 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
   })();
   var themeToggleBtn = $("#themeToggleBtn");
   if (themeToggleBtn) themeToggleBtn.addEventListener("click", cycleTheme);
+
+  // ---------- notifications Windows natives + badge sur l'icône ----------
+  function computeTodayConflictCount(){
+    var c = computeConflicts(fmtDate(new Date()));
+    return c.employees.length + c.vehicles.length;
+  }
+  function renderNotifStatus(){
+    var statusText = $("#notifStatusText"), btn = $("#notifEnableBtn");
+    if (!statusText || !btn) return;
+    if (!("Notification" in window)){
+      statusText.textContent = "Notifications non supportées par ce navigateur.";
+      btn.hidden = true;
+      return;
+    }
+    var perm = Notification.permission;
+    if (perm === "granted"){
+      statusText.textContent = "Activées — vous serez averti(e) des mises à jour pendant que l'app est en arrière-plan.";
+      btn.hidden = true;
+    } else if (perm === "denied"){
+      statusText.textContent = "Bloquées par le navigateur. Autorisez-les depuis les réglages du site pour les activer.";
+      btn.hidden = true;
+    } else {
+      statusText.textContent = "Désactivées — activez-les pour être averti(e) des changements pendant que l'app est en arrière-plan.";
+      btn.hidden = false;
+    }
+  }
+  var notifEnableBtn = $("#notifEnableBtn");
+  if (notifEnableBtn) notifEnableBtn.addEventListener("click", function(){
+    if (!("Notification" in window)) return;
+    Notification.requestPermission().then(function(){ renderNotifStatus(); });
+  });
+  var notifyState = {lastNotifyAt: 0};
+  function maybeNotifyUpdate(prevConflictCount){
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    if (!document.hidden) return;
+    var now = Date.now();
+    if (now - notifyState.lastNotifyAt < 15000) return;
+    var newCount = computeTodayConflictCount();
+    var body = newCount > prevConflictCount
+      ? "⚠ Nouveau conflit de double réservation aujourd'hui."
+      : "Le planning a été mis à jour par un collègue.";
+    notifyState.lastNotifyAt = now;
+    try {
+      var n = new Notification("Planning Effectifs", {body: body, icon: "icons/icon-192.png", tag: "planning-update"});
+      n.onclick = function(){ window.focus(); n.close(); };
+    } catch(e){ /* Notification constructor unsupported in this context — skip silently */ }
+  }
+  function updateAppBadge(){
+    if (!("setAppBadge" in navigator)) return;
+    var count = computeTodayConflictCount();
+    if (count > 0) navigator.setAppBadge(count).catch(function(){});
+    else if ("clearAppBadge" in navigator) navigator.clearAppBadge().catch(function(){});
+  }
 
   function openVehiclePicker(anchor, assignment){
     if (!canEdit()) return;
@@ -3401,17 +3487,39 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
       });
     });
   }
+  function updateTopBannerSpacing(){
+    var updateBar = $("#updateBanner"), offlineBar = $("#offlineBanner");
+    var anyVisible = (updateBar && !updateBar.hidden) || (offlineBar && !offlineBar.hidden);
+    document.body.classList.toggle("has-top-banner", !!anyVisible);
+  }
   function showUpdateBanner(reg){
     var bar = $("#updateBanner"); if (!bar) return;
     bar.hidden = false;
+    updateTopBannerSpacing();
     $("#updateReloadBtn").addEventListener("click", function(){
       if (reg.waiting) reg.waiting.postMessage({type:"SKIP_WAITING"});
     });
   }
 
+  // ---------- mode hors ligne (lecture seule) ----------
+  function setOfflineBanner(offline){
+    var bar = $("#offlineBanner"); if (!bar) return;
+    bar.hidden = !offline;
+    if (offline){
+      var label = state.lastSyncAt
+        ? "📡 Hors ligne — dernières données du " + state.lastSyncAt.toLocaleDateString("fr-CH") + " à " + state.lastSyncAt.toLocaleTimeString("fr-CH", {hour:"2-digit", minute:"2-digit"})
+        : "📡 Hors ligne — aucune donnée synchronisée pour l'instant";
+      $("#offlineBannerText").textContent = label;
+    }
+    updateTopBannerSpacing();
+  }
+  window.addEventListener("offline", function(){ setOfflineBanner(true); });
+  window.addEventListener("online", function(){ setOfflineBanner(false); refreshAll(); });
+
   function boot(){
     renderDow();
     setupDragReordering();
+    if ("onLine" in navigator && !navigator.onLine) setOfflineBanner(true);
     if (loadSession()) enterApp();
   }
   boot();

@@ -40,6 +40,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Backup database before deploying
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_PORT }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            if [ -f /opt/planning-app/data/planning.db ]; then
+              sqlite3 /opt/planning-app/data/planning.db "VACUUM INTO '/opt/planning-app/data/backups/avant-deploiement-$(date +%Y-%m-%d_%Hh%M).db'"
+            else
+              echo "No existing database yet (first deploy) — skipping pre-deploy backup."
+            fi
+
       - name: Copy public/index.html
         uses: appleboy/scp-action@v0.1.7
         with:

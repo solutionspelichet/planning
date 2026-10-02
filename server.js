@@ -275,39 +275,42 @@ function verifyPassword(password, salt, storedHash) {
 function randomToken() { return crypto.randomBytes(24).toString('hex'); }
 
 // ---------- login rate limiting ----------
-// Keyed by username (not IP): the goal is to slow down guessing a specific
-// account's password, which an attacker can do from any/many IPs but not
-// with any/many usernames. In-memory only, like `sessions` below — fine for
-// a single-process app, and resets on restart same as everything else here.
-const loginAttempts = new Map(); // username (lowercased) -> {count, lockedUntil, lastAttemptAt}
-const LOGIN_MAX_ATTEMPTS = 5;
-const LOGIN_LOCKOUT_MS = 5 * 60 * 1000;
-const LOGIN_ATTEMPT_FORGET_MS = 15 * 60 * 1000; // drop stale entries so probing many fake usernames can't grow this forever
-function pruneLoginAttempts() {
+// Two independent buckets per failed attempt: one keyed by username (slows
+// down guessing one specific account's password, from any/many IPs) and one
+// keyed by source IP (slows down one source hammering the endpoint at all,
+// regardless of which account it's trying). In-memory only, like `sessions`
+// below — fine for a single-process app, and resets on restart same as
+// everything else here.
+const rateLimitBuckets = new Map(); // "kind:key" -> {count, lockedUntil, lastAttemptAt}
+const LOGIN_USER_MAX_ATTEMPTS = 5, LOGIN_USER_LOCKOUT_MS = 5 * 60 * 1000;
+const LOGIN_IP_MAX_ATTEMPTS = 20, LOGIN_IP_LOCKOUT_MS = 10 * 60 * 1000;
+const RATE_LIMIT_FORGET_MS = 15 * 60 * 1000; // drop stale entries so probing many fake usernames/IPs can't grow this forever
+function rateLimitKey(kind, key) { return kind + ':' + String(key || '').toLowerCase(); }
+function pruneRateLimits() {
   const now = Date.now();
-  for (const [key, entry] of loginAttempts) {
-    if (entry.lockedUntil < now && now - entry.lastAttemptAt > LOGIN_ATTEMPT_FORGET_MS) loginAttempts.delete(key);
+  for (const [k, entry] of rateLimitBuckets) {
+    if (entry.lockedUntil < now && now - entry.lastAttemptAt > RATE_LIMIT_FORGET_MS) rateLimitBuckets.delete(k);
   }
 }
-function isLoginLocked(username) {
-  pruneLoginAttempts();
-  const entry = loginAttempts.get((username || '').toLowerCase());
+function isRateLimited(kind, key) {
+  pruneRateLimits();
+  const entry = rateLimitBuckets.get(rateLimitKey(kind, key));
   return !!(entry && entry.lockedUntil > Date.now());
 }
-function recordFailedLogin(username) {
-  const key = (username || '').toLowerCase();
+function recordRateLimitFailure(kind, key, maxAttempts, lockoutMs) {
+  const k = rateLimitKey(kind, key);
   const now = Date.now();
-  const entry = loginAttempts.get(key) || { count: 0, lockedUntil: 0, lastAttemptAt: now };
+  const entry = rateLimitBuckets.get(k) || { count: 0, lockedUntil: 0, lastAttemptAt: now };
   entry.count += 1;
   entry.lastAttemptAt = now;
-  if (entry.count >= LOGIN_MAX_ATTEMPTS) {
-    entry.lockedUntil = now + LOGIN_LOCKOUT_MS;
+  if (entry.count >= maxAttempts) {
+    entry.lockedUntil = now + lockoutMs;
     entry.count = 0;
   }
-  loginAttempts.set(key, entry);
+  rateLimitBuckets.set(k, entry);
 }
-function clearFailedLogins(username) {
-  loginAttempts.delete((username || '').toLowerCase());
+function clearRateLimit(kind, key) {
+  rateLimitBuckets.delete(rateLimitKey(kind, key));
 }
 
 const sessions = new Map(); // token -> {username, role, expires}
@@ -382,6 +385,11 @@ function broadcast() {
 }
 
 const app = express();
+// Exactly one reverse proxy in front in production (Nginx Proxy Manager —
+// see README), so req.ip resolves to the real client IP from the single
+// X-Forwarded-For hop it adds, instead of always reporting the proxy's own
+// Docker-gateway address for every visitor.
+app.set('trust proxy', 1);
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -396,13 +404,16 @@ app.get('/api/events', requireAuth, (req, res) => {
 // ---------- auth ----------
 app.post('/api/login', (req, res) => {
   const { username, password } = req.body || {};
-  if (isLoginLocked(username)) return res.json({ ok: false, error: 'too_many_attempts' });
+  if (isRateLimited('user', username) || isRateLimited('ip', req.ip)) {
+    return res.json({ ok: false, error: 'too_many_attempts' });
+  }
   const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username || '');
   if (!user || !verifyPassword(password || '', user.salt, user.hash)) {
-    recordFailedLogin(username);
+    recordRateLimitFailure('user', username, LOGIN_USER_MAX_ATTEMPTS, LOGIN_USER_LOCKOUT_MS);
+    recordRateLimitFailure('ip', req.ip, LOGIN_IP_MAX_ATTEMPTS, LOGIN_IP_LOCKOUT_MS);
     return res.json({ ok: false, error: 'invalid_credentials' });
   }
-  clearFailedLogins(username);
+  clearRateLimit('user', username);
   if (!user.hash.startsWith('scrypt:')) {
     const { salt, hash } = hashPassword(password);
     db.prepare('UPDATE users SET salt = ?, hash = ? WHERE username = ?').run(salt, hash, user.username);
@@ -459,19 +470,59 @@ function recordDossierHistory(oldRow, newValues, changedBy) {
   tx();
 }
 
+// Dossiers (and their assignments) that ended more than this long ago are
+// left out of the main payload — every screen only ever looks at the
+// current/near-future window, so there's no reason to keep re-sending years
+// of closed jobsites on every load as the database grows. They're never
+// deleted, just not in the hot path; /api/dossiers/archive looks them up
+// on demand (Admin tab).
+const ARCHIVE_CUTOFF_MONTHS = 18;
+function archiveCutoffDate() {
+  const d = new Date();
+  d.setMonth(d.getMonth() - ARCHIVE_CUTOFF_MONTHS);
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
 app.get('/api/all', requireAuth, (req, res) => {
+  const cutoff = archiveCutoffDate();
   res.json({
     ok: true,
     role: req.session.role,
     username: req.session.username,
     employees: db.prepare('SELECT * FROM employees').all().map(rowToEmployee),
     vehicles: db.prepare('SELECT * FROM vehicles').all().map(rowToVehicle),
-    dossiers: db.prepare('SELECT * FROM dossiers').all().map(rowToDossier),
-    assignments: db.prepare('SELECT * FROM assignments').all().map(rowToAssignment),
+    dossiers: db.prepare('SELECT * FROM dossiers WHERE endDate >= ?').all(cutoff).map(rowToDossier),
+    assignments: db.prepare(`
+      SELECT a.* FROM assignments a JOIN dossiers d ON d.id = a.dossierId WHERE d.endDate >= ?
+    `).all(cutoff).map(rowToAssignment),
     absences: db.prepare('SELECT * FROM absences').all().map(rowToAbsence),
     vehicleDowntimes: db.prepare('SELECT * FROM vehicle_downtimes').all().map(rowToVehicleDowntime),
     settings: Object.fromEntries(db.prepare('SELECT key, value FROM settings').all().map(r => [r.key, r.value]))
   });
+});
+
+const ARCHIVE_SEARCH_LIMIT = 100;
+app.get('/api/dossiers/archive', requireAuth, (req, res) => {
+  const q = String(req.query.q || '').trim();
+  if (q.length < 2) return res.json({ ok: true, dossiers: [], assignmentsByDossier: {} });
+  const cutoff = archiveCutoffDate();
+  const like = '%' + q + '%';
+  const dossiers = db.prepare(`
+    SELECT * FROM dossiers
+    WHERE endDate < ?
+      AND (client LIKE ? COLLATE NOCASE OR dossierNumber LIKE ? COLLATE NOCASE
+           OR addressFrom LIKE ? COLLATE NOCASE OR addressTo LIKE ? COLLATE NOCASE)
+    ORDER BY endDate DESC
+    LIMIT ?
+  `).all(cutoff, like, like, like, like, ARCHIVE_SEARCH_LIMIT).map(rowToDossier);
+  const assignmentsByDossier = {};
+  if (dossiers.length) {
+    const placeholders = dossiers.map(() => '?').join(',');
+    db.prepare(`SELECT * FROM assignments WHERE dossierId IN (${placeholders})`)
+      .all(...dossiers.map(d => d.id)).map(rowToAssignment)
+      .forEach(a => { (assignmentsByDossier[a.dossierId] = assignmentsByDossier[a.dossierId] || []).push(a); });
+  }
+  res.json({ ok: true, dossiers, assignmentsByDossier });
 });
 
 app.post('/api/settings', requireAuth, requireWrite, (req, res) => {
@@ -737,6 +788,9 @@ app.post('/api/users/:username/reset-password', requireAuth, requireAdmin, (req,
   if (!exists) return res.json({ ok: false, error: 'not_found' });
   const { salt, hash } = hashPassword(password);
   db.prepare('UPDATE users SET salt = ?, hash = ? WHERE username = ?').run(salt, hash, req.params.username);
+  // An admin resetting the password is an authorized override — don't leave
+  // the account locked out from whatever failed attempts led to the reset.
+  clearRateLimit('user', req.params.username);
   res.json({ ok: true });
 });
 app.delete('/api/users/:username', requireAuth, requireAdmin, (req, res) => {
@@ -746,7 +800,7 @@ app.delete('/api/users/:username', requireAuth, requireAdmin, (req, res) => {
 });
 
 // ---------- backups API (admin only) ----------
-const BACKUP_FILENAME_RE = /^planning-[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}h[0-9]{2}\.db$|^avant-restauration-[0-9-]+\.db$/;
+const BACKUP_FILENAME_RE = /^planning-[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}h[0-9]{2}\.db$|^avant-restauration-[0-9-]+\.db$|^avant-deploiement-[0-9-]+_[0-9]{2}h[0-9]{2}\.db$/;
 
 app.get('/api/backups', requireAuth, requireAdmin, (req, res) => {
   const files = fs.readdirSync(BACKUP_DIR)

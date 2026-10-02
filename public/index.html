@@ -1676,7 +1676,7 @@ body.has-top-banner .topbar{top:40px}
     } else if (!filteredToday.length){
       host.appendChild(el("div", {class:"empty-note", text:"Aucun chantier ne correspond au filtre sélectionné."}));
     } else {
-      filteredToday.forEach(function(dossier){ host.appendChild(renderDossierCard(dossier, conflicts, state.selectedDate, dossiersToday.indexOf(dossier)+1)); });
+      filteredToday.forEach(function(dossier){ host.appendChild(renderDossierCard(dossier, conflicts, state.selectedDate, clientOrderIndex(dossiersToday, dossier))); });
     }
     syncPaneHeight("#quickViewToday", "#dossierList");
     renderNextDayPanel();
@@ -1710,7 +1710,7 @@ body.has-top-banner .topbar{top:40px}
     } else if (!filteredNext.length){
       listHost.appendChild(el("div", {class:"empty-note", text:"Aucun chantier ne correspond au filtre sélectionné."}));
     } else {
-      filteredNext.forEach(function(dossier){ listHost.appendChild(renderDossierCard(dossier, conflictsNext, nextDateStr, dossiersNext.indexOf(dossier)+1)); });
+      filteredNext.forEach(function(dossier){ listHost.appendChild(renderDossierCard(dossier, conflictsNext, nextDateStr, clientOrderIndex(dossiersNext, dossier))); });
     }
     syncPaneHeight("#quickViewNext", "#nextDayList");
   }
@@ -1854,6 +1854,13 @@ body.has-top-banner .topbar{top:40px}
     if (dossier.id.indexOf("depot_") === 0) return "DEPOT";
     if (dossier.id.indexOf("archivage_") === 0) return "ARCHIVAGE";
     return null;
+  }
+  // Dépôt/Archivage are auto-generated fixtures, not real client jobsites —
+  // they never get a number badge and never count towards one either.
+  function clientOrderIndex(dayDossiers, dossier){
+    if (autoDossierKind(dossier)) return null;
+    var clientDossiers = dayDossiers.filter(function(d){ return !autoDossierKind(d); });
+    return clientDossiers.indexOf(dossier) + 1;
   }
   function parseNum(v){
     var n = parseFloat((v||"").toString().replace(",", "."));

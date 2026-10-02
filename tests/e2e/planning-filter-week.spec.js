@@ -1,15 +1,14 @@
 const { test, expect } = require('@playwright/test');
 const { login, createDossier, dossierCardByName } = require('./helpers');
 
+// The move-type selector lives in the card's header (select.dossier-slot-header),
+// not in an .info-field with its own label.
 async function setMoveType(page, cardName, type) {
   const card = await dossierCardByName(page, cardName);
   await page.evaluate(
     ({ id, type }) => {
       const card = document.querySelector(`.dossier-card[data-id="${id}"]`);
-      const field = Array.from(card.querySelectorAll('.info-field')).find(
-        (f) => f.querySelector('label') && f.querySelector('label').textContent.indexOf('Type de déménagement') !== -1
-      );
-      const sel = field.querySelector('select');
+      const sel = card.querySelector('select.dossier-slot-header');
       sel.value = type;
       sel.dispatchEvent(new Event('change', { bubbles: true }));
     },

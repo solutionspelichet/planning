@@ -77,10 +77,19 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 .login-error{color:var(--danger);font-size:12.5px;margin-top:10px;min-height:1em}
 
 .planning-grid{display:grid;grid-template-columns:300px 1fr;gap:18px;align-items:start}
-@media (max-width:760px){ .planning-grid{grid-template-columns:1fr} }
+@media (max-width:760px){
+  .planning-grid{grid-template-columns:1fr}
+  .day-panel{order:1}
+  .calendar-stack{order:2}
+}
 
 .day-row{display:grid;grid-template-columns:460px 1fr;gap:18px;align-items:start;margin-top:14px}
-@media (max-width:700px){ .day-row{grid-template-columns:1fr} .quick-pane{flex-wrap:nowrap;height:220px} .quick-group{flex-basis:90px} }
+@media (max-width:700px){
+  .day-row{grid-template-columns:1fr}
+  .quick-pane{flex-wrap:nowrap;height:170px;order:2}
+  .quick-group{flex-basis:90px}
+  #dossierList,#nextDayList{order:1}
+}
 @media (max-width:860px){
   .zen-wrap{grid-template-columns:1fr}
   .week-grid{display:flex;overflow-x:auto;gap:8px}

@@ -166,7 +166,10 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 .cal-day .warn-dot{background:var(--danger)!important}
 
 .day-panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;min-width:0}
-.day-panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.day-panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+  position:sticky;top:100px;z-index:20;background:var(--surface);
+  margin:-16px -16px 14px -16px;padding:16px 16px 10px;border-radius:12px 12px 0 0;border-bottom:1px solid var(--border)}
+body.has-top-banner .day-panel-head{top:140px}
 .day-panel-head h2{font-size:16px;text-transform:capitalize}
 .day-panel-actions{display:flex;gap:8px;flex-wrap:wrap}
 .btn{border:none;background:var(--accent);color:var(--accent-fg);border-radius:8px;padding:8px 14px;
@@ -228,9 +231,9 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 #dossierList,#nextDayList{display:flex;flex-wrap:nowrap;gap:12px;align-items:start;padding-bottom:6px;overflow-x:auto;min-width:0}
 .dossier-card{border:1px solid var(--border);border-left:var(--type-border-width) solid var(--border);border-radius:11px;padding:10px 12px;background:var(--bg);
   flex:0 0 230px;width:230px;overflow:hidden}
-.dossier-card.type-NL{border-left-color:var(--chip-nl)}
-.dossier-card.type-INTER{border-left-color:var(--chip-inter)}
-.dossier-card.type-GM{border-left-color:var(--chip-gm)}
+.dossier-card.slot-J{border-left-color:var(--chip-j)}
+.dossier-card.slot-M{border-left-color:var(--chip-m)}
+.dossier-card.slot-A{border-left-color:var(--chip-a)}
 .dossier-card.auto-DEPOT{border-left-color:var(--type-depot)}
 .dossier-card.auto-ARCHIVAGE{border-left-color:var(--type-archivage)}
 .dossier-slot-wrap{position:relative;margin:-10px -12px 10px -12px}
@@ -238,24 +241,24 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
   font:inherit;font-weight:800;font-size:13px;letter-spacing:.03em;text-align:center;text-transform:uppercase;
   cursor:pointer;background:var(--border);color:var(--fg);appearance:none;-webkit-appearance:none;border-radius:0}
 .dossier-slot-header:disabled{cursor:default}
-.dossier-slot-header.slot-J{background:var(--chip-j);color:#fff}
-.dossier-slot-header.slot-M{background:var(--chip-m);color:#fff}
-.dossier-slot-header.slot-A{background:var(--chip-a);color:#fff}
+.dossier-slot-header.type-NL{background:var(--chip-nl);color:#fff}
+.dossier-slot-header.type-INTER{background:var(--chip-inter);color:#fff}
+.dossier-slot-header.type-GM{background:var(--chip-gm);color:#fff}
 .dossier-order-badge{position:absolute;top:50%;right:7px;transform:translateY(-50%);
   font-size:10.5px;font-weight:800;color:#fff;background:rgba(0,0,0,.28);
   padding:1px 7px;border-radius:10px;pointer-events:none}
 .dossier-head{display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap}
-.dossier-head input.client-name{font:inherit;font-weight:700;font-size:14.5px;border:none;background:transparent;
-  color:var(--fg);flex:1;min-width:120px;border-radius:6px;padding:2px 4px}
+.dossier-head input.client-name{font:inherit;font-weight:700;font-size:17px;border:none;background:transparent;
+  color:var(--fg);flex:1;min-width:120px;border-radius:6px;padding:5px 6px}
 .dossier-head input.client-name:focus{background:var(--surface);outline:1px solid var(--accent)}
 .day-badge{font-size:11px;font-weight:700;color:var(--fg-muted);background:var(--surface);
   border:1px solid var(--border);border-radius:20px;padding:3px 9px;flex:none}
 .date-range{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;font-size:12px;color:var(--fg-muted);margin-bottom:10px}
-.date-range input{border:1px solid var(--border);background:var(--surface);color:var(--fg);border-radius:6px;padding:3px 4px;font:inherit;font-size:11.5px;min-width:0;flex:1 1 92px}
+.date-range input{border:1px solid var(--border);background:var(--surface);color:var(--fg);border-radius:6px;padding:3px 4px;font:inherit;font-size:11.5px;font-weight:700;min-width:0;flex:1 1 92px}
 .section-label{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--fg-muted);margin:8px 0 5px}
 .info-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(95px,1fr));gap:6px 8px;margin-bottom:6px}
 .info-field label{display:block;font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--fg-muted);margin-bottom:2px}
-.info-field input{width:100%;border:1px solid var(--border);background:var(--surface);color:var(--fg);border-radius:6px;padding:5px 7px;font:inherit;font-size:12.5px}
+.info-field input{width:100%;border:1px solid var(--border);background:var(--surface);color:var(--fg);border-radius:6px;padding:5px 7px;font:inherit;font-size:12.5px;font-weight:700}
 .info-field.narrow{max-width:110px}
 .day-fields{display:flex;flex-wrap:wrap;gap:8px 10px;margin-bottom:10px}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
@@ -266,9 +269,6 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 .info-field select.slot-J{background:var(--chip-j);color:#fff;border-color:var(--chip-j)}
 .info-field select.slot-M{background:var(--chip-m);color:#fff;border-color:var(--chip-m)}
 .info-field select.slot-A{background:var(--chip-a);color:#fff;border-color:var(--chip-a)}
-.info-field select.type-NL{background:var(--chip-nl);color:#fff;border-color:var(--chip-nl)}
-.info-field select.type-INTER{background:var(--chip-inter);color:#fff;border-color:var(--chip-inter)}
-.info-field select.type-GM{background:var(--chip-gm);color:#fff;border-color:var(--chip-gm)}
 .chip button{border:none;background:transparent;color:var(--fg-muted);cursor:pointer;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px}
 .chip button:hover{background:var(--border);color:var(--fg)}
 .add-chip{border:1px dashed var(--border);background:transparent;color:var(--fg-muted);border-radius:20px;padding:4px 12px;font-size:12.5px;cursor:pointer}
@@ -365,7 +365,7 @@ table.week-table tr.week-sub td.week-metric-label{padding-left:16px;text-transfo
   background:none;border:none;color:var(--fg);cursor:pointer;padding:0 0 10px;width:100%;text-align:left}
 .next-day-toggle:hover{color:var(--accent)}
 .address-stack{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
-.address-stack .info-field textarea,.info-field.wide textarea{width:100%;font-size:13px;padding:7px 9px;font-family:inherit;
+.address-stack .info-field textarea,.info-field.wide textarea{width:100%;font-size:13px;font-weight:700;padding:7px 9px;font-family:inherit;
   border:1px solid var(--border);background:var(--surface);color:var(--fg);border-radius:6px;resize:vertical}
 .info-field.wide{width:100%;margin-bottom:8px}
 .info-field.wide textarea{resize:none;overflow:hidden;min-height:44px}
@@ -387,7 +387,7 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
 .emp-row{display:flex;align-items:center;gap:8px;padding:6px 4px;border-radius:7px}
 .emp-row:hover{background:var(--weekend)}
 .emp-row.inactive .emp-name{color:var(--fg-muted);text-decoration:line-through}
-.emp-name{flex:1;font-size:13.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.emp-name{flex:1;font-size:13.5px;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .icon-btn{border:none;background:transparent;color:var(--fg-muted);cursor:pointer;width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;flex:none}
 .icon-btn:hover{background:var(--border);color:var(--fg)}
 .add-row{display:flex;gap:6px;margin-top:10px}
@@ -1620,11 +1620,11 @@ body.has-top-banner .topbar{top:40px}
     ["DEPOT","ARCHIVAGE"].forEach(function(k){
       host.appendChild(el("span", {class:"settings-swatch", style:"background:var(--type-"+k.toLowerCase()+")", text: k==="DEPOT"?"Dépôt":"Archivage"}));
     });
-    var card = el("div", {class:"dossier-card settings-mini-card type-GM"});
+    var card = el("div", {class:"dossier-card settings-mini-card slot-M"});
     var previewMode = settingValue(state.settingsDraft, {key:"card-bg-mode", def:"none"});
     var previewColorVar = previewMode === "type" ? "var(--chip-gm)" : previewMode === "slot" ? "var(--chip-m)" : null;
     if (previewColorVar) card.style.background = "color-mix(in srgb, " + previewColorVar + " 16%, var(--bg))";
-    card.appendChild(el("div", {class:"dossier-slot-header slot-M", text:"M — MATIN"}));
+    card.appendChild(el("div", {class:"dossier-slot-header type-GM", text:"GM"}));
     card.appendChild(el("div", {style:"font-weight:700;font-size:13px", text:"Aperçu chantier (type GM, créneau M)"}));
     host.appendChild(card);
   }
@@ -2003,23 +2003,25 @@ body.has-top-banner .topbar{top:40px}
   function renderDossierCard(dossier, conflicts, dateStr, orderIndex){
     var assignment = assignmentFor(dossier.id, dateStr);
     var autoKind = autoDossierKind(dossier);
-    var typeClass = autoKind ? " auto-"+autoKind : (dossier.moveType ? " type-"+dossier.moveType : "");
-    var card = el("div", {class:"dossier-card" + typeClass});
+    // Border-left color now follows the slot (J/A/M); the move type moved up
+    // to the full-width header (see typeHeader below), swapping their roles.
+    var slotClass = autoKind ? " auto-"+autoKind : (assignment.slot ? " slot-"+assignment.slot : "");
+    var card = el("div", {class:"dossier-card" + slotClass});
     applyDossierBg(card, dossier, assignment, autoKind);
     var slotWrap = el("div", {class:"dossier-slot-wrap"});
-    var slotHeader = el("select", {class:"dossier-slot-header" + (assignment.slot ? " slot-"+assignment.slot : "")});
-    slotHeader.disabled = !canEdit();
-    [["", "— Créneau non défini —"], ["J","J — JOURNÉE"], ["M","M — MATIN"], ["A","A — APRÈS-MIDI"]].forEach(function(pair){
+    var typeHeader = el("select", {class:"dossier-slot-header" + (dossier.moveType ? " type-"+dossier.moveType : "")});
+    typeHeader.disabled = !canEdit();
+    [["", "— Type non défini —"]].concat(MOVE_TYPES.map(function(t){ return [t, t]; })).forEach(function(pair){
       var opt = el("option", {value:pair[0], text:pair[1]});
-      if (pair[0] === (assignment.slot||"")) opt.setAttribute("selected","selected");
-      slotHeader.appendChild(opt);
+      if (pair[0] === (dossier.moveType||"")) opt.setAttribute("selected","selected");
+      typeHeader.appendChild(opt);
     });
-    slotHeader.addEventListener("change", function(){
-      slotHeader.className = "dossier-slot-header" + (slotHeader.value ? " slot-"+slotHeader.value : "");
-      applyDossierBg(card, dossier, Object.assign({}, assignment, {slot: slotHeader.value}), autoKind);
-      saveAssignment(assignment, {slot: slotHeader.value});
+    typeHeader.addEventListener("change", function(){
+      typeHeader.className = "dossier-slot-header" + (typeHeader.value ? " type-"+typeHeader.value : "");
+      applyDossierBg(card, Object.assign({}, dossier, {moveType: typeHeader.value}), assignment, autoKind);
+      saveDossierMeta(dossier, {moveType: typeHeader.value});
     });
-    slotWrap.appendChild(slotHeader);
+    slotWrap.appendChild(typeHeader);
     if (orderIndex) slotWrap.appendChild(el("span", {class:"dossier-order-badge", text:String(orderIndex)}));
     card.appendChild(slotWrap);
     if (canEdit()){ card.draggable = true; card.dataset.id = dossier.id; card.classList.add("draggable-row"); }
@@ -2029,6 +2031,9 @@ body.has-top-banner .topbar{top:40px}
     var head = el("div", {class:"dossier-head"});
     var nameInput = el("input", {class:"client-name", value: dossier.client || "", placeholder:"Nom du client…"});
     nameInput.disabled = !canEdit();
+    nameInput.addEventListener("focus", function(){
+      if (nameInput.value === "Nouveau client") nameInput.value = "";
+    });
     nameInput.addEventListener("change", function(){ saveDossierMeta(dossier, {client: nameInput.value.trim() || "Client"}); });
     head.appendChild(nameInput);
     if (totalDays > 1) head.appendChild(el("span", {class:"day-badge", text:"Jour " + idx + "/" + totalDays}));
@@ -2068,6 +2073,25 @@ body.has-top-banner .topbar{top:40px}
     range.appendChild(endInput);
     card.appendChild(range);
 
+    var slotField = el("div", {class:"info-field wide"});
+    slotField.appendChild(el("label", {text:"Créneau"}));
+    var slotSel = el("select", {class: assignment.slot ? "slot-"+assignment.slot : ""});
+    slotSel.disabled = !canEdit();
+    [["", "—"], ["J","J — JOURNÉE"], ["M","M — MATIN"], ["A","A — APRÈS-MIDI"]].forEach(function(pair){
+      var opt = el("option", {value:pair[0], text:pair[1]});
+      if (pair[0] === (assignment.slot||"")) opt.setAttribute("selected","selected");
+      slotSel.appendChild(opt);
+    });
+    slotSel.addEventListener("change", function(){
+      slotSel.className = slotSel.value ? "slot-"+slotSel.value : "";
+      card.classList.remove("slot-J", "slot-M", "slot-A");
+      if (!autoKind && slotSel.value) card.classList.add("slot-"+slotSel.value);
+      applyDossierBg(card, dossier, Object.assign({}, assignment, {slot: slotSel.value}), autoKind);
+      saveAssignment(assignment, {slot: slotSel.value});
+    });
+    slotField.appendChild(slotSel);
+    card.appendChild(slotField);
+
     function infoField(labelText, key, placeholder, narrow, wide){
       var field = el("div", {class:"info-field" + (narrow?" narrow":"") + (wide?" wide":"")});
       field.appendChild(el("label", {text:labelText}));
@@ -2094,25 +2118,6 @@ body.has-top-banner .topbar{top:40px}
       field.appendChild(input);
       return field;
     }
-    function selectField(labelText, key, options, colorPrefix, source, saveFn, narrow){
-      var field = el("div", {class:"info-field" + (narrow?" narrow":"")});
-      field.appendChild(el("label", {text:labelText}));
-      var sel = el("select", {class: source[key] ? colorPrefix+source[key] : ""});
-      sel.disabled = !canEdit();
-      sel.appendChild(el("option", {value:"", text:"—"}));
-      options.forEach(function(code){
-        var opt = el("option", {value:code, text:code});
-        if (code === source[key]) opt.setAttribute("selected","selected");
-        sel.appendChild(opt);
-      });
-      sel.addEventListener("change", function(){
-        sel.className = sel.value ? colorPrefix+sel.value : "";
-        var patch={}; patch[key]=sel.value; saveFn(patch);
-      });
-      field.appendChild(sel);
-      return field;
-    }
-
     var addressStack = el("div", {class:"address-stack"});
     addressStack.appendChild(addressField("Adresse de départ", "addressFrom"));
     addressStack.appendChild(addressField("Adresse d'arrivée", "addressTo"));
@@ -2122,8 +2127,6 @@ body.has-top-banner .topbar{top:40px}
     infoGrid.appendChild(infoField("Volume", "volume", "m³", true));
     infoGrid.appendChild(infoField("Vendeur", "seller", "Initiales", true));
     infoGrid.appendChild(infoField("Coordinatrice", "coordinator", "Initiales", true));
-    infoGrid.appendChild(selectField("Type de déménagement", "moveType", MOVE_TYPES, "type-", dossier,
-      function(patch){ saveDossierMeta(dossier, patch); }, true));
     card.appendChild(infoGrid);
     function autoGrow(ta){ ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; }
     function textareaField(labelText, key, placeholder){

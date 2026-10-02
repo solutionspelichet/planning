@@ -615,7 +615,13 @@ body.has-top-banner .topbar{top:40px}
       <div class="cal-dow" id="vacCalDow"></div>
       <div class="cal-days" id="vacCalDays"></div>
     </div>
-    <h3 style="margin:0 0 8px">Vue tableau du mois</h3>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+      <h3 style="margin:0">Vue tableau du mois</h3>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost" id="exportVacCsvBtn">⬇ Export CSV</button>
+        <button class="btn btn-ghost" id="exportVacPdfBtn">📄 Export PDF</button>
+      </div>
+    </div>
     <div class="grid-wrap" style="margin-bottom:18px"><div id="vacAvailabilityHost" style="min-height:60px"></div></div>
     <div class="company-grid" style="grid-template-columns:repeat(auto-fill,minmax(420px,1fr))">
       <div class="company-card">
@@ -1711,6 +1717,24 @@ body.has-top-banner .topbar{top:40px}
     var el2 = $("#vacMonthTitle"); if (!el2) return;
     el2.textContent = MONTHS_FR[state.vgCursor.getMonth()] + " " + state.vgCursor.getFullYear();
   }
+  // Shared by the Gantt table render and its CSV/PDF exports: who/what has
+  // at least one absence/immobilisation in the given month, and a lookup
+  // for which reason (if any) applies to a given day.
+  function vacAvailabilityData(cursor){
+    var year = cursor.getFullYear(), month = cursor.getMonth();
+    var nDays = new Date(year, month+1, 0).getDate();
+    function reasonOnDate(ranges, idKey, id, dateStr){
+      var hit = ranges.filter(function(r){ return r[idKey]===id && r.startDate<=dateStr && dateStr<=r.endDate; });
+      return hit.length ? hit[0].reason : null;
+    }
+    var empsWithEvents = state.employees.filter(function(e){
+      return e.active!==false && state.absences.some(function(a){ return a.employeeId===e.id && monthOverlapsRange(cursor, a.startDate, a.endDate); });
+    }).sort(function(a,b){ return (a.order||0)-(b.order||0); });
+    var vehsWithEvents = state.vehicles.filter(function(v){
+      return v.active!==false && state.vehicleDowntimes.some(function(d){ return d.vehicleId===v.id && monthOverlapsRange(cursor, d.startDate, d.endDate); });
+    }).sort(function(a,b){ return (a.order||0)-(b.order||0); });
+    return {year:year, month:month, nDays:nDays, empsWithEvents:empsWithEvents, vehsWithEvents:vehsWithEvents, reasonOnDate:reasonOnDate};
+  }
   // Gantt-style table: one row per person/vehicle with at least one
   // absence/immobilisation this month, one column per day, cells colored
   // by reason on the days they're actually out. Complements the day-grid
@@ -1718,20 +1742,9 @@ body.has-top-banner .topbar{top:40px}
   // at a glance) and the lists below (which don't show *which* days).
   function renderVacAvailability(){
     var host = $("#vacAvailabilityHost"); if (!host) return;
-    var year = state.vgCursor.getFullYear(), month = state.vgCursor.getMonth();
-    var nDays = new Date(year, month+1, 0).getDate();
-
-    function reasonOnDate(ranges, idKey, id, dateStr){
-      var hit = ranges.filter(function(r){ return r[idKey]===id && r.startDate<=dateStr && dateStr<=r.endDate; });
-      return hit.length ? hit[0].reason : null;
-    }
-
-    var empsWithEvents = state.employees.filter(function(e){
-      return e.active!==false && state.absences.some(function(a){ return a.employeeId===e.id && monthOverlapsRange(state.vgCursor, a.startDate, a.endDate); });
-    }).sort(function(a,b){ return (a.order||0)-(b.order||0); });
-    var vehsWithEvents = state.vehicles.filter(function(v){
-      return v.active!==false && state.vehicleDowntimes.some(function(d){ return d.vehicleId===v.id && monthOverlapsRange(state.vgCursor, d.startDate, d.endDate); });
-    }).sort(function(a,b){ return (a.order||0)-(b.order||0); });
+    var data = vacAvailabilityData(state.vgCursor);
+    var year = data.year, month = data.month, nDays = data.nDays;
+    var empsWithEvents = data.empsWithEvents, vehsWithEvents = data.vehsWithEvents, reasonOnDate = data.reasonOnDate;
 
     host.innerHTML = "";
     if (!empsWithEvents.length && !vehsWithEvents.length){
@@ -1774,6 +1787,105 @@ body.has-top-banner .topbar{top:40px}
 
     table.appendChild(tbody);
     host.appendChild(table);
+  }
+  function exportVacAvailabilityCsv(){
+    var data = vacAvailabilityData(state.vgCursor);
+    if (!data.empsWithEvents.length && !data.vehsWithEvents.length) return toast("Rien à exporter ce mois-ci");
+    var header = ["Nom / Véhicule"];
+    for (var d=1; d<=data.nDays; d++) header.push(String(d));
+    var rows = [header];
+    function pushRows(items, ranges, idKey){
+      items.forEach(function(item){
+        var row = [item.name];
+        for (var dd=1; dd<=data.nDays; dd++){
+          row.push(data.reasonOnDate(ranges, idKey, item.id, fmtDate(new Date(data.year, data.month, dd))) || "");
+        }
+        rows.push(row);
+      });
+    }
+    pushRows(data.empsWithEvents, state.absences, "employeeId");
+    pushRows(data.vehsWithEvents, state.vehicleDowntimes, "vehicleId");
+    var csv = rows.map(function(r){ return r.map(csvCell).join(";"); }).join("\r\n");
+    var blob = new Blob(["﻿" + csv], {type:"text/csv;charset=utf-8;"});
+    var url = URL.createObjectURL(blob);
+    var a = el("a", {href:url, download:"vacances-garage-" + MONTHS_FR[data.month].toLowerCase() + "-" + data.year + ".csv"});
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+  }
+  function resolveReasonRgb(reason){
+    var expr = REASON_COLORS[reason];
+    var m = expr && /var\(--([\w-]+)\)/.exec(expr);
+    var hex = (m && getComputedStyle(document.documentElement).getPropertyValue("--"+m[1]).trim()) || "#888888";
+    var hm = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return hm ? [parseInt(hm[1],16), parseInt(hm[2],16), parseInt(hm[3],16)] : [136,136,136];
+  }
+  function exportVacAvailabilityPdf(){
+    if (!window.jspdf || !window.jspdf.jsPDF){ toast("Bibliothèque PDF indisponible (pas de connexion internet ?)"); return; }
+    var data = vacAvailabilityData(state.vgCursor);
+    if (!data.empsWithEvents.length && !data.vehsWithEvents.length) return toast("Rien à exporter ce mois-ci");
+    var monthLabel = MONTHS_FR[data.month] + " " + data.year;
+    var doc = new window.jspdf.jsPDF({unit:"mm", format:"a4", orientation:"landscape"});
+    var pageW = 297, pageH = 210, margin = 10;
+    var nameColW = 38;
+    var dayColW = (pageW - margin*2 - nameColW) / data.nDays;
+    var rowH = 6;
+    var y = margin;
+    function drawHeader(){
+      doc.setFont("helvetica", "bold"); doc.setFontSize(13);
+      doc.text("Absences & immobilisations — " + monthLabel, margin, y); y += 7;
+      doc.setFont("helvetica", "normal"); doc.setFontSize(6.5);
+      var legendX = margin;
+      Object.keys(REASON_COLORS).forEach(function(reason){
+        var rgb = resolveReasonRgb(reason);
+        doc.setFillColor(rgb[0], rgb[1], rgb[2]);
+        doc.rect(legendX, y-2.6, 3, 3, "F");
+        doc.text(reason, legendX+4, y);
+        legendX += 4 + doc.getTextWidth(reason) + 6;
+      });
+      y += 6;
+      doc.setFontSize(6);
+      for (var d=1; d<=data.nDays; d++){
+        var x = margin + nameColW + (d-1)*dayColW;
+        doc.text(String(d), x + dayColW/2, y, {align:"center"});
+      }
+      y += 2;
+      doc.setDrawColor(200);
+      doc.line(margin, y, pageW-margin, y);
+      y += 4;
+    }
+    drawHeader();
+    function addSection(label, items, ranges, idKey){
+      if (!items.length) return;
+      if (y + rowH > pageH - margin){ doc.addPage(); y = margin; drawHeader(); }
+      doc.setFont("helvetica", "bold"); doc.setFontSize(8.5);
+      doc.text(label.toUpperCase() + " (" + items.length + ")", margin, y);
+      y += 5;
+      items.forEach(function(item){
+        if (y + rowH > pageH - margin){
+          doc.addPage(); y = margin; drawHeader();
+          doc.setFont("helvetica", "bold"); doc.setFontSize(8.5);
+          doc.text(label.toUpperCase() + " (suite)", margin, y); y += 5;
+        }
+        doc.setFont("helvetica", "normal"); doc.setFontSize(7.5);
+        var nameLines = doc.splitTextToSize(item.name, nameColW-2);
+        doc.text(nameLines[0], margin, y+3.8);
+        for (var dd=1; dd<=data.nDays; dd++){
+          var dateStr = fmtDate(new Date(data.year, data.month, dd));
+          var reason = data.reasonOnDate(ranges, idKey, item.id, dateStr);
+          if (reason){
+            var rgb = resolveReasonRgb(reason);
+            doc.setFillColor(rgb[0], rgb[1], rgb[2]);
+            var x = margin + nameColW + (dd-1)*dayColW;
+            doc.rect(x+0.4, y, dayColW-0.8, rowH-1.4, "F");
+          }
+        }
+        y += rowH;
+      });
+      y += 3;
+    }
+    addSection("Personnel", data.empsWithEvents, state.absences, "employeeId");
+    addSection("Véhicules", data.vehsWithEvents, state.vehicleDowntimes, "vehicleId");
+    doc.save("vacances-garage-" + MONTHS_FR[data.month].toLowerCase() + "-" + data.year + ".pdf");
   }
   function renderAbsenceList(){
     var host = $("#absenceList"); if (!host) return;
@@ -1838,6 +1950,8 @@ body.has-top-banner .topbar{top:40px}
       toast("Immobilisation ajoutée"); refreshAll();
     });
   });
+  var exportVacCsvBtn = $("#exportVacCsvBtn"); if (exportVacCsvBtn) exportVacCsvBtn.addEventListener("click", exportVacAvailabilityCsv);
+  var exportVacPdfBtn = $("#exportVacPdfBtn"); if (exportVacPdfBtn) exportVacPdfBtn.addEventListener("click", exportVacAvailabilityPdf);
 
   // ---------- settings (couleurs, épaisseurs) ----------
   function settingValue(values, item){
@@ -2289,6 +2403,19 @@ body.has-top-banner .topbar{top:40px}
     });
     return warnings;
   }
+  // Someone/something can be assigned to a dossier before an absence or
+  // immobilisation is entered for the same date (or vice versa) — this
+  // catches the mismatch instead of relying on someone to notice it.
+  function assignedAbsenceWarnings(assignment, dateStr){
+    var warnings = [];
+    (assignment.employees||[]).forEach(function(a){
+      if (isEmployeeAbsentOn(a.employeeId, dateStr)) warnings.push(empName(a.employeeId) + " est en absence/congé ce jour-là");
+    });
+    (assignment.vehicleIds||[]).forEach(function(vid){
+      if (isVehicleDownOn(vid, dateStr)) warnings.push(vehName(vid) + " est immobilisé ce jour-là");
+    });
+    return warnings;
+  }
   function capacityWarning(dossier, assignment){
     var volume = parseNum(dossier.volume);
     var vehicleIds = assignment.vehicleIds || [];
@@ -2346,6 +2473,9 @@ body.has-top-banner .topbar{top:40px}
     if (capWarn) card.appendChild(el("div", {class:"capacity-warning", text:"⚠ " + capWarn}));
     resourceMismatchWarnings(dossier, assignment).forEach(function(msg){
       card.appendChild(el("div", {class:"capacity-warning", text:"⚠ " + msg}));
+    });
+    assignedAbsenceWarnings(assignment, dateStr).forEach(function(msg){
+      card.appendChild(el("div", {class:"capacity-warning", text:"🚫 " + msg}));
     });
 
     var numberField = el("div", {class:"info-field wide", style:"margin-bottom:8px"});

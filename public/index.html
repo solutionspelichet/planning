@@ -860,7 +860,8 @@ body.has-top-banner .topbar{top:40px}
     eventSource: null,
     autoDossiersEnsured: {},
     planningFilter: [],
-    planningViewMode: "day"
+    planningViewMode: "day",
+    offlineQueue: []
   };
   var PLANNING_FILTER_KEY = "pe_planning_filter_v1";
   (function loadPlanningFilter(){
@@ -871,6 +872,20 @@ body.has-top-banner .topbar{top:40px}
   })();
   function savePlanningFilter(){
     try { localStorage.setItem(PLANNING_FILTER_KEY, JSON.stringify(state.planningFilter)); } catch(e){ /* storage unavailable — filter still works for this session */ }
+  }
+
+  // Writes made while offline: queued here (and mirrored to localStorage so
+  // they survive a page reload) instead of being lost, then replayed in
+  // order as soon as the browser reports "online" again.
+  var OFFLINE_QUEUE_KEY = "pe_offline_queue_v1";
+  (function loadOfflineQueue(){
+    try {
+      var saved = JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY));
+      if (Array.isArray(saved)) state.offlineQueue = saved;
+    } catch(e){ /* ignore corrupt/missing value */ }
+  })();
+  function saveOfflineQueue(){
+    try { localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(state.offlineQueue)); } catch(e){ /* storage unavailable — queue still works for this session */ }
   }
 
   function $(sel, root){ return (root||document).querySelector(sel); }
@@ -905,7 +920,7 @@ body.has-top-banner .topbar{top:40px}
   // Real same-origin server: plain REST calls, no redirect/CORS workarounds
   // needed. One `api(action, extra)` wrapper keeps every call site below
   // unchanged regardless of which HTTP verb/route it maps to.
-  function request(method, path, body){
+  function rawRequest(method, path, body){
     var headers = {};
     if (state.token) headers["X-Auth-Token"] = state.token;
     if (body !== undefined) headers["Content-Type"] = "application/json";
@@ -913,34 +928,93 @@ body.has-top-banner .topbar{top:40px}
       .then(function(r){ return r.json().catch(function(){ return {ok:false, error:"bad_response"}; }); })
       .catch(function(){ return {ok:false, error:"network"}; });
   }
+  function queueOfflineWrite(method, path, body){
+    state.offlineQueue.push({method: method, path: path, body: body});
+    saveOfflineQueue();
+    setOfflineBanner(true);
+  }
+  function request(method, path, body){
+    return rawRequest(method, path, body).then(function(res){
+      // A write that fails with a network error (not a server-side rejection)
+      // means we're offline: queue it for replay instead of discarding the
+      // user's change, and tell the caller it "succeeded" so the normal UI
+      // flow (toast, optimistic refresh) proceeds as if it had gone through.
+      // Login is excluded: there's no token yet to act on, and faking an "ok"
+      // response for it would drop the user into the app with no session.
+      // User creation/password-reset are excluded too: their body carries a
+      // plaintext password, which must not sit around in localStorage.
+      var isSensitiveAdminWrite = path === "/api/login" || path === "/api/users" || /\/reset-password$/.test(path);
+      if (res.error === "network" && method !== "GET" && !isSensitiveAdminWrite){
+        queueOfflineWrite(method, path, body);
+        return {ok:true, queued:true};
+      }
+      return res;
+    });
+  }
   function api(action, extra){
     extra = extra || {};
+    var p;
     switch (action){
-      case "login": return request("POST", "/api/login", {username: extra.username, password: extra.password});
-      case "getAll": return request("GET", "/api/all");
-      case "saveEmployee": return request("POST", "/api/employees", {item: extra.item});
-      case "deleteEmployee": return request("DELETE", "/api/employees/" + encodeURIComponent(extra.id));
-      case "saveVehicle": return request("POST", "/api/vehicles", {item: extra.item});
-      case "deleteVehicle": return request("DELETE", "/api/vehicles/" + encodeURIComponent(extra.id));
-      case "saveDossier": return request("POST", "/api/dossiers", {item: extra.item});
-      case "deleteDossier": return request("DELETE", "/api/dossiers/" + encodeURIComponent(extra.id));
-      case "getDossierHistory": return request("GET", "/api/dossiers/" + encodeURIComponent(extra.id) + "/history");
-      case "getActionLog": return request("GET", "/api/action-log?limit=" + encodeURIComponent(extra.limit || 10));
-      case "undoAction": return request("POST", "/api/action-log/" + encodeURIComponent(extra.id) + "/undo");
-      case "saveAssignment": return request("POST", "/api/assignments", {item: extra.item});
-      case "saveAbsence": return request("POST", "/api/absences", {item: extra.item});
-      case "deleteAbsence": return request("DELETE", "/api/absences/" + encodeURIComponent(extra.id));
-      case "saveDowntime": return request("POST", "/api/vehicle-downtimes", {item: extra.item});
-      case "saveSettings": return request("POST", "/api/settings", {values: extra.values});
-      case "deleteDowntime": return request("DELETE", "/api/vehicle-downtimes/" + encodeURIComponent(extra.id));
-      case "listUsers": return request("GET", "/api/users");
-      case "createUser": return request("POST", "/api/users", {username: extra.username, password: extra.password, role: extra.role});
-      case "deleteUser": return request("DELETE", "/api/users/" + encodeURIComponent(extra.username));
-      case "resetPassword": return request("POST", "/api/users/" + encodeURIComponent(extra.username) + "/reset-password", {password: extra.password});
-      case "listBackups": return request("GET", "/api/backups");
-      case "runBackup": return request("POST", "/api/backups/run");
-      default: return Promise.resolve({ok:false, error:"unknown_action"});
+      case "login": p = request("POST", "/api/login", {username: extra.username, password: extra.password}); break;
+      case "getAll": p = request("GET", "/api/all"); break;
+      case "saveEmployee": p = request("POST", "/api/employees", {item: extra.item}); break;
+      case "deleteEmployee": p = request("DELETE", "/api/employees/" + encodeURIComponent(extra.id)); break;
+      case "saveVehicle": p = request("POST", "/api/vehicles", {item: extra.item}); break;
+      case "deleteVehicle": p = request("DELETE", "/api/vehicles/" + encodeURIComponent(extra.id)); break;
+      case "saveDossier": p = request("POST", "/api/dossiers", {item: extra.item}); break;
+      case "deleteDossier": p = request("DELETE", "/api/dossiers/" + encodeURIComponent(extra.id)); break;
+      case "getDossierHistory": p = request("GET", "/api/dossiers/" + encodeURIComponent(extra.id) + "/history"); break;
+      case "getActionLog": p = request("GET", "/api/action-log?limit=" + encodeURIComponent(extra.limit || 10)); break;
+      case "undoAction": p = request("POST", "/api/action-log/" + encodeURIComponent(extra.id) + "/undo"); break;
+      case "saveAssignment": p = request("POST", "/api/assignments", {item: extra.item}); break;
+      case "saveAbsence": p = request("POST", "/api/absences", {item: extra.item}); break;
+      case "deleteAbsence": p = request("DELETE", "/api/absences/" + encodeURIComponent(extra.id)); break;
+      case "saveDowntime": p = request("POST", "/api/vehicle-downtimes", {item: extra.item}); break;
+      case "saveSettings": p = request("POST", "/api/settings", {values: extra.values}); break;
+      case "deleteDowntime": p = request("DELETE", "/api/vehicle-downtimes/" + encodeURIComponent(extra.id)); break;
+      case "listUsers": p = request("GET", "/api/users"); break;
+      case "createUser": p = request("POST", "/api/users", {username: extra.username, password: extra.password, role: extra.role}); break;
+      case "deleteUser": p = request("DELETE", "/api/users/" + encodeURIComponent(extra.username)); break;
+      case "resetPassword": p = request("POST", "/api/users/" + encodeURIComponent(extra.username) + "/reset-password", {password: extra.password}); break;
+      case "listBackups": p = request("GET", "/api/backups"); break;
+      case "runBackup": p = request("POST", "/api/backups/run"); break;
+      default: p = Promise.resolve({ok:false, error:"unknown_action"});
     }
+    return p.then(function(res){
+      // A write queued for later (offline) never reached the server, so the
+      // local state the UI renders from must be patched here the same way a
+      // successful response would have — otherwise the "Dossier créé"-style
+      // toast would fire over an empty list, since refreshAll()'s own GET
+      // fails too while offline and leaves state untouched.
+      if (res && res.queued) applyQueuedWriteLocally(action, extra);
+      return res;
+    });
+  }
+  function applyQueuedWriteLocally(action, extra){
+    function upsert(arr, item){
+      var i = arr.findIndex(function(x){ return x.id === item.id; });
+      if (i >= 0) arr[i] = item; else arr.push(item);
+    }
+    function remove(arr, id){
+      var i = arr.findIndex(function(x){ return x.id === id; });
+      if (i >= 0) arr.splice(i, 1);
+    }
+    switch (action){
+      case "saveEmployee": upsert(state.employees, extra.item); break;
+      case "deleteEmployee": remove(state.employees, extra.id); break;
+      case "saveVehicle": upsert(state.vehicles, extra.item); break;
+      case "deleteVehicle": remove(state.vehicles, extra.id); break;
+      case "saveDossier": upsert(state.dossiers, extra.item); break;
+      case "deleteDossier": remove(state.dossiers, extra.id); break;
+      case "saveAssignment": upsert(state.assignments, extra.item); break;
+      case "saveAbsence": upsert(state.absences, extra.item); break;
+      case "deleteAbsence": remove(state.absences, extra.id); break;
+      case "saveDowntime": upsert(state.vehicleDowntimes, extra.item); break;
+      case "deleteDowntime": remove(state.vehicleDowntimes, extra.id); break;
+      case "saveSettings": Object.assign(state.settings, extra.values); break;
+      default: return; // read-only/admin actions never reach here (see isSensitiveAdminWrite)
+    }
+    renderAllFromState();
   }
 
   // ---------- auth ----------
@@ -997,7 +1071,7 @@ body.has-top-banner .topbar{top:40px}
     $("#whoRole").textContent = state.role;
     document.body.classList.toggle("view-only", !canEdit());
     $("#adminTabBtn").hidden = state.role !== "admin";
-    refreshAll().then(handleStartupShortcut);
+    (navigator.onLine && state.offlineQueue.length ? flushOfflineQueue() : refreshAll()).then(handleStartupShortcut);
     connectLive();
     schedulePoll(POLL_MS);
   }
@@ -1035,6 +1109,15 @@ body.has-top-banner .topbar{top:40px}
     }, delay);
   }
 
+  function renderAllFromState(){
+    applySettingsToRoot(state.settings);
+    renderEffectifs(); renderVehicles(); renderCalendar(); renderDayPanel(); renderAvailability();
+    renderVgCalendar(); renderVgDayPanel();
+    if (state.activeTab === "dashboard") renderDashboard();
+    if (state.activeTab === "vacances") { renderAbsenceSelects(); renderAbsenceList(); renderDowntimeList(); }
+    if (state.activeTab === "settings") renderSettingsTab();
+    if (state.role === "admin") { renderUsers(); renderBackups(); }
+  }
   function refreshAll(){
     var prevConflictCount = computeTodayConflictCount();
     return api("getAll", {}).then(function(res){
@@ -1052,13 +1135,7 @@ body.has-top-banner .topbar{top:40px}
       state.absences = res.absences || [];
       state.vehicleDowntimes = res.vehicleDowntimes || [];
       state.settings = res.settings || {};
-      applySettingsToRoot(state.settings);
-      renderEffectifs(); renderVehicles(); renderCalendar(); renderDayPanel(); renderAvailability();
-      renderVgCalendar(); renderVgDayPanel();
-      if (state.activeTab === "dashboard") renderDashboard();
-      if (state.activeTab === "vacances") { renderAbsenceSelects(); renderAbsenceList(); renderDowntimeList(); }
-      if (state.activeTab === "settings") renderSettingsTab();
-      if (state.role === "admin") { renderUsers(); renderBackups(); }
+      renderAllFromState();
       updateAppBadge();
       maybeNotifyUpdate(prevConflictCount);
     });
@@ -3524,7 +3601,9 @@ body.has-top-banner .topbar{top:40px}
     });
   }
 
-  // ---------- mode hors ligne (lecture seule) ----------
+  // ---------- mode hors ligne ----------
+  // Writes made while offline are queued (see queueOfflineWrite) rather than
+  // blocked, so this is no longer strictly read-only — the banner says so.
   function setOfflineBanner(offline){
     var bar = $("#offlineBanner"); if (!bar) return;
     bar.hidden = !offline;
@@ -3532,12 +3611,43 @@ body.has-top-banner .topbar{top:40px}
       var label = state.lastSyncAt
         ? "📡 Hors ligne — dernières données du " + state.lastSyncAt.toLocaleDateString("fr-CH") + " à " + state.lastSyncAt.toLocaleTimeString("fr-CH", {hour:"2-digit", minute:"2-digit"})
         : "📡 Hors ligne — aucune donnée synchronisée pour l'instant";
+      if (state.offlineQueue.length){
+        label += " · " + state.offlineQueue.length + " modification(s) en attente d'envoi";
+      }
       $("#offlineBannerText").textContent = label;
     }
     updateTopBannerSpacing();
   }
+  // Replays queued writes in order as soon as we're back online. Stops (and
+  // leaves the rest queued) the moment a replay still fails with a network
+  // error — a connection can flicker right after the "online" event fires —
+  // so nothing is lost; the next reconnect or app restart picks up where it
+  // left off. A non-network failure (e.g. a genuinely rejected write) is
+  // dropped after one try, since retrying the same bad payload forever can't
+  // help.
+  function flushOfflineQueue(){
+    if (!state.offlineQueue.length){ setOfflineBanner(false); return refreshAll(); }
+    var bar = $("#offlineBanner");
+    if (bar){ bar.hidden = false; updateTopBannerSpacing(); }
+    function step(){
+      if (!state.offlineQueue.length) return Promise.resolve();
+      var item = state.offlineQueue[0];
+      if (bar) $("#offlineBannerText").textContent = "🔄 Synchronisation de " + state.offlineQueue.length + " modification(s) en attente…";
+      return rawRequest(item.method, item.path, item.body).then(function(res){
+        if (res.error === "network") return; // still offline: keep it queued, stop here
+        state.offlineQueue.shift();
+        saveOfflineQueue();
+        return step();
+      });
+    }
+    return step().then(function(){
+      if (state.offlineQueue.length) { setOfflineBanner(true); return; }
+      setOfflineBanner(false);
+      return refreshAll();
+    });
+  }
   window.addEventListener("offline", function(){ setOfflineBanner(true); });
-  window.addEventListener("online", function(){ setOfflineBanner(false); refreshAll(); });
+  window.addEventListener("online", function(){ flushOfflineQueue(); });
 
   function boot(){
     renderDow();

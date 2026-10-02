@@ -1229,8 +1229,8 @@ body.has-top-banner .topbar{top:40px}
     $("#loginError").textContent = "";
     api("login", {username:username, password:password}).then(function(res){
       if (!res.ok){
-        $("#loginError").textContent = res.error === "network"
-          ? "Impossible de joindre le serveur."
+        $("#loginError").textContent = res.error === "network" ? "Impossible de joindre le serveur."
+          : res.error === "too_many_attempts" ? "Trop de tentatives — réessayez dans quelques minutes."
           : "Identifiant ou mot de passe incorrect.";
         return;
       }

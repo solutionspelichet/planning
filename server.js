@@ -250,8 +250,65 @@ function scheduleBackups() {
 scheduleBackups();
 
 // ---------- password / sessions ----------
+// Passwords are hashed with scrypt (salted, deliberately slow — unlike a
+// single SHA-256 pass, which a GPU can brute-force at billions/sec if the
+// database ever leaks). Old accounts created before this still have a bare
+// hex SHA-256 hash in `hash`; verifyPassword() recognizes both, and a
+// successful login against an old hash immediately re-hashes it with
+// scrypt (see /api/login) — a lazy migration with no forced reset needed.
 function sha256(text) { return crypto.createHash('sha256').update(text, 'utf8').digest('hex'); }
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = 'scrypt:' + crypto.scryptSync(password, salt, 64).toString('hex');
+  return { salt, hash };
+}
+function verifyPassword(password, salt, storedHash) {
+  if (storedHash.startsWith('scrypt:')) {
+    const expected = Buffer.from(storedHash.slice(7), 'hex');
+    const actual = crypto.scryptSync(password, salt, expected.length);
+    return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+  }
+  const expected = Buffer.from(storedHash, 'hex');
+  const actual = Buffer.from(sha256(salt + password), 'hex');
+  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+}
 function randomToken() { return crypto.randomBytes(24).toString('hex'); }
+
+// ---------- login rate limiting ----------
+// Keyed by username (not IP): the goal is to slow down guessing a specific
+// account's password, which an attacker can do from any/many IPs but not
+// with any/many usernames. In-memory only, like `sessions` below — fine for
+// a single-process app, and resets on restart same as everything else here.
+const loginAttempts = new Map(); // username (lowercased) -> {count, lockedUntil, lastAttemptAt}
+const LOGIN_MAX_ATTEMPTS = 5;
+const LOGIN_LOCKOUT_MS = 5 * 60 * 1000;
+const LOGIN_ATTEMPT_FORGET_MS = 15 * 60 * 1000; // drop stale entries so probing many fake usernames can't grow this forever
+function pruneLoginAttempts() {
+  const now = Date.now();
+  for (const [key, entry] of loginAttempts) {
+    if (entry.lockedUntil < now && now - entry.lastAttemptAt > LOGIN_ATTEMPT_FORGET_MS) loginAttempts.delete(key);
+  }
+}
+function isLoginLocked(username) {
+  pruneLoginAttempts();
+  const entry = loginAttempts.get((username || '').toLowerCase());
+  return !!(entry && entry.lockedUntil > Date.now());
+}
+function recordFailedLogin(username) {
+  const key = (username || '').toLowerCase();
+  const now = Date.now();
+  const entry = loginAttempts.get(key) || { count: 0, lockedUntil: 0, lastAttemptAt: now };
+  entry.count += 1;
+  entry.lastAttemptAt = now;
+  if (entry.count >= LOGIN_MAX_ATTEMPTS) {
+    entry.lockedUntil = now + LOGIN_LOCKOUT_MS;
+    entry.count = 0;
+  }
+  loginAttempts.set(key, entry);
+}
+function clearFailedLogins(username) {
+  loginAttempts.delete((username || '').toLowerCase());
+}
 
 const sessions = new Map(); // token -> {username, role, expires}
 
@@ -288,8 +345,7 @@ function requireAdmin(req, res, next) {
   if (count > 0) return;
   const username = process.env.SEED_ADMIN_USER || 'Pelichet';
   const password = process.env.SEED_ADMIN_PASSWORD || crypto.randomBytes(9).toString('base64url');
-  const salt = crypto.randomBytes(16).toString('hex');
-  const hash = sha256(salt + password);
+  const { salt, hash } = hashPassword(password);
   db.prepare('INSERT INTO users (username, salt, hash, role) VALUES (?, ?, ?, ?)').run(username, salt, hash, 'admin');
   console.log('=============================================');
   console.log('First run: created admin account');
@@ -340,9 +396,16 @@ app.get('/api/events', requireAuth, (req, res) => {
 // ---------- auth ----------
 app.post('/api/login', (req, res) => {
   const { username, password } = req.body || {};
+  if (isLoginLocked(username)) return res.json({ ok: false, error: 'too_many_attempts' });
   const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username || '');
-  if (!user || sha256(user.salt + (password || '')) !== user.hash) {
+  if (!user || !verifyPassword(password || '', user.salt, user.hash)) {
+    recordFailedLogin(username);
     return res.json({ ok: false, error: 'invalid_credentials' });
+  }
+  clearFailedLogins(username);
+  if (!user.hash.startsWith('scrypt:')) {
+    const { salt, hash } = hashPassword(password);
+    db.prepare('UPDATE users SET salt = ?, hash = ? WHERE username = ?').run(salt, hash, user.username);
   }
   const token = randomToken();
   sessions.set(token, { username: user.username, role: user.role, expires: Date.now() + SESSION_TTL_MS });
@@ -663,8 +726,7 @@ app.post('/api/users', requireAuth, requireAdmin, (req, res) => {
   }
   const exists = db.prepare('SELECT 1 FROM users WHERE username = ?').get(username);
   if (exists) return res.json({ ok: false, error: 'username_taken' });
-  const salt = crypto.randomBytes(16).toString('hex');
-  const hash = sha256(salt + password);
+  const { salt, hash } = hashPassword(password);
   db.prepare('INSERT INTO users (username, salt, hash, role) VALUES (?, ?, ?, ?)').run(username, salt, hash, role);
   res.json({ ok: true });
 });
@@ -673,8 +735,7 @@ app.post('/api/users/:username/reset-password', requireAuth, requireAdmin, (req,
   if (!password || password.length < 4) return res.status(400).json({ ok: false, error: 'bad_request' });
   const exists = db.prepare('SELECT 1 FROM users WHERE username = ?').get(req.params.username);
   if (!exists) return res.json({ ok: false, error: 'not_found' });
-  const salt = crypto.randomBytes(16).toString('hex');
-  const hash = sha256(salt + password);
+  const { salt, hash } = hashPassword(password);
   db.prepare('UPDATE users SET salt = ?, hash = ? WHERE username = ?').run(salt, hash, req.params.username);
   res.json({ ok: true });
 });

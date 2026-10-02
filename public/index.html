@@ -606,10 +606,14 @@ body.has-top-banner .topbar{top:40px}
   </div>
 
   <div class="view" id="view-vacances" hidden>
-    <div class="cal-head" style="max-width:260px;margin-bottom:14px">
-      <button id="vacPrevMonth" aria-label="Mois précédent">‹</button>
-      <div class="cal-title" id="vacMonthTitle">—</div>
-      <button id="vacNextMonth" aria-label="Mois suivant">›</button>
+    <div class="calendar" style="max-width:320px;margin-bottom:18px">
+      <div class="cal-head">
+        <button id="vacPrevMonth" aria-label="Mois précédent">‹</button>
+        <div class="cal-title" id="vacMonthTitle">—</div>
+        <button id="vacNextMonth" aria-label="Mois suivant">›</button>
+      </div>
+      <div class="cal-dow" id="vacCalDow"></div>
+      <div class="cal-days" id="vacCalDays"></div>
     </div>
     <div class="company-grid" style="grid-template-columns:repeat(auto-fill,minmax(420px,1fr))">
       <div class="company-card">
@@ -1510,7 +1514,7 @@ body.has-top-banner .topbar{top:40px}
 
   // ---------- calendar ----------
   function renderDow(){
-    [$("#calDow"), $("#vgCalDow")].forEach(function(host){
+    [$("#calDow"), $("#vgCalDow"), $("#vacCalDow")].forEach(function(host){
       if (!host) return;
       host.innerHTML = "";
       DOW_FR.forEach(function(d){ host.appendChild(el("div",{text:d})); });
@@ -1568,10 +1572,14 @@ body.has-top-banner .topbar{top:40px}
   $("#nextMonth").addEventListener("click", function(){ shiftMonth(1); });
 
   // ---------- vacances & garage: second calendar + day detail ----------
+  // Renders into every calendar host that shows Vacances/Garage data: the
+  // small one in the Planning sidebar (#vgCalDays) and the full one on the
+  // Vacances & Garage tab itself (#vacCalDays) — same cells, same dots,
+  // just two places to look at them from.
   function renderVgCalendar(){
-    $("#vgCalTitle").textContent = MONTHS_FR[state.vgCursor.getMonth()] + " " + state.vgCursor.getFullYear();
-    var host = $("#vgCalDays"); if (!host) return;
-    host.innerHTML = "";
+    var monthLabel = MONTHS_FR[state.vgCursor.getMonth()] + " " + state.vgCursor.getFullYear();
+    var titleEl1 = $("#vgCalTitle"); if (titleEl1) titleEl1.textContent = monthLabel;
+    var titleEl2 = $("#vacMonthTitle"); if (titleEl2) titleEl2.textContent = monthLabel;
     var year = state.vgCursor.getFullYear(), month = state.vgCursor.getMonth();
     var firstDow = (new Date(year, month, 1).getDay() + 6) % 7;
     var nDays = new Date(year, month+1, 0).getDate();
@@ -1580,25 +1588,29 @@ body.has-top-banner .topbar{top:40px}
     for (var i = firstDow; i > 0; i--) cells.push({day: prevDays-i+1, other:true, date:null});
     for (var d = 1; d <= nDays; d++) cells.push({day:d, other:false, date: fmtDate(new Date(year,month,d))});
     while (cells.length % 7 !== 0) cells.push({day: cells.length-nDays-firstDow+1, other:true, date:null});
-    cells.forEach(function(c){
-      var dow = c.date ? new Date(c.date).getDay() : null;
-      var isWeekend = dow === 0 || dow === 6;
-      var cls = "cal-day" + (c.other?" other-month":"") + (isWeekend?" weekend":"") + (c.date===state.vgSelectedDate?" selected":"");
-      var cell = el("div", {class:cls});
-      cell.appendChild(el("div", {text:String(c.day)}));
-      if (c.date){
-        var dayReasons = absencesOn(c.date).map(function(a){ return a.reason; })
-          .concat(downtimesOn(c.date).map(function(v){ return v.reason; }));
-        if (dayReasons.length){
-          var row = el("div", {class:"dot-row"});
-          dayReasons.slice(0,4).forEach(function(reason){
-            row.appendChild(el("span", {class:"dot", style:"background:"+(REASON_COLORS[reason]||"var(--accent)")}));
-          });
-          cell.appendChild(row);
+    ["#vgCalDays", "#vacCalDays"].forEach(function(hostSel){
+      var host = $(hostSel); if (!host) return;
+      host.innerHTML = "";
+      cells.forEach(function(c){
+        var dow = c.date ? new Date(c.date).getDay() : null;
+        var isWeekend = dow === 0 || dow === 6;
+        var cls = "cal-day" + (c.other?" other-month":"") + (isWeekend?" weekend":"") + (c.date===state.vgSelectedDate?" selected":"");
+        var cell = el("div", {class:cls});
+        cell.appendChild(el("div", {text:String(c.day)}));
+        if (c.date){
+          var dayReasons = absencesOn(c.date).map(function(a){ return a.reason; })
+            .concat(downtimesOn(c.date).map(function(v){ return v.reason; }));
+          if (dayReasons.length){
+            var row = el("div", {class:"dot-row"});
+            dayReasons.slice(0,4).forEach(function(reason){
+              row.appendChild(el("span", {class:"dot", style:"background:"+(REASON_COLORS[reason]||"var(--accent)")}));
+            });
+            cell.appendChild(row);
+          }
+          cell.addEventListener("click", function(dateStr){ return function(){ state.vgSelectedDate=dateStr; renderVgCalendar(); renderVgDayPanel(); }; }(c.date));
         }
-        cell.addEventListener("click", function(dateStr){ return function(){ state.vgSelectedDate=dateStr; renderVgCalendar(); renderVgDayPanel(); }; }(c.date));
-      }
-      host.appendChild(cell);
+        host.appendChild(cell);
+      });
     });
   }
   function shiftVgMonth(delta){

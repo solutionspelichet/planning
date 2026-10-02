@@ -88,7 +88,8 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
   .day-row{grid-template-columns:1fr}
   .quick-pane{flex-wrap:nowrap;height:170px;order:2}
   .quick-group{flex-basis:90px}
-  #dossierList,#nextDayList{order:1}
+  #dossierList,#nextDayList{order:1;flex-direction:column;overflow-x:visible}
+  #dossierList .dossier-card,#nextDayList .dossier-card{flex:1 1 auto;width:100%}
 }
 @media (max-width:860px){
   .zen-wrap{grid-template-columns:1fr}

@@ -953,6 +953,39 @@ body.has-top-banner .topbar{top:40px}
     (children||[]).forEach(function(c){ if (c) e.appendChild(c); });
     return e;
   }
+  // "Add new X" inputs (new employee, new company, new vehicle…) aren't
+  // bound to any saved entity, so a full re-render — which fires often:
+  // every 30s poll, any SSE push from another tab/user, or the app's own
+  // refreshAll() after an unrelated save — used to wipe out whatever was
+  // typed but not yet submitted, mid-keystroke. This keeps that text (and
+  // the cursor/focus) across re-renders, keyed by a caller-chosen string
+  // (e.g. "newEmployee:"+companyId) so it reattaches to the right input.
+  //
+  // Focus must be captured with captureFocusedPersistKey() *before* the
+  // caller tears down its container (host.innerHTML = "" or similar): once
+  // the focused element is detached, the browser blurs it immediately, so
+  // listening for "blur" to track which key was focused is too late — by
+  // the time the new input exists, that signal is already gone.
+  var PERSISTENT_INPUT_STATE = {};
+  function captureFocusedPersistKey(host){
+    var ae = document.activeElement;
+    if (ae && host.contains(ae) && ae.dataset && ae.dataset.persistKey){
+      return { key: ae.dataset.persistKey, selStart: ae.selectionStart, selEnd: ae.selectionEnd };
+    }
+    return null;
+  }
+  function bindPersistentInput(input, key, focusSnapshot){
+    input.dataset.persistKey = key;
+    if (PERSISTENT_INPUT_STATE[key] !== undefined) input.value = PERSISTENT_INPUT_STATE[key];
+    input.addEventListener("input", function(){ PERSISTENT_INPUT_STATE[key] = input.value; });
+    if (focusSnapshot && focusSnapshot.key === key){
+      setTimeout(function(){
+        input.focus();
+        try { input.setSelectionRange(focusSnapshot.selStart, focusSnapshot.selEnd); } catch(e){}
+      }, 0);
+    }
+  }
+  function clearPersistentInput(key){ delete PERSISTENT_INPUT_STATE[key]; }
   function toast(msg){
     var t = $("#toast"); t.textContent = msg; t.classList.add("show");
     clearTimeout(toast._t); toast._t = setTimeout(function(){ t.classList.remove("show"); }, 2500);
@@ -3209,16 +3242,20 @@ body.has-top-banner .topbar{top:40px}
 
   // ---------- Effectifs ----------
   function renderEffectifs(){
-    var host = $("#companyGrid"); host.innerHTML = "";
+    var host = $("#companyGrid");
+    var focusSnap = captureFocusedPersistKey(host);
+    host.innerHTML = "";
     var companies = getCompanies();
     if (canEdit()){
       var newCoRow = el("div", {class:"company-card add-company-row"});
       newCoRow.appendChild(el("h3", {text:"Ajouter un type d'effectif"}));
       var addRow = el("div", {class:"add-row"});
       var coInput = el("input", {placeholder:"Ex. Pelichet, SwissJob…"});
+      bindPersistentInput(coInput, "newCompany", focusSnap);
       addRow.appendChild(coInput);
       function addCompany(){
         var name = coInput.value.trim(); if (!name) return; coInput.value = "";
+        clearPersistentInput("newCompany");
         var list = companies.concat([{id: uid("co"), name: name, color: NEW_COMPANY_COLORS[companies.length % NEW_COMPANY_COLORS.length]}]);
         saveCompanies(list);
       }
@@ -3276,6 +3313,7 @@ body.has-top-banner .topbar{top:40px}
       card.appendChild(list);
       var addEmpRow = el("div", {class:"add-row edit-only"});
       var input = el("input", {placeholder:"Nom Prénom…"});
+      bindPersistentInput(input, "newEmployee:"+co.id, focusSnap);
       addEmpRow.appendChild(input);
       addEmpRow.appendChild(el("button", {text:"Ajouter", onclick: function(){ addEmployee(co.id, input); }}));
       card.appendChild(addEmpRow);
@@ -3290,6 +3328,7 @@ body.has-top-banner .topbar{top:40px}
   function addEmployee(companyId, input){
     if (!canEdit()) return;
     var name = input.value.trim(); if (!name) return; input.value = "";
+    clearPersistentInput("newEmployee:"+companyId);
     api("saveEmployee", {item:{id:uid("emp"), company:companyId, name:name, active:true, order:Date.now()}})
       .then(function(res){ if (!res.ok) return toast("Ajout impossible"); toast("Employé ajouté"); refreshAll(); });
   }
@@ -3313,7 +3352,9 @@ body.has-top-banner .topbar{top:40px}
 
   // ---------- Véhicules ----------
   function renderVehicles(){
-    var host = $("#vehicleGrid"); host.innerHTML = "";
+    var host = $("#vehicleGrid");
+    var focusSnap = captureFocusedPersistKey(host);
+    host.innerHTML = "";
     var card = el("div", {class:"company-card"});
     card.appendChild(el("h3", {}, [el("span",{text:"Parc véhicules"}), el("span",{class:"company-count",text:state.vehicles.length})]));
     var list = el("ul", {class:"emp-list"});
@@ -3346,7 +3387,9 @@ body.has-top-banner .topbar{top:40px}
     });
     card.appendChild(list);
     var addRow = el("div", {class:"add-row edit-only"});
-    var input = el("input", {placeholder:"Nom du véhicule…"}); addRow.appendChild(input);
+    var input = el("input", {placeholder:"Nom du véhicule…"});
+    bindPersistentInput(input, "newVehicle", focusSnap);
+    addRow.appendChild(input);
     addRow.appendChild(el("button", {text:"Ajouter", onclick: function(){ addVehicle(input); }}));
     card.appendChild(addRow);
     input.addEventListener("keydown", function(ev){ if (ev.key==="Enter") addVehicle(input); });
@@ -3355,6 +3398,7 @@ body.has-top-banner .topbar{top:40px}
   function addVehicle(input){
     if (!canEdit()) return;
     var name = input.value.trim(); if (!name) return; input.value = "";
+    clearPersistentInput("newVehicle");
     api("saveVehicle", {item:{id:uid("veh"), name:name, active:true, order:Date.now()}})
       .then(function(res){ if (!res.ok) return toast("Ajout impossible"); toast("Véhicule ajouté"); refreshAll(); });
   }

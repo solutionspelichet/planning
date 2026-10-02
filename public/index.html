@@ -147,6 +147,7 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 
 .calendar-stack{display:flex;flex-direction:column;gap:18px;position:sticky;top:80px}
 .calendar{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px}
+.calendar-label{font-size:12.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--fg-muted);margin:0 0 10px}
 .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .cal-head button{width:28px;height:28px;border-radius:8px;border:1px solid var(--border);background:var(--bg);
   color:var(--fg);cursor:pointer}
@@ -196,22 +197,26 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 .week-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-top:10px}
 .week-day-col{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px;min-height:150px;
   display:flex;flex-direction:column;gap:6px}
-.week-day-head{font-size:11px;font-weight:800;text-transform:uppercase;color:var(--fg-muted);display:flex;justify-content:space-between;
+.week-day-head{font-size:12.5px;font-weight:800;text-transform:uppercase;color:var(--fg);display:flex;justify-content:space-between;
   padding-bottom:6px;margin-bottom:2px;border-bottom:1px solid var(--border);cursor:pointer}
 .week-day-head:hover{color:var(--accent)}
 .week-day-head.weekend{color:var(--danger)}
 .week-day-col.is-today .week-day-head{color:var(--accent)}
 .week-day-col.drag-over{border-color:var(--accent);background:var(--danger-bg);box-shadow:0 0 0 2px var(--accent) inset}
-.week-chip{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;border-radius:6px;padding:4px 6px;
-  border-left:3px solid var(--border);background:var(--bg);color:var(--fg);cursor:pointer;overflow:hidden}
+.week-day-vehcount{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:2px}
+.week-day-vehcount-item{font-size:10px;font-weight:700;color:var(--fg-muted);background:var(--weekend);border-radius:10px;padding:1px 6px}
+.week-day-vehcount-item.over{color:#fff;background:var(--danger)}
+.week-chip{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;border-radius:6px;padding:5px 7px;
+  border-left:4px solid var(--border);background:var(--bg);color:var(--fg);cursor:pointer;overflow:hidden}
 .week-chip:hover{background:var(--weekend)}
 .week-chip.movable{cursor:grab}
 .week-chip.movable:active{cursor:grabbing}
 .week-chip-move{flex:none;margin-left:auto;border:none;background:rgba(0,0,0,.08);color:inherit;
   width:20px;height:20px;border-radius:5px;font-size:12px;line-height:1;cursor:pointer;padding:0}
 .week-chip-move:hover{background:rgba(0,0,0,.18)}
-.week-chip-slot{width:6px;height:6px;border-radius:50%;flex:none}
+.week-chip-slot{width:7px;height:7px;border-radius:50%;flex:none}
 .week-chip-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.week-chip-volume{flex:none;font-size:10px;font-weight:700;color:var(--fg-muted)}
 .week-chip-more{font-size:10.5px;color:var(--fg-muted);text-align:center;padding:2px;cursor:pointer}
 .week-chip-more:hover{color:var(--accent)}
 .type-dist-row{display:flex;align-items:center;gap:10px;margin-bottom:7px;font-size:12px}
@@ -514,6 +519,7 @@ body.has-top-banner .topbar{top:40px}
     <div class="planning-grid">
       <div class="calendar-stack">
         <div class="calendar">
+          <h3 class="calendar-label">Planning</h3>
           <div class="cal-head">
             <button id="prevMonth" aria-label="Mois précédent">‹</button>
             <div class="cal-title" id="calTitle">—</div>
@@ -523,6 +529,7 @@ body.has-top-banner .topbar{top:40px}
           <div class="cal-days" id="calDays"></div>
         </div>
         <div class="calendar">
+          <h3 class="calendar-label">Vacances, Congés et Immobilisation</h3>
           <div class="cal-head">
             <button id="vgPrevMonth" aria-label="Mois précédent">‹</button>
             <div class="cal-title" id="vgCalTitle">—</div>
@@ -1576,10 +1583,13 @@ body.has-top-banner .topbar{top:40px}
       var cell = el("div", {class:cls});
       cell.appendChild(el("div", {text:String(c.day)}));
       if (c.date){
-        var count = absencesOn(c.date).length + downtimesOn(c.date).length;
-        if (count){
+        var dayReasons = absencesOn(c.date).map(function(a){ return a.reason; })
+          .concat(downtimesOn(c.date).map(function(v){ return v.reason; }));
+        if (dayReasons.length){
           var row = el("div", {class:"dot-row"});
-          for (var n=0; n<Math.min(count,4); n++) row.appendChild(el("span",{class:"dot"}));
+          dayReasons.slice(0,4).forEach(function(reason){
+            row.appendChild(el("span", {class:"dot", style:"background:"+(REASON_COLORS[reason]||"var(--accent)")}));
+          });
           cell.appendChild(row);
         }
         cell.addEventListener("click", function(dateStr){ return function(){ state.vgSelectedDate=dateStr; renderVgCalendar(); renderVgDayPanel(); }; }(c.date));
@@ -2069,6 +2079,9 @@ body.has-top-banner .topbar{top:40px}
     }
     var allWeekDossiers = days.reduce(function(acc, day){ return acc.concat(day.dossiers); }, []);
     renderPlanningFilterBar(allWeekDossiers, "weekFilterBar");
+    var vehTypeMap = {}; state.vehicles.forEach(function(v){ vehTypeMap[v.id] = v.type; });
+    var vehTotalsByType = {};
+    VEHICLE_TYPES.forEach(function(t){ vehTotalsByType[t] = state.vehicles.filter(function(v){ return v.type===t && v.active!==false; }).length; });
     days.forEach(function(day){
       var isWeekend = day.date.getDay() === 0 || day.date.getDay() === 6;
       var col = el("div", {class:"week-day-col" + (day.dateStr === state.selectedDate ? " is-today" : "")});
@@ -2077,6 +2090,13 @@ body.has-top-banner .topbar{top:40px}
       ]);
       head.addEventListener("click", function(dateStr){ return function(){ goToDayFromWeek(dateStr); }; }(day.dateStr));
       col.appendChild(head);
+      var vehRow = el("div", {class:"week-day-vehcount"});
+      VEHICLE_TYPES.forEach(function(t){
+        if (!vehTotalsByType[t]) return; // skip types with no fleet at all
+        var used = vehCountOn(day.dateStr, vehTypeMap, t);
+        vehRow.appendChild(el("span", {class:"week-day-vehcount-item"+(used>vehTotalsByType[t]?" over":""), text: used+"/"+vehTotalsByType[t]+" "+t}));
+      });
+      if (vehRow.childNodes.length) col.appendChild(vehRow);
       if (canEdit()){
         col.addEventListener("dragover", function(ev){ ev.preventDefault(); ev.currentTarget.classList.add("drag-over"); });
         col.addEventListener("dragleave", function(ev){ ev.currentTarget.classList.remove("drag-over"); });
@@ -2101,7 +2121,8 @@ body.has-top-banner .topbar{top:40px}
           var chip = el("div", {class:"week-chip" + (movable ? " movable" : ""), style:"border-left-color:" + borderColor,
             title: dossier.client + (movable ? " — glisser pour changer de jour" : "")}, [
             el("span", {class:"week-chip-slot", style:"background:" + slotColor}),
-            el("span", {class:"week-chip-name", text: dossier.client || "(sans nom)"})
+            el("span", {class:"week-chip-name", text: dossier.client || "(sans nom)"}),
+            dossier.volume ? el("span", {class:"week-chip-volume", text: dossier.volume+" m³"}) : null
           ]);
           if (movable){
             chip.draggable = true;
@@ -2765,6 +2786,7 @@ body.has-top-banner .topbar{top:40px}
     var assignment = assignmentFor(dossier.id, dateStr);
     var card = el("div", {class:"print-card"});
     card.appendChild(el("h3", {text: (dossier.dossierNumber ? dossier.dossierNumber + " — " : "") + (dossier.client || "Client")}));
+    card.appendChild(printField("N° dossier", dossier.dossierNumber));
     card.appendChild(printField("Départ", dossier.addressFrom));
     card.appendChild(printField("Arrivée", dossier.addressTo));
     card.appendChild(printField("Volume", dossier.volume));
@@ -2867,6 +2889,7 @@ body.has-top-banner .topbar{top:40px}
         var vehNames = (assignment.vehicleIds || []).map(vehName);
         var raw = [
           { bold:true, text: (idx+1) + ". " + (dossier.client || "(sans nom)") + (dossier.dossierNumber ? "  —  N° " + dossier.dossierNumber : "") },
+          { bold:false, text: "N° dossier : " + (dossier.dossierNumber || "—") },
           { bold:false, text: "Créneau : " + (assignment.slot || "non défini") + "   ·   Type : " + typeLabel + (dossier.volume ? "   ·   Volume : " + dossier.volume + " m³" : "") }
         ];
         if (dossier.addressFrom) raw.push({bold:false, text:"Départ : " + dossier.addressFrom});

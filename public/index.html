@@ -751,6 +751,7 @@ body.has-top-banner .topbar{top:40px}
         <h3><span>Sauvegardes</span></h3>
         <p class="chart-sub" style="margin:0 0 10px">Automatiques à 10h, 14h, 16h, 20h et 22h · conservées 7 jours sur le serveur · copiées sur Google Drive (sauvegarde ultime).</p>
         <div id="driveSyncStatus" style="margin-bottom:12px"></div>
+        <div id="diskStatus" style="margin-bottom:12px"></div>
         <button class="btn edit-only" id="runBackupBtn" style="margin-bottom:12px">Sauvegarder maintenant</button>
         <ul class="emp-list" id="backupList"></ul>
         <div class="add-row edit-only" style="flex-wrap:wrap;margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
@@ -1162,6 +1163,7 @@ body.has-top-banner .topbar{top:40px}
       case "deleteUser": p = request("DELETE", "/api/users/" + encodeURIComponent(extra.username)); break;
       case "resetPassword": p = request("POST", "/api/users/" + encodeURIComponent(extra.username) + "/reset-password", {password: extra.password}); break;
       case "listBackups": p = request("GET", "/api/backups"); break;
+      case "health": p = request("GET", "/api/health"); break;
       case "searchArchive": p = request("GET", "/api/dossiers/archive?q=" + encodeURIComponent(extra.q || "")); break;
       case "runBackup": p = request("POST", "/api/backups/run"); break;
       default: p = Promise.resolve({ok:false, error:"unknown_action"});
@@ -1303,7 +1305,7 @@ body.has-top-banner .topbar{top:40px}
     if (state.activeTab === "dashboard") renderDashboard();
     if (state.activeTab === "vacances") { renderAbsenceSelects(); renderAbsenceList(); renderDowntimeList(); renderVacAvailability(); }
     if (state.activeTab === "settings") renderSettingsTab();
-    if (state.role === "admin") { renderUsers(); renderBackups(); renderDriveSyncStatus(); }
+    if (state.role === "admin") { renderUsers(); renderBackups(); renderDriveSyncStatus(); renderDiskStatus(); }
   }
   function refreshAll(){
     var prevConflictCount = computeTodayConflictCount();
@@ -3873,6 +3875,23 @@ body.has-top-banner .topbar{top:40px}
     } else {
       host.appendChild(el("div", {class:"capacity-warning", text:"⚠ Pas de synchro Google Drive réussie depuis le " + whenText + " (plus de " + DRIVE_SYNC_STALE_HOURS + "h) — vérifiez que les sauvegardes automatiques tournent toujours."}));
     }
+  }
+  var DISK_LOW_THRESHOLD_PCT = 10;
+  function renderDiskStatus(){
+    var host = $("#diskStatus"); if (!host) return;
+    api("health", {}).then(function(res){
+      host.innerHTML = "";
+      if (!res.ok || res.diskFreePercent === null){
+        host.appendChild(el("p", {class:"chart-sub", style:"margin:0", text:"Espace disque : indisponible sur ce serveur."}));
+        return;
+      }
+      var text = "Espace disque libre sur le VPS : " + res.diskFreePercent + "%";
+      if (res.diskFreePercent < DISK_LOW_THRESHOLD_PCT){
+        host.appendChild(el("div", {class:"capacity-warning", text:"⚠ " + text + " — espace faible."}));
+      } else {
+        host.appendChild(el("p", {class:"chart-sub", style:"margin:0", text:"✅ " + text}));
+      }
+    });
   }
   function renderBackups(){
     api("listBackups", {}).then(function(res){

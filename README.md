@@ -170,6 +170,40 @@ Dans l'app, onglet **Admin** :
   envoyés avec le planning courant (`/api/all`) pour garder ça léger — ils
   restent cherchables par client/n°/adresse via la carte "Archives"
 
+## Alertes Telegram (surveillance externe)
+
+`.github/workflows/healthcheck.yml` interroge `GET /api/health` (public,
+sans authentification — signaux d'infra uniquement, jamais de données
+métier) toutes les ~10 minutes et envoie une alerte Telegram **sur
+changement d'état seulement** (pas à chaque exécution, pour ne pas spammer
+pendant une panne qui dure) :
+
+- 🔴 / ✅ l'app devient injoignable / redevient accessible
+- ⚠️ / ✅ espace disque du VPS sous 10 % libre / revenu à la normale
+- ⚠️ / ✅ la synchro Google Drive échoue / refonctionne
+
+Le cron de GitHub Actions est best-effort (peut avoir quelques minutes de
+retard en cas de forte charge de la plateforme) — ce n'est pas un SLA de
+disponibilité, juste une alerte "quelque chose a changé".
+
+**Mise en place (à faire une fois, dans Telegram puis dans GitHub)** :
+
+1. Dans Telegram, parler à **@BotFather**, envoyer `/newbot` et suivre les
+   instructions → il donne un **token** (ressemble à
+   `123456789:AAFlm...`).
+2. Démarrer une conversation avec ce nouveau bot (cherchez son nom
+   d'utilisateur et envoyez-lui n'importe quel message, par ex. "salut").
+3. Récupérer son **chat_id** : ouvrir dans un navigateur
+   `https://api.telegram.org/bot<VOTRE_TOKEN>/getUpdates` juste après avoir
+   envoyé ce message — le JSON contient `"chat":{"id":NNNNNNNN,...}`.
+4. Dans GitHub : repo → Settings → Secrets and variables → Actions →
+   ajouter `TELEGRAM_BOT_TOKEN` (le token de l'étape 1) et
+   `TELEGRAM_CHAT_ID` (le nombre de l'étape 3).
+
+Tant que ces deux secrets ne sont pas renseignés, le workflow tourne quand
+même (il ne casse rien) mais se contente d'écrire dans ses logs ce qu'il
+*aurait* envoyé.
+
 ## En cas de souci
 
 ```bash

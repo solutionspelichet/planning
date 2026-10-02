@@ -393,6 +393,25 @@ app.set('trust proxy', 1);
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Unauthenticated on purpose — an external uptime monitor (see
+// .github/workflows/healthcheck.yml) needs to reach this with no
+// credentials, same as a load balancer's /healthz. Reports infra signals
+// only (disk space, last Drive sync result), never business data.
+app.get('/api/health', (req, res) => {
+  let diskFreeBytes = null, diskFreePercent = null;
+  try {
+    const s = fs.statfsSync(DATA_DIR);
+    diskFreeBytes = s.bavail * s.bsize;
+    diskFreePercent = Math.round((s.bavail / s.blocks) * 1000) / 10;
+  } catch (err) { /* statfsSync unavailable on this platform/Node version — report null, not fatal */ }
+  let driveSyncStatus = null;
+  try {
+    const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('driveSyncStatus');
+    if (row) driveSyncStatus = JSON.parse(row.value);
+  } catch (err) { /* malformed or absent — report null */ }
+  res.json({ ok: true, serverTime: Date.now(), diskFreeBytes, diskFreePercent, driveSyncStatus });
+});
+
 app.get('/api/events', requireAuth, (req, res) => {
   res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
   res.flushHeaders();

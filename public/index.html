@@ -917,6 +917,67 @@ body.has-top-banner .topbar{top:40px}
   function parseDate(s){ var p = s.split("-").map(Number); return new Date(p[0], p[1]-1, p[2]); }
   function dayCount(a,b){ return Math.round((parseDate(b)-parseDate(a))/86400000)+1; }
   function dayIndex(a,b){ return Math.round((parseDate(b)-parseDate(a))/86400000)+1; }
+
+  // ---------- jours fériés (canton de Genève) ----------
+  function isWeekend(d){ var dow = d.getDay(); return dow === 0 || dow === 6; }
+  // Named distinctly from addDays(dateStr,n) below (string in/out) — this one
+  // works on Date objects, used only by the holiday/business-day math here.
+  function addDaysToDate(d, n){ var r = new Date(d); r.setDate(r.getDate()+n); return r; }
+  // Gauss/Meeus algorithm for the Gregorian Easter Sunday of a given year —
+  // the moving Geneva holidays (Vendredi Saint, Lundi de Pâques, Ascension,
+  // Lundi de Pentecôte, Jeûne genevois) are all computed from it so this
+  // keeps working correctly for any year, not just the ones hardcoded today.
+  function easterSunday(year){
+    var a = year % 19, b = Math.floor(year/100), c = year % 100;
+    var d = Math.floor(b/4), e = b % 4, f = Math.floor((b+8)/25), g = Math.floor((b-f+1)/3);
+    var h = (19*a + b - d - g + 15) % 30, i = Math.floor(c/4), k = c % 4;
+    var l = (32 + 2*e + 2*i - h - k) % 7, m = Math.floor((a + 11*h + 22*l)/451);
+    var month = Math.floor((h + l - 7*m + 114)/31), day = ((h + l - 7*m + 114) % 31) + 1;
+    return new Date(year, month-1, day);
+  }
+  var SWISS_HOLIDAY_CACHE = {};
+  function swissHolidaysGE(year){
+    if (SWISS_HOLIDAY_CACHE[year]) return SWISS_HOLIDAY_CACHE[year];
+    var easter = easterSunday(year);
+    var firstSeptSunday = addDaysToDate(new Date(year, 8, 1), (7 - new Date(year, 8, 1).getDay()) % 7);
+    var dates = [
+      new Date(year,0,1),                  // Nouvel An
+      addDaysToDate(easter,-2),            // Vendredi Saint
+      addDaysToDate(easter,1),             // Lundi de Pâques
+      addDaysToDate(easter,39),            // Ascension
+      addDaysToDate(easter,50),            // Lundi de Pentecôte
+      new Date(year,7,1),                  // Fête nationale
+      addDaysToDate(firstSeptSunday,4),    // Jeûne genevois
+      new Date(year,11,25),                // Noël
+      new Date(year,11,31)                 // Restauration de la République
+    ];
+    var set = {};
+    dates.forEach(function(d){ set[fmtDate(d)] = true; });
+    SWISS_HOLIDAY_CACHE[year] = set;
+    return set;
+  }
+  function isSwissHoliday(d){ return !!swissHolidaysGE(d.getFullYear())[fmtDate(d)]; }
+  // Holidays are always excluded; weekends only count as non-working days
+  // unless the dossier is flagged "travail le week-end".
+  function isBusinessDay(d, includeWeekends){
+    if (isSwissHoliday(d)) return false;
+    if (!includeWeekends && isWeekend(d)) return false;
+    return true;
+  }
+  function businessDayCount(a, b, includeWeekends){
+    var count = 0;
+    for (var d = parseDate(a), end = parseDate(b); d <= end; d = addDaysToDate(d,1)){
+      if (isBusinessDay(d, includeWeekends)) count++;
+    }
+    return Math.max(count, 1);
+  }
+  function businessDayIndex(a, dateStr, includeWeekends){
+    var idx = 0;
+    for (var d = parseDate(a), target = parseDate(dateStr); d <= target; d = addDaysToDate(d,1)){
+      if (isBusinessDay(d, includeWeekends)) idx++;
+    }
+    return Math.max(idx, 1);
+  }
   function empName(id){ var e = state.employees.find(function(x){return x.id===id;}); return e?e.name:"(supprimé)"; }
   function vehName(id){ var v = state.vehicles.find(function(x){return x.id===id;}); return v?v.name:"(supprimé)"; }
   function isVehPL(id){ var v = state.vehicles.find(function(x){return x.id===id;}); return !!v && v.type==="PL"; }
@@ -2025,8 +2086,8 @@ body.has-top-banner .topbar{top:40px}
     if (orderIndex) slotWrap.appendChild(el("span", {class:"dossier-order-badge", text:String(orderIndex)}));
     card.appendChild(slotWrap);
     if (canEdit()){ card.draggable = true; card.dataset.id = dossier.id; card.classList.add("draggable-row"); }
-    var totalDays = dayCount(dossier.startDate, dossier.endDate);
-    var idx = dayIndex(dossier.startDate, dateStr);
+    var totalDays = businessDayCount(dossier.startDate, dossier.endDate, !!dossier.workWeekends);
+    var idx = businessDayIndex(dossier.startDate, dateStr, !!dossier.workWeekends);
 
     var head = el("div", {class:"dossier-head"});
     var nameInput = el("input", {class:"client-name", value: dossier.client || "", placeholder:"Nom du client…"});
@@ -2072,6 +2133,18 @@ body.has-top-banner .topbar{top:40px}
     });
     range.appendChild(endInput);
     card.appendChild(range);
+
+    if (canEdit()){
+      var weekendRow = el("label", {class:"copy-all-days"});
+      var weekendChk = el("input", {type:"checkbox"});
+      weekendChk.checked = !!dossier.workWeekends;
+      weekendChk.addEventListener("change", function(){
+        saveDossierMeta(dossier, {workWeekends: weekendChk.checked});
+      });
+      weekendRow.appendChild(weekendChk);
+      weekendRow.appendChild(document.createTextNode("Travail le week-end (compte les samedis/dimanches dans la durée)"));
+      card.appendChild(weekendRow);
+    }
 
     var slotField = el("div", {class:"info-field wide"});
     slotField.appendChild(el("label", {text:"Créneau"}));

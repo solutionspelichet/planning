@@ -4,9 +4,15 @@ Backend Node.js/Express + SQLite (via `better-sqlite3`) avec mises à jour en
 temps réel via Server-Sent Events (SSE). Remplace l'ancienne version Google
 Apps Script.
 
-Aucun mot de passe n'est jamais stocké en clair : seul un hash SHA-256 salé
-par utilisateur. **Les identifiants d'infrastructure (VPS, NPM, Drive, admin
-app) sont dans `SECRETS.md`, volontairement exclu de git — voir ce fichier.**
+Aucun mot de passe n'est jamais stocké en clair : hash salé par utilisateur
+via `scrypt` (volontairement lent, résiste au brute-force si la base fuit).
+Les comptes créés avant ce changement avaient un hash SHA-256 — toujours
+reconnu à la connexion, et migré vers `scrypt` automatiquement dès la
+prochaine connexion réussie de ce compte (pas de réinitialisation forcée).
+Les tentatives de connexion sont aussi limitées (5 échecs sur un compte, ou
+20 échecs depuis une même IP, bloquent 5-10 min). **Les identifiants
+d'infrastructure (VPS, NPM, Drive, admin app) sont dans `SECRETS.md`,
+volontairement exclu de git — voir ce fichier.**
 
 ## Infrastructure actuelle (résumé)
 
@@ -47,9 +53,23 @@ clé (`~/.ssh/id_ed25519`). Mot de passe de secours dans `SECRETS.md`.
 
 ## Déployer une mise à jour
 
-Depuis ce dossier (`vps-app/`), uploader les deux fichiers modifiés puis
-redémarrer le service :
+**Automatique** : tout push sur la branche `main-63nl54` du repo GitHub
+(`solutionspelichet/planning`) déclenche `.github/workflows/deploy.yml` :
 
+1. **`test`** — installe les dépendances, lance la suite Playwright complète
+   (`npm run test:e2e`, voir plus bas). Le déploiement ne se lance pas si un
+   test échoue.
+2. **`deploy`** (seulement si `test` est vert) :
+   - Sauvegarde la base courante sur le VPS (`VACUUM INTO
+     avant-deploiement-*.db`) avant de toucher quoi que ce soit — visible et
+     téléchargeable depuis l'onglet Admin comme les autres sauvegardes.
+   - Copie `server.js` et `public/index.html` sur le VPS via SSH (secrets
+     `VPS_HOST`/`VPS_PORT`/`VPS_USER`/`VPS_SSH_KEY` du repo GitHub).
+   - `systemctl restart planning-app`.
+
+Pas de déploiement manuel à faire depuis un poste local. Pour contourner
+le pipeline en urgence (déconseillé — plus de garde-fou), la méthode manuelle
+reste :
 ```bash
 scp -P 22022 server.js root@87.106.213.25:/opt/planning-app/server.js
 scp -P 22022 public/index.html root@87.106.213.25:/opt/planning-app/public/index.html
@@ -58,12 +78,30 @@ ssh -p 22022 root@87.106.213.25 "systemctl restart planning-app"
 
 **Important** : redémarrer le service coupe toutes les sessions actives
 (stockées en mémoire, pas en base) — tout le monde devra se reconnecter.
-Prévoir ça en dehors des heures de pointe si possible.
+Le service a `Restart=always` dans systemd, donc il revient automatiquement
+après un arrêt (vérifié : `systemctl show planning-app -p Restart`).
 
 Si vous modifiez le schéma SQLite dans `server.js`, ajoutez une migration
 idempotente (voir les fonctions `migrateVehicleType` /
 `migrateDossierDisplayOrder` dans le fichier) — ne modifiez jamais une
 colonne existante directement, la base de prod contient déjà des données.
+
+## Suite de tests (Playwright)
+
+```bash
+npm run test:e2e
+```
+
+Lance le vrai `server.js` sur une base SQLite jetable (jamais `data/`) et
+pilote un vrai navigateur (Chromium) dessus — voir `playwright.config.js`
+et `tests/global-setup.js`. Les fichiers de `tests/e2e/` couvrent : auth +
+limitation de tentatives, CRUD dossiers, conflits de double-réservation et
+d'absence/immobilisation, exports CSV/PDF (jour, semaine, mois), le tableau
+Vacances & Garage, le statut de synchro Drive, l'affichage mobile (pas de
+débordement horizontal à 390px) et l'archivage des vieux dossiers.
+
+C'est cette même suite qui gate le déploiement automatique (ci-dessus) —
+un changement qui casse un de ces comportements ne part pas en prod.
 
 ## Reverse proxy (Nginx Proxy Manager)
 
@@ -118,11 +156,19 @@ en tant que root manuellement — les deux fichiers existent, gardez-les
 synchronisés si vous retouchez l'auth Drive).
 
 Dans l'app, onglet **Admin** :
-- Liste des sauvegardes VPS avec téléchargement
+- Liste des sauvegardes VPS avec téléchargement (y compris les snapshots
+  `avant-deploiement-*` et `avant-restauration-*` pris automatiquement)
 - Bouton "Sauvegarder maintenant"
+- **Statut de synchro Drive** : vert si la dernière copie vers Drive a
+  réussi récemment, rouge avec le message d'erreur sinon, avertissement si
+  aucune synchro réussie depuis plus de 15h (silence qui, avant, ne
+  remontait que dans les logs serveur)
 - **Restauration** : uploader un fichier `.db` (téléchargé depuis Drive ou
   local) → le serveur le valide, sauvegarde l'état courant par sécurité
   (`avant-restauration-*.db`), puis redémarre pour appliquer le changement
+- **Archives** : les dossiers terminés depuis plus de 18 mois ne sont plus
+  envoyés avec le planning courant (`/api/all`) pour garder ça léger — ils
+  restent cherchables par client/n°/adresse via la carte "Archives"
 
 ## En cas de souci
 
@@ -153,11 +199,14 @@ sudo sqlite3 /opt/planning-app/data/planning.db "VACUUM INTO '/root/backup-manue
 
 (c'est exactement ce que fait le bouton "Sauvegarder maintenant" de l'app).
 
-## Git
+## Git / GitHub
 
-Ce dossier est un dépôt git local (`git status` à la racine du projet
-`planning-effectifs`) **sans remote configuré** — rien n'est poussé sur
-GitHub ou ailleurs. Si vous migrez ou clonez ce projet, pensez à committer
-et pousser vers un remote avant, sinon seul `SECRETS.md` (gitignored, donc
-jamais perdu par git mais jamais synchronisé non plus) et les fichiers déjà
-déployés sur le VPS font foi.
+Repo : [`solutionspelichet/planning`](https://github.com/solutionspelichet/planning),
+branche de développement/déploiement : `main-63nl54` (tout push dessus
+déclenche le pipeline décrit plus haut). `main` sert de branche stable —
+`main-63nl54` y est fusionnée périodiquement via Pull Request.
+
+`SECRETS.md` reste gitignored (jamais poussé) ; les secrets du pipeline
+(`VPS_HOST`, `VPS_PORT`, `VPS_USER`, `VPS_SSH_KEY`) sont dans les repo
+secrets GitHub (Settings → Secrets and variables → Actions), pas dans ce
+fichier.

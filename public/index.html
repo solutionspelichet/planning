@@ -563,6 +563,7 @@ body.has-top-banner .topbar{top:40px}
             </div>
             <button class="btn btn-ghost" id="exportCsvBtn">⬇ Export CSV (mois)</button>
             <button class="btn btn-ghost" id="exportPdfBtn">📄 Export PDF (jour)</button>
+            <button class="btn btn-ghost" id="exportWeekPdfBtn">📄 Export PDF (semaine)</button>
             <button class="btn btn-ghost" id="printDayBtn">🖨 Imprimer</button>
             <button class="btn edit-only" id="newDossierBtn">+ Nouveau dossier</button>
           </div>
@@ -757,6 +758,14 @@ body.has-top-banner .topbar{top:40px}
           <input type="file" id="restoreFileInput" accept=".db" style="flex:1 1 100%">
           <button id="restoreBtn">Restaurer</button>
         </div>
+      </div>
+      <div class="company-card">
+        <h3><span>Archives</span></h3>
+        <p class="chart-sub" style="margin:0 0 10px">Les dossiers terminés depuis plus de 18 mois ne sont plus chargés avec le planning courant — recherchez-les ici par client, n° de dossier ou adresse.</p>
+        <div class="add-row" style="margin-bottom:10px">
+          <input type="text" id="archiveSearchInput" placeholder="Rechercher un dossier archivé…" style="flex:1 1 auto">
+        </div>
+        <ul class="emp-list" id="archiveResults"></ul>
       </div>
     </div>
     <div class="chart-card" style="margin-top:16px">
@@ -1153,6 +1162,7 @@ body.has-top-banner .topbar{top:40px}
       case "deleteUser": p = request("DELETE", "/api/users/" + encodeURIComponent(extra.username)); break;
       case "resetPassword": p = request("POST", "/api/users/" + encodeURIComponent(extra.username) + "/reset-password", {password: extra.password}); break;
       case "listBackups": p = request("GET", "/api/backups"); break;
+      case "searchArchive": p = request("GET", "/api/dossiers/archive?q=" + encodeURIComponent(extra.q || "")); break;
       case "runBackup": p = request("POST", "/api/backups/run"); break;
       default: p = Promise.resolve({ok:false, error:"unknown_action"});
     }
@@ -2505,6 +2515,9 @@ body.has-top-banner .topbar{top:40px}
     numberInput.addEventListener("change", function(){ saveDossierMeta(dossier, {dossierNumber: numberInput.value.toUpperCase()}); });
     numberField.appendChild(numberInput);
     card.appendChild(numberField);
+    if (dossier.dossierNumber && state.dossiers.some(function(d){ return d.id !== dossier.id && d.dossierNumber === dossier.dossierNumber; })){
+      card.appendChild(el("div", {class:"capacity-warning", text:"⚠ Le N° " + dossier.dossierNumber + " est déjà utilisé par un autre dossier"}));
+    }
 
     var range = el("div", {class:"date-range"});
     range.appendChild(el("span", {text:"Du"}));
@@ -2696,6 +2709,14 @@ body.has-top-banner .topbar{top:40px}
   function closePopover(){ var p = $(".popover"); if (p) p.remove(); }
   document.addEventListener("click", function(ev){
     if (!ev.target.closest(".popover") && !ev.target.closest(".add-chip") && !ev.target.closest(".quick-expand") && !ev.target.closest(".history-btn") && !ev.target.closest(".week-chip-move")) closePopover();
+  });
+
+  // ---------- raccourcis clavier globaux ----------
+  document.addEventListener("keydown", function(ev){
+    if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "k"){
+      var search = $("#globalSearch");
+      if (search){ search.focus(); search.select(); ev.preventDefault(); }
+    }
   });
 
   // ---------- raccourcis clavier (vue Planning, jour) ----------
@@ -3142,15 +3163,52 @@ body.has-top-banner .topbar{top:40px}
   }
   $("#exportCsvBtn").addEventListener("click", exportMonthCsv);
 
+  // Shared by exportDayPdf and exportWeekPdf: draws one dossier's block at
+  // the given y, paginating first if it wouldn't fit, and returns the new y.
+  function drawDossierPdfBlock(doc, dossier, dateStr, idx, pageW, pageH, margin, y){
+    var assignment = assignmentFor(dossier.id, dateStr);
+    var autoKind = autoDossierKind(dossier);
+    var typeLabel = autoKind ? (autoKind === "DEPOT" ? "Dépôt" : "Archivage") : (dossier.moveType || "—");
+    var empNames = (assignment.employees || []).map(function(a){ return empName(a.employeeId); });
+    var vehNames = (assignment.vehicleIds || []).map(vehName);
+    var raw = [
+      { bold:true, text: (idx+1) + ". " + (dossier.client || "(sans nom)") + (dossier.dossierNumber ? "  —  N° " + dossier.dossierNumber : "") },
+      { bold:false, text: "N° dossier : " + (dossier.dossierNumber || "—") },
+      { bold:false, text: "Créneau : " + (assignment.slot || "non défini") + "   ·   Type : " + typeLabel + (dossier.volume ? "   ·   Volume : " + dossier.volume + " m³" : "") }
+    ];
+    if (dossier.addressFrom) raw.push({bold:false, text:"Départ : " + dossier.addressFrom});
+    if (dossier.addressTo) raw.push({bold:false, text:"Arrivée : " + dossier.addressTo});
+    if (empNames.length) raw.push({bold:false, text:"Effectif : " + empNames.join(", ")});
+    if (vehNames.length) raw.push({bold:false, text:"Véhicules : " + vehNames.join(", ")});
+    if (dossier.task) raw.push({bold:false, text:"Tâche : " + dossier.task.replace(/\n/g, " / ")});
+    if (dossier.comment) raw.push({bold:false, text:"Commentaire : " + dossier.comment.replace(/\n/g, " / ")});
+
+    var wrapped = raw.map(function(l){ return {bold:l.bold, lines: doc.splitTextToSize(l.text, pageW - margin*2)}; });
+    var blockHeight = wrapped.reduce(function(sum, w){ return sum + w.lines.length * (w.bold ? 5.4 : 4.8); }, 0) + 5;
+    if (y + blockHeight > pageH - margin){ doc.addPage(); y = 18; }
+
+    wrapped.forEach(function(w){
+      doc.setFont("helvetica", w.bold ? "bold" : "normal");
+      doc.setFontSize(w.bold ? 11.5 : 9.5);
+      doc.text(w.lines, margin, y);
+      y += w.lines.length * (w.bold ? 5.4 : 4.8);
+    });
+    y += 3;
+    doc.setDrawColor(230); doc.line(margin, y, pageW - margin, y); y += 5;
+    return y;
+  }
+  function planningFilterSuffix(){
+    if (!state.planningFilter.length) return "";
+    return " (filtré : " + state.planningFilter.map(function(k){
+      var t = PLANNING_FILTER_TYPES.find(function(x){ return x.key === k; }); return t ? t.label : k;
+    }).join(", ") + ")";
+  }
   function exportDayPdf(){
     if (!window.jspdf || !window.jspdf.jsPDF){ toast("Bibliothèque PDF indisponible (pas de connexion internet ?)"); return; }
     var doc = new window.jspdf.jsPDF({unit:"mm", format:"a4"});
     var d = parseDate(state.selectedDate);
     var dow = ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d.getDay()];
-    var titleText = "Chantiers — " + dow + " " + d.getDate() + " " + MONTHS_FR[d.getMonth()] + " " + d.getFullYear();
-    if (state.planningFilter.length) titleText += " (filtré : " + state.planningFilter.map(function(k){
-      var t = PLANNING_FILTER_TYPES.find(function(x){ return x.key === k; }); return t ? t.label : k;
-    }).join(", ") + ")";
+    var titleText = "Chantiers — " + dow + " " + d.getDate() + " " + MONTHS_FR[d.getMonth()] + " " + d.getFullYear() + planningFilterSuffix();
     var dossiersToday = activeDossiersOn(state.selectedDate).filter(matchesPlanningFilter).sort(function(a,b){ return (a.displayOrder||0)-(b.displayOrder||0); });
     var pageW = 210, pageH = 297, margin = 14, y = 18;
     doc.setFont("helvetica", "bold"); doc.setFontSize(14);
@@ -3161,40 +3219,42 @@ body.has-top-banner .topbar{top:40px}
       doc.text("Aucun chantier ce jour-là.", margin, y);
     } else {
       dossiersToday.forEach(function(dossier, idx){
-        var assignment = assignmentFor(dossier.id, state.selectedDate);
-        var autoKind = autoDossierKind(dossier);
-        var typeLabel = autoKind ? (autoKind === "DEPOT" ? "Dépôt" : "Archivage") : (dossier.moveType || "—");
-        var empNames = (assignment.employees || []).map(function(a){ return empName(a.employeeId); });
-        var vehNames = (assignment.vehicleIds || []).map(vehName);
-        var raw = [
-          { bold:true, text: (idx+1) + ". " + (dossier.client || "(sans nom)") + (dossier.dossierNumber ? "  —  N° " + dossier.dossierNumber : "") },
-          { bold:false, text: "N° dossier : " + (dossier.dossierNumber || "—") },
-          { bold:false, text: "Créneau : " + (assignment.slot || "non défini") + "   ·   Type : " + typeLabel + (dossier.volume ? "   ·   Volume : " + dossier.volume + " m³" : "") }
-        ];
-        if (dossier.addressFrom) raw.push({bold:false, text:"Départ : " + dossier.addressFrom});
-        if (dossier.addressTo) raw.push({bold:false, text:"Arrivée : " + dossier.addressTo});
-        if (empNames.length) raw.push({bold:false, text:"Effectif : " + empNames.join(", ")});
-        if (vehNames.length) raw.push({bold:false, text:"Véhicules : " + vehNames.join(", ")});
-        if (dossier.task) raw.push({bold:false, text:"Tâche : " + dossier.task.replace(/\n/g, " / ")});
-        if (dossier.comment) raw.push({bold:false, text:"Commentaire : " + dossier.comment.replace(/\n/g, " / ")});
-
-        var wrapped = raw.map(function(l){ return {bold:l.bold, lines: doc.splitTextToSize(l.text, pageW - margin*2)}; });
-        var blockHeight = wrapped.reduce(function(sum, w){ return sum + w.lines.length * (w.bold ? 5.4 : 4.8); }, 0) + 5;
-        if (y + blockHeight > pageH - margin){ doc.addPage(); y = 18; }
-
-        wrapped.forEach(function(w){
-          doc.setFont("helvetica", w.bold ? "bold" : "normal");
-          doc.setFontSize(w.bold ? 11.5 : 9.5);
-          doc.text(w.lines, margin, y);
-          y += w.lines.length * (w.bold ? 5.4 : 4.8);
-        });
-        y += 3;
-        doc.setDrawColor(230); doc.line(margin, y, pageW - margin, y); y += 5;
+        y = drawDossierPdfBlock(doc, dossier, state.selectedDate, idx, pageW, pageH, margin, y);
       });
     }
     doc.save("chantiers-" + state.selectedDate + ".pdf");
   }
   $("#exportPdfBtn").addEventListener("click", exportDayPdf);
+  function exportWeekPdf(){
+    if (!window.jspdf || !window.jspdf.jsPDF){ toast("Bibliothèque PDF indisponible (pas de connexion internet ?)"); return; }
+    var doc = new window.jspdf.jsPDF({unit:"mm", format:"a4"});
+    var pageW = 210, pageH = 297, margin = 14;
+    var weekDates = getWeekDates(state.selectedDate);
+    var dowNames = ["lundi","mardi","mercredi","jeudi","vendredi","samedi","dimanche"];
+    var first = parseDate(weekDates[0]), last = parseDate(weekDates[weekDates.length-1]);
+    var suffix = planningFilterSuffix();
+    weekDates.forEach(function(dateStr, i){
+      var y = 18;
+      if (i > 0) { doc.addPage(); }
+      var d = parseDate(dateStr);
+      var titleText = "Chantiers — " + dowNames[i] + " " + d.getDate() + " " + MONTHS_FR[d.getMonth()] + " " + d.getFullYear() + suffix;
+      doc.setFont("helvetica", "bold"); doc.setFontSize(14);
+      doc.text(titleText, margin, y); y += 8;
+      doc.setDrawColor(200); doc.line(margin, y, pageW - margin, y); y += 8;
+      var dossiersOfDay = activeDossiersOn(dateStr).filter(matchesPlanningFilter).sort(function(a,b){ return (a.displayOrder||0)-(b.displayOrder||0); });
+      if (!dossiersOfDay.length){
+        doc.setFont("helvetica", "normal"); doc.setFontSize(11);
+        doc.text("Aucun chantier ce jour-là.", margin, y);
+      } else {
+        dossiersOfDay.forEach(function(dossier, idx){
+          y = drawDossierPdfBlock(doc, dossier, dateStr, idx, pageW, pageH, margin, y);
+        });
+      }
+    });
+    doc.save("chantiers-semaine-" + weekDates[0] + "-au-" + weekDates[weekDates.length-1] + ".pdf");
+  }
+  var exportWeekPdfBtn = $("#exportWeekPdfBtn");
+  if (exportWeekPdfBtn) exportWeekPdfBtn.addEventListener("click", exportWeekPdf);
 
   // ---------- Disponibilités ----------
   function renderAvailability(){
@@ -3829,6 +3889,45 @@ body.has-top-banner .topbar{top:40px}
       });
     });
   }
+  function renderArchiveResults(dossiers, assignmentsByDossier){
+    var host = $("#archiveResults"); host.innerHTML = "";
+    if (!dossiers.length){
+      host.appendChild(el("li", {class:"empty-note", text:"Aucun résultat."}));
+      return;
+    }
+    dossiers.forEach(function(d){
+      var assignments = assignmentsByDossier[d.id] || [];
+      var empNames = {}, vehNames = {};
+      assignments.forEach(function(a){
+        (a.employees||[]).forEach(function(x){ empNames[empName(x.employeeId)] = true; });
+        (a.vehicleIds||[]).forEach(function(vid){ vehNames[vehName(vid)] = true; });
+      });
+      var parts = [
+        (d.dossierNumber ? "N° " + d.dossierNumber + " — " : "") + (d.client || "(sans nom)"),
+        d.startDate + " → " + d.endDate,
+      ];
+      if (d.addressFrom || d.addressTo) parts.push((d.addressFrom||"—") + " → " + (d.addressTo||"—"));
+      if (Object.keys(empNames).length) parts.push("Effectif : " + Object.keys(empNames).join(", "));
+      if (Object.keys(vehNames).length) parts.push("Véhicules : " + Object.keys(vehNames).join(", "));
+      var row = el("li", {class:"emp-row", style:"flex-direction:column;align-items:flex-start;gap:2px"});
+      row.appendChild(el("span", {class:"emp-name", text: parts[0]}));
+      for (var i=1; i<parts.length; i++) row.appendChild(el("span", {style:"font-size:11.5px;color:var(--fg-muted)", text: parts[i]}));
+      host.appendChild(row);
+    });
+  }
+  var archiveSearchTimer = null;
+  var archiveSearchInput = $("#archiveSearchInput");
+  if (archiveSearchInput) archiveSearchInput.addEventListener("input", function(){
+    var q = archiveSearchInput.value.trim();
+    clearTimeout(archiveSearchTimer);
+    if (q.length < 2){ $("#archiveResults").innerHTML = ""; return; }
+    archiveSearchTimer = setTimeout(function(){
+      api("searchArchive", {q:q}).then(function(res){
+        if (!res.ok) return;
+        renderArchiveResults(res.dossiers, res.assignmentsByDossier);
+      });
+    }, 300);
+  });
   var runBackupBtn = $("#runBackupBtn");
   if (runBackupBtn) runBackupBtn.addEventListener("click", function(){
     runBackupBtn.disabled = true;

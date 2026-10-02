@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Planning Effectifs</title>
+<script>(function(){try{var t=localStorage.getItem("pe_theme_v1");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#d97328">
 <meta name="mobile-web-app-capable" content="yes">
@@ -25,7 +26,7 @@
   --type-border-width:10px; --slot-header-pad:10px;
 }
 @media (prefers-color-scheme: dark){
-  :root{
+  :root:not([data-theme="light"]){
     --bg:#1b1a17; --surface:#242220; --border:#3a362f; --fg:#f1ede4; --fg-muted:#a89f8e;
     --accent:#e8863c; --accent-fg:#1b1a17; --weekend:#2c2a25; --danger:#e0685c; --danger-bg:#3a2320;
     --chip-j:#5b8fe0; --chip-m:#3cb495; --chip-a:#a284e8;
@@ -35,6 +36,16 @@
     --reason-entretien:#e0a940; --reason-reparation:#a284e8; --reason-accident:#e0685c;
     --type-depot:#4ba3a3; --type-archivage:#a6855f;
   }
+}
+:root[data-theme="dark"]{
+  --bg:#1b1a17; --surface:#242220; --border:#3a362f; --fg:#f1ede4; --fg-muted:#a89f8e;
+  --accent:#e8863c; --accent-fg:#1b1a17; --weekend:#2c2a25; --danger:#e0685c; --danger-bg:#3a2320;
+  --chip-j:#5b8fe0; --chip-m:#3cb495; --chip-a:#a284e8;
+  --chip-nl:#9a927f; --chip-inter:#e0a940; --chip-gm:#e0685c;
+  --dispo-free:#3cb46f; --dispo-idle:#2a2823; --dispo-conflict:#e0685c; --dispo-absent:#e0b23c;
+  --reason-conges:#5b8fe0; --reason-maladie:#e0685c; --reason-recup:#3cb495;
+  --reason-entretien:#e0a940; --reason-reparation:#a284e8; --reason-accident:#e0685c;
+  --type-depot:#4ba3a3; --type-archivage:#a6855f;
 }
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:'Public Sans',system-ui,sans-serif;margin:0}
@@ -176,6 +187,9 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 .week-chip:hover{background:var(--weekend)}
 .week-chip.movable{cursor:grab}
 .week-chip.movable:active{cursor:grabbing}
+.week-chip-move{flex:none;margin-left:auto;border:none;background:rgba(0,0,0,.08);color:inherit;
+  width:20px;height:20px;border-radius:5px;font-size:12px;line-height:1;cursor:pointer;padding:0}
+.week-chip-move:hover{background:rgba(0,0,0,.18)}
 .week-chip-slot{width:6px;height:6px;border-radius:50%;flex:none}
 .week-chip-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .week-chip-more{font-size:10.5px;color:var(--fg-muted);text-align:center;padding:2px;cursor:pointer}
@@ -463,6 +477,7 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
       <div class="search-results" id="searchResults" hidden></div>
     </div>
     <button class="btn btn-ghost edit-only history-btn" id="undoHistoryBtn" title="Dernières actions / Annuler">↩ Annuler</button>
+    <button class="btn btn-ghost" id="themeToggleBtn" title="Changer de thème">🌓</button>
     <div class="who">
       <span><b id="whoName">—</b></span>
       <span class="role-pill" id="whoRole">—</span>
@@ -502,6 +517,7 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
         <div class="day-panel-head">
           <h2 id="dayTitle">—</h2>
           <div class="day-panel-actions">
+            <button class="btn btn-ghost" id="goTodayBtn" title="Revenir à la date du jour">📅 Aujourd'hui</button>
             <div class="view-mode-toggle">
               <button type="button" class="view-mode-btn active" id="viewModeDayBtn">Jour</button>
               <button type="button" class="view-mode-btn" id="viewModeWeekBtn">Semaine</button>
@@ -955,9 +971,25 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
     $("#whoRole").textContent = state.role;
     document.body.classList.toggle("view-only", !canEdit());
     $("#adminTabBtn").hidden = state.role !== "admin";
-    refreshAll();
+    refreshAll().then(handleStartupShortcut);
     connectLive();
     schedulePoll(POLL_MS);
+  }
+
+  // Handles the PWA app shortcut ("Nouveau dossier" from a long-press on the
+  // installed app's icon), which lands here as a ?action=new-dossier query
+  // param. Cleared from the URL right away so a later reload of the same
+  // tab doesn't keep re-creating dossiers.
+  function handleStartupShortcut(){
+    var params = new URLSearchParams(window.location.search);
+    if (!params.has("action")) return;
+    if (params.get("action") === "new-dossier" && canEdit()){
+      var btn = $("#newDossierBtn");
+      if (btn) btn.click();
+    }
+    params.delete("action");
+    var rest = params.toString();
+    window.history.replaceState({}, "", window.location.pathname + (rest ? "?" + rest : ""));
   }
 
   // Server pushes a "changed" event over SSE the instant any client writes,
@@ -1680,6 +1712,23 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
       }}).then(function(){ toast("Chantier déplacé avec son équipe"); refreshAll(); });
     });
   }
+  function openMoveDayPopover(anchor, dossier, days, currentDateStr){
+    closePopover();
+    var rect = anchor.getBoundingClientRect();
+    var pop = el("div", {class:"popover"});
+    pop.style.top = (rect.bottom+4) + "px"; pop.style.left = Math.min(rect.left, window.innerWidth-246) + "px";
+    var dowShort = ["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
+    pop.appendChild(el("div", {class:"opt-group", text:"Déplacer vers…"}));
+    days.forEach(function(day){
+      if (day.dateStr === currentDateStr) return;
+      var label = dowShort[(day.date.getDay()+6) % 7] + " " + day.date.getDate();
+      pop.appendChild(el("div", {class:"opt", text:label, onclick: function(){
+        moveDossierToDate(dossier, day.dateStr);
+        closePopover();
+      }}));
+    });
+    document.body.appendChild(pop);
+  }
   var WEEK_CHIP_MAX = 6;
   function renderWeekView(){
     var host = $("#weekGrid"); if (!host) return;
@@ -1735,6 +1784,12 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
               ev.dataTransfer.setData("text/plain", dossierId);
               ev.dataTransfer.effectAllowed = "move";
             }; }(dossier.id));
+            var moveBtn = el("button", {type:"button", class:"week-chip-move", title:"Déplacer vers un autre jour (utile au toucher)"}, [document.createTextNode("⇄")]);
+            moveBtn.addEventListener("click", function(dossier, fromDateStr){ return function(ev){
+              ev.stopPropagation();
+              openMoveDayPopover(ev.currentTarget, dossier, days, fromDateStr);
+            }; }(dossier, day.dateStr));
+            chip.appendChild(moveBtn);
           }
           chip.addEventListener("click", function(dateStr){ return function(){ goToDayFromWeek(dateStr); }; }(day.dateStr));
           col.appendChild(chip);
@@ -1750,6 +1805,17 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
   }
   $("#viewModeDayBtn").addEventListener("click", function(){ state.planningViewMode = "day"; renderDayPanel(); });
   $("#viewModeWeekBtn").addEventListener("click", function(){ state.planningViewMode = "week"; renderDayPanel(); });
+  var goTodayBtn = $("#goTodayBtn");
+  if (goTodayBtn) goTodayBtn.addEventListener("click", function(){
+    var now = new Date();
+    var todayStr = fmtDate(now);
+    state.selectedDate = todayStr;
+    state.vgSelectedDate = todayStr;
+    state.cursor = new Date(now.getFullYear(), now.getMonth(), 1);
+    state.vgCursor = new Date(now.getFullYear(), now.getMonth(), 1);
+    state.planningViewMode = "day";
+    renderCalendar(); renderDayPanel(); renderVgCalendar(); renderVgDayPanel();
+  });
 
   function autoDossierKind(dossier){
     if (dossier.id.indexOf("depot_") === 0) return "DEPOT";
@@ -1985,7 +2051,7 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
 
   function closePopover(){ var p = $(".popover"); if (p) p.remove(); }
   document.addEventListener("click", function(ev){
-    if (!ev.target.closest(".popover") && !ev.target.closest(".add-chip") && !ev.target.closest(".quick-expand") && !ev.target.closest(".history-btn")) closePopover();
+    if (!ev.target.closest(".popover") && !ev.target.closest(".add-chip") && !ev.target.closest(".quick-expand") && !ev.target.closest(".history-btn") && !ev.target.closest(".week-chip-move")) closePopover();
   });
 
   // ---------- raccourcis clavier (vue Planning, jour) ----------
@@ -2157,6 +2223,32 @@ td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
   }
   var undoHistoryBtn = $("#undoHistoryBtn");
   if (undoHistoryBtn) undoHistoryBtn.addEventListener("click", function(ev){ openActionLogPopover(ev.currentTarget); });
+
+  // ---------- thème clair / sombre / auto ----------
+  var THEME_KEY = "pe_theme_v1";
+  function applyTheme(theme){
+    if (theme === "dark" || theme === "light") document.documentElement.setAttribute("data-theme", theme);
+    else document.documentElement.removeAttribute("data-theme");
+    var metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) metaTheme.setAttribute("content", theme === "dark" ? "#1b1a17" : "#d97328");
+  }
+  function cycleTheme(){
+    var current = null;
+    try { current = localStorage.getItem(THEME_KEY); } catch(e){ /* no storage — theme stays per-tab only */ }
+    var next = current === "dark" ? "light" : current === "light" ? null : "dark";
+    try {
+      if (next === null) localStorage.removeItem(THEME_KEY); else localStorage.setItem(THEME_KEY, next);
+    } catch(e){ /* ignore */ }
+    applyTheme(next);
+    toast(next === "dark" ? "Thème sombre" : next === "light" ? "Thème clair" : "Thème automatique (système)");
+  }
+  (function(){
+    var saved = null;
+    try { saved = localStorage.getItem(THEME_KEY); } catch(e){ /* ignore */ }
+    applyTheme(saved);
+  })();
+  var themeToggleBtn = $("#themeToggleBtn");
+  if (themeToggleBtn) themeToggleBtn.addEventListener("click", cycleTheme);
 
   function openVehiclePicker(anchor, assignment){
     if (!canEdit()) return;

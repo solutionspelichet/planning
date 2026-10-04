@@ -14,6 +14,7 @@ const URL = process.env.HEALTHCHECK_URL;
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const STATE_FILE = process.env.STATE_FILE || 'healthcheck-state.json';
+const FORCE_TEST_ALERT = process.env.FORCE_TEST_ALERT === 'true';
 const DISK_LOW_THRESHOLD_PCT = 10;
 
 function loadPrevState() {
@@ -60,6 +61,11 @@ async function sendTelegram(text) {
     messages.push(`⚠️ Échec de la dernière synchro Google Drive : ${health.driveSyncStatus.error || 'raison inconnue'}.`);
   }
   if (prev.driveSyncFailed && !driveSyncFailed && up) messages.push('✅ La synchro Google Drive fonctionne de nouveau.');
+  // Manual-only (workflow_dispatch "test_alert" input), forces a real send
+  // through this exact code path + the configured secrets, independent of
+  // whether any real state actually changed — the normal state-change logic
+  // above is what the unattended schedule relies on and isn't affected by this.
+  if (FORCE_TEST_ALERT) messages.push(`🧪 Test manuel : l'automatisation (script + secrets GitHub) fonctionne. État actuel : ${up ? 'en ligne' : 'injoignable'}.`);
 
   for (const msg of messages) await sendTelegram(msg);
 

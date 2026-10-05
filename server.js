@@ -7,6 +7,13 @@
 // No plaintext password is ever stored: only a per-user random salt + a
 // salted SHA-256 hash.
 
+// Nothing in the deploy pipeline (systemd service, deploy workflow) sets
+// NODE_ENV, so Express defaults to its "development" mode in production —
+// among other things, that includes the real error stack trace in any
+// unhandled route error's response body. Default to production here unless
+// something explicitly overrides it (e.g. a future dev-mode script).
+if (!process.env.NODE_ENV) process.env.NODE_ENV = 'production';
+
 const express = require('express');
 const crypto = require('crypto');
 const path = require('path');
@@ -391,6 +398,17 @@ const app = express();
 // Docker-gateway address for every visitor.
 app.set('trust proxy', 1);
 app.use(express.json({ limit: '2mb' }));
+// Baseline hardening headers. No Content-Security-Policy here on purpose —
+// the app loads Google Fonts and a vendored script alongside its own inline
+// <script>/<style>, and getting a CSP wrong silently breaks rendering
+// rather than failing loudly, so it isn't worth retrofitting without being
+// able to click through every tab after.
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Unauthenticated on purpose — an external uptime monitor (see
@@ -473,6 +491,12 @@ const DOSSIER_HISTORY_FIELDS = [
   'client', 'dossierNumber', 'startDate', 'endDate', 'addressFrom', 'addressTo',
   'volume', 'seller', 'coordinator', 'task', 'comment', 'moveType'
 ];
+// Per dossier, not global — unlike action_log, a long-lived dossier that
+// gets edited often shouldn't have its own history crowded out by unrelated
+// dossiers' entries. A dossier is deleted wholesale (and its history with
+// it, see removeDossierRow) long before 200 tracked-field edits pile up on
+// one, so this is a ceiling against pathological cases, not a normal trim.
+const DOSSIER_HISTORY_LIMIT_PER_DOSSIER = 200;
 function recordDossierHistory(oldRow, newValues, changedBy) {
   const changes = DOSSIER_HISTORY_FIELDS
     .map(field => ({ field, oldValue: (oldRow ? oldRow[field] : '') || '', newValue: newValues[field] || '' }))
@@ -482,9 +506,15 @@ function recordDossierHistory(oldRow, newValues, changedBy) {
     INSERT INTO dossier_history (id, dossierId, field, oldValue, newValue, changedBy, changedAt)
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
+  const trim = db.prepare(`
+    DELETE FROM dossier_history WHERE dossierId = ? AND id NOT IN (
+      SELECT id FROM dossier_history WHERE dossierId = ? ORDER BY changedAt DESC LIMIT ?
+    )
+  `);
   const now = Date.now();
   const tx = db.transaction(() => {
     changes.forEach(c => insert.run(crypto.randomUUID(), newValues.id, c.field, c.oldValue, c.newValue, changedBy, now));
+    trim.run(newValues.id, newValues.id, DOSSIER_HISTORY_LIMIT_PER_DOSSIER);
   });
   tx();
 }
@@ -854,4 +884,34 @@ app.post('/api/backups/restore', requireAuth, requireAdmin, express.raw({ type: 
   setTimeout(() => { db.close(); process.exit(0); }, 300);
 });
 
+// Catches anything a route handler throws synchronously (an async handler's
+// rejection won't land here — none of the routes above pass errors to
+// next(), they all catch and respond themselves) and whatever Express's own
+// routing/body-parsing could still throw. Replaces Express's default error
+// page, which would otherwise show the real stack trace in NODE_ENV=production's
+// absence up to now (see the NODE_ENV default near the top of this file).
+app.use((err, req, res, next) => {
+  console.error('Unhandled request error:', err);
+  if (res.headersSent) return next(err);
+  // Respect a client-error status already on the error (e.g. malformed
+  // JSON body from express.json() carries .status = 400) rather than
+  // reporting every error as a 500, server-side, problem.
+  res.status(err.status || err.statusCode || 500).json({ ok: false, error: 'server_error' });
+});
+
 app.listen(PORT, () => console.log('Planning Effectifs listening on port ' + PORT));
+
+// A synchronous throw that still somehow misses every try/catch and the
+// Express error handler above leaves the process in an unknown state —
+// Node's own guidance is to log and exit rather than keep serving requests,
+// and let systemd's Restart=always (see README) bring it back up clean.
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception — exiting so systemd can restart cleanly:', err);
+  process.exit(1);
+});
+// An unhandled promise rejection is almost always scoped to one request's
+// async chain rather than corrupting shared state, so this just logs it for
+// visibility instead of taking the whole server down with it.
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled promise rejection:', reason);
+});

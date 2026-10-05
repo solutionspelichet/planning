@@ -23,6 +23,7 @@
   --reason-conges:#3467b8; --reason-maladie:#c1443a; --reason-recup:#1f8a70;
   --reason-entretien:#c98a1b; --reason-reparation:#7a4fc4; --reason-accident:#c1443a;
   --type-depot:#3d8b8b; --type-archivage:#8b6b45;
+  --addr-gm:#e2534d; --addr-transit:#3fa15a;
   --type-border-width:10px; --slot-header-pad:10px;
 }
 @media (prefers-color-scheme: dark){
@@ -35,6 +36,7 @@
     --reason-conges:#5b8fe0; --reason-maladie:#e0685c; --reason-recup:#3cb495;
     --reason-entretien:#e0a940; --reason-reparation:#a284e8; --reason-accident:#e0685c;
     --type-depot:#4ba3a3; --type-archivage:#a6855f;
+    --addr-gm:#e2534d; --addr-transit:#3fa15a;
   }
 }
 :root[data-theme="dark"]{
@@ -46,6 +48,7 @@
   --reason-conges:#5b8fe0; --reason-maladie:#e0685c; --reason-recup:#3cb495;
   --reason-entretien:#e0a940; --reason-reparation:#a284e8; --reason-accident:#e0685c;
   --type-depot:#4ba3a3; --type-archivage:#a6855f;
+  --addr-gm:#e2534d; --addr-transit:#3fa15a;
 }
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:'Public Sans',system-ui,sans-serif;margin:0}
@@ -400,8 +403,8 @@ table.week-table tr.week-row-veh td.week-metric-label{border-left:4px solid var(
   border:1px solid var(--border);background:var(--surface);color:var(--fg);border-radius:6px;resize:vertical}
 .info-field.wide{width:100%;margin-bottom:8px}
 .info-field.wide textarea{resize:none;overflow:hidden;min-height:44px}
-.address-field textarea.addr-gm{background:#fde2e1;border-color:#e2534d;color:#7a1f1b}
-.address-field textarea.addr-transit{background:#e1f5e6;border-color:#3fa15a;color:#1d5c32}
+.address-field textarea.addr-gm{background:color-mix(in srgb, var(--addr-gm) 16%, var(--surface));border-color:var(--addr-gm);color:color-mix(in srgb, var(--addr-gm) 65%, black)}
+.address-field textarea.addr-transit{background:color-mix(in srgb, var(--addr-transit) 16%, var(--surface));border-color:var(--addr-transit);color:color-mix(in srgb, var(--addr-transit) 65%, black)}
 td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
 .draggable-row{cursor:grab}
 .draggable-row:active{cursor:grabbing}
@@ -976,6 +979,10 @@ body.has-top-banner .topbar{top:40px}
       {key:"chip-gm", label:"GM — Grand mouvement", type:"color", def:"#c1443a"},
       {key:"type-depot", label:"Dépôt", type:"color", def:"#3d8b8b"},
       {key:"type-archivage", label:"Archivage", type:"color", def:"#8b6b45"}
+    ]},
+    {group:"Adresse de départ/arrivée (selon le texte saisi)", items:[
+      {key:"addr-gm", label:"Texte exactement « GM »", type:"color", def:"#e2534d"},
+      {key:"addr-transit", label:"Texte contenant « transit depot »", type:"color", def:"#3fa15a"}
     ]},
     {group:"Motifs d'absence du personnel", items:[
       {key:"reason-conges", label:"Congés", type:"color", def:"#3467b8"},
@@ -2101,6 +2108,8 @@ body.has-top-banner .topbar{top:40px}
     ["DEPOT","ARCHIVAGE"].forEach(function(k){
       host.appendChild(el("span", {class:"settings-swatch", style:"background:var(--type-"+k.toLowerCase()+")", text: k==="DEPOT"?"Dépôt":"Archivage"}));
     });
+    host.appendChild(el("span", {class:"settings-swatch", style:"background:var(--addr-gm)", text:"Adresse GM"}));
+    host.appendChild(el("span", {class:"settings-swatch", style:"background:var(--addr-transit)", text:"Adresse transit dépôt"}));
     var card = el("div", {class:"dossier-card settings-mini-card slot-M"});
     var previewMode = settingValue(state.settingsDraft, {key:"card-bg-mode", def:"none"});
     var previewColorVar = previewMode === "type" ? "var(--chip-gm)" : previewMode === "slot" ? "var(--chip-m)" : null;

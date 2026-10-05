@@ -59,7 +59,7 @@ test.describe('Vue Semaine : badges effectif/véhicules assigné vs prévu', () 
     await expect(page.locator('.week-day-empcount-item').first()).toContainText('/4 pers.');
   });
 
-  test('sans "prévu" ce jour-là, le badge retombe sur le réel (pas de "/0")', async ({ page }) => {
+  test('sans "prévu" saisi ce jour-là, le badge affiche quand même "assigné/0"', async ({ page }) => {
     await login(page);
     // A date next month, away from "today" (where other tests in this
     // suite leave planned values), so this day's total planned stays 0.
@@ -80,9 +80,9 @@ test.describe('Vue Semaine : badges effectif/véhicules assigné vs prévu', () 
 
     await page.click('#viewModeWeekBtn');
     await page.waitForTimeout(600);
-    const badge = page.locator('.week-day-empcount-item').first();
-    await expect(badge).toHaveText(/^\d+ pers\.$/); // plain count, no "/0"
-    await expect(badge).not.toContainText('/');
+    // The badge always divides by the planned total, even when it's 0 —
+    // that's a real, honest signal ("nothing planned yet"), not hidden.
+    await expect(page.locator('.week-day-empcount-item').first()).toHaveText(/^\d+\/0 pers\.$/);
   });
 });
 

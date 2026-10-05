@@ -2339,13 +2339,8 @@ body.has-top-banner .topbar{top:40px}
       var empMobilized = empCountOn(day.dateStr, null, null);
       var empPlanned = plannedEmpOn(day.dateStr);
       if (empMobilized || empPlanned){
-        // "Effectif prévu" is an optional per-dossier field that's rarely
-        // filled in in practice — comparing against it when it's 0 produces
-        // a meaningless "X/0" on most days, so only show the comparison
-        // when at least one dossier that day actually has a plan entered.
-        var empText = empPlanned > 0 ? (empMobilized + "/" + empPlanned + " pers.") : (empMobilized + " pers.");
         var empRow = el("div", {class:"week-day-empcount"}, [
-          el("span", {class:"week-day-empcount-item", title: empPlanned > 0 ? "assigné / prévu" : "assigné", text: empText})
+          el("span", {class:"week-day-empcount-item", title:"assigné / prévu", text: empMobilized + "/" + empPlanned + " pers."})
         ]);
         col.appendChild(empRow);
       }
@@ -2354,12 +2349,7 @@ body.has-top-banner .topbar{top:40px}
         if (!vehTotalsByType[t]) return; // skip types with no fleet at all
         var used = vehCountOn(day.dateStr, vehTypeMap, t);
         var planned = plannedVehOn(day.dateStr, t);
-        // Same reasoning as above: fall back to "assigné / flotte disponible"
-        // (always accurate, from real vehicle records) rather than show a
-        // "/0" against an unfilled "prévu" field.
-        var vehDenom = planned > 0 ? planned : vehTotalsByType[t];
-        var vehTitle = planned > 0 ? "assigné / prévu" : "assigné / flotte disponible";
-        vehRow.appendChild(el("span", {class:"week-day-vehcount-item"+(used>vehTotalsByType[t]?" over":""), title:vehTitle, text: used+"/"+vehDenom+" "+t}));
+        vehRow.appendChild(el("span", {class:"week-day-vehcount-item"+(used>vehTotalsByType[t]?" over":""), title:"assigné / prévu (flotte disponible : "+vehTotalsByType[t]+")", text: used+"/"+planned+" "+t}));
       });
       if (vehRow.childNodes.length) col.appendChild(vehRow);
       if (canEdit()){

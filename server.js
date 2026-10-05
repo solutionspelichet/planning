@@ -256,6 +256,32 @@ function scheduleBackups() {
 }
 scheduleBackups();
 
+// SQLite doesn't reclaim space from deleted rows on its own — dossier_history
+// and action_log entries get pruned (see recordDossierHistory/recordAction)
+// but the freed pages stay in the file until something VACUUMs it. Safe to
+// run against the live, open connection (SQLite handles this internally, the
+// same way VACUUM INTO above safely snapshots a live database); scheduled
+// for the dead of night once a month rather than piggybacking on
+// BACKUP_HOURS, since this is a different concern (file compaction, not
+// snapshotting) with no reason to share that schedule.
+function scheduleMonthlyVacuum() {
+  let lastRunMonthKey = '';
+  setInterval(() => {
+    const now = new Date();
+    if (now.getDate() !== 1 || now.getHours() !== 3 || now.getMinutes() !== 0) return;
+    const key = now.toISOString().slice(0, 7); // one run per calendar month
+    if (key === lastRunMonthKey) return;
+    lastRunMonthKey = key;
+    try {
+      db.exec('VACUUM');
+      console.log('Monthly VACUUM completed.');
+    } catch (err) {
+      console.error('Monthly VACUUM failed:', err.message);
+    }
+  }, 30 * 1000);
+}
+scheduleMonthlyVacuum();
+
 // ---------- password / sessions ----------
 // Passwords are hashed with scrypt (salted, deliberately slow — unlike a
 // single SHA-256 pass, which a GPU can brute-force at billions/sec if the

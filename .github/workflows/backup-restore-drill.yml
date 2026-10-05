@@ -1,0 +1,56 @@
+name: Backup restore drill
+
+# Backups are created, retained, synced to Drive and their status is
+# surfaced in the Admin tab — but none of that proves a backup file can
+# actually be opened and restored. Once a month, copy the most recent
+# on-VPS backup, run SQLite's own integrity check on it, and sanity-check
+# it has real data — catches silent corruption long before the day someone
+# actually needs to restore from it.
+on:
+  schedule:
+    - cron: '0 3 1 * *' # 1st of each month, 03:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  drill:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify latest backup opens cleanly and has data
+        id: drill
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_PORT }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            LATEST=$(ls -t /opt/planning-app/data/backups/*.db 2>/dev/null | head -1)
+            if [ -z "$LATEST" ]; then
+              echo "No backup file found at all." >&2
+              exit 1
+            fi
+            echo "Testing backup: $LATEST"
+            TMP=/tmp/backup-drill-test.db
+            cp "$LATEST" "$TMP"
+            INTEGRITY=$(sqlite3 "$TMP" "PRAGMA integrity_check;")
+            if [ "$INTEGRITY" != "ok" ]; then
+              echo "Integrity check failed: $INTEGRITY" >&2
+              rm -f "$TMP"
+              exit 1
+            fi
+            EMP_COUNT=$(sqlite3 "$TMP" "SELECT COUNT(*) FROM employees;")
+            DOS_COUNT=$(sqlite3 "$TMP" "SELECT COUNT(*) FROM dossiers;")
+            rm -f "$TMP"
+            echo "Backup OK: $LATEST ($EMP_COUNT employees, $DOS_COUNT dossiers)"
+            if [ "$EMP_COUNT" -lt 1 ]; then
+              echo "Backup has zero employees — looks empty, not just small." >&2
+              exit 1
+            fi
+
+      - name: Alert on failure
+        if: failure()
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d text="⚠️ Le test mensuel de restauration de sauvegarde a échoué pour Planning Pelichet. Voir : https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"

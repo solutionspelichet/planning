@@ -3,6 +3,11 @@ name: Deploy to VPS
 on:
   push:
     branches: [main-63nl54]
+  # So a PR (Dependabot's dependency bumps included) runs the e2e suite and
+  # shows green/red before anyone merges it, instead of only finding out
+  # after the merge triggers a real deploy.
+  pull_request:
+    branches: [main-63nl54]
 
 # Two deploys were landing close together (e.g. two commits pushed at once)
 # and running their "deploy" jobs concurrently — their pre-deploy backups
@@ -44,6 +49,7 @@ jobs:
 
   deploy:
     needs: test
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

@@ -58,6 +58,32 @@ test.describe('Vue Semaine : badges effectif/véhicules assigné vs prévu', () 
     await page.waitForTimeout(600);
     await expect(page.locator('.week-day-empcount-item').first()).toContainText('/4 pers.');
   });
+
+  test('sans "prévu" ce jour-là, le badge retombe sur le réel (pas de "/0")', async ({ page }) => {
+    await login(page);
+    // A date next month, away from "today" (where other tests in this
+    // suite leave planned values), so this day's total planned stays 0.
+    await page.click('#nextMonth');
+    await page.waitForTimeout(300);
+    // A weekday, not a weekend — a brand-new dossier defaults to
+    // "travail le week-end" off, so one dated on a Sat/Sun wouldn't even
+    // show up in its own day's list.
+    await page.locator('#calDays .cal-day:not(.other-month):not(.weekend)').first().click();
+    await page.waitForTimeout(400);
+
+    await createDossier(page, 'E2E Sans Prevu');
+    const card = await dossierCardByName(page, 'E2E Sans Prevu');
+    await card.locator('.chips .add-chip').first().click();
+    await page.waitForTimeout(300);
+    await page.locator('.popover .opt', { hasText: 'PEL-ROSALES Oscar' }).click();
+    await page.waitForTimeout(500);
+
+    await page.click('#viewModeWeekBtn');
+    await page.waitForTimeout(600);
+    const badge = page.locator('.week-day-empcount-item').first();
+    await expect(badge).toHaveText(/^\d+ pers\.$/); // plain count, no "/0"
+    await expect(badge).not.toContainText('/');
+  });
 });
 
 test.describe('Impression : numéro d\'ordre du chantier', () => {

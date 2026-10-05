@@ -785,6 +785,15 @@ body.has-top-banner .topbar{top:40px}
         </div>
       </div>
       <div class="company-card">
+        <h3><span>Importer un ancien planning (Excel)</span></h3>
+        <p class="chart-sub" style="margin:0 0 10px">Lit un fichier .xlsx/.xlsm au format de l'ancien planning (onglet EFFECTIFS + un onglet par mois) et recrée les employés, véhicules, dossiers et affectations manquants. Les employés/véhicules sont reconnus par leur nom et les dossiers par leur n° — importer deux fois le même fichier ne duplique rien, sauf les quelques chantiers sans numéro de dossier.</p>
+        <div class="add-row edit-only" style="flex-wrap:wrap">
+          <input type="file" id="legacyImportFileInput" accept=".xlsx,.xlsm" style="flex:1 1 100%">
+          <button id="legacyImportAnalyzeBtn">Analyser</button>
+        </div>
+        <div id="legacyImportSummary" style="margin-top:12px"></div>
+      </div>
+      <div class="company-card">
         <h3><span>Archives</span></h3>
         <p class="chart-sub" style="margin:0 0 10px">Les dossiers terminés depuis plus de 18 mois ne sont plus chargés avec le planning courant — recherchez-les ici par client, n° de dossier ou adresse.</p>
         <div class="add-row" style="margin-bottom:10px">
@@ -1110,6 +1119,9 @@ body.has-top-banner .topbar{top:40px}
   function toast(msg){
     var t = $("#toast"); t.textContent = msg; t.classList.add("show");
     clearTimeout(toast._t); toast._t = setTimeout(function(){ t.classList.remove("show"); }, 2500);
+  }
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, function(c){ return ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]; });
   }
   function fmtDate(d){ return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); }
   function parseDate(s){ var p = s.split("-").map(Number); return new Date(p[0], p[1]-1, p[2]); }
@@ -4225,6 +4237,57 @@ body.has-top-banner .topbar{top:40px}
       toast("Restauration en cours, rechargement dans 5s…");
       setTimeout(function(){ location.reload(); }, 5000);
     }).catch(function(){ restoreBtn.disabled = false; toast("Erreur réseau"); });
+  });
+
+  var legacyImportAnalyzeBtn = $("#legacyImportAnalyzeBtn");
+  function renderLegacyImportSummary(summary, forCommit){
+    var box = $("#legacyImportSummary");
+    var warningsHtml = "";
+    if (summary.warnings && summary.warnings.length){
+      warningsHtml = "<p style='margin:10px 0 4px;font-weight:700;font-size:12px'>Avertissements (" + summary.warnings.length + ") — à vérifier après import :</p>" +
+        "<ul style='margin:0 0 10px;padding-left:18px;font-size:12px;color:var(--fg-muted);max-height:160px;overflow:auto'>" +
+        summary.warnings.slice(0, 30).map(function(w){ return "<li>" + escapeHtml(w) + "</li>"; }).join("") +
+        (summary.warnings.length > 30 ? "<li>… et " + (summary.warnings.length - 30) + " autre(s).</li>" : "") +
+        "</ul>";
+    }
+    box.innerHTML =
+      "<ul class='emp-list'>" +
+      "<li>" + summary.employeesToCreate + " employé(s) à créer</li>" +
+      "<li>" + summary.vehiclesToCreate + " véhicule(s) à créer</li>" +
+      "<li>" + summary.dossiersToCreate + " dossier(s) à créer (" + summary.assignmentsToCreate + " affectations)</li>" +
+      (summary.dossiersSkippedAlreadyPresent ? "<li>" + summary.dossiersSkippedAlreadyPresent + " dossier(s) déjà présents, ignorés</li>" : "") +
+      "</ul>" + warningsHtml +
+      (forCommit ? "<button class='btn' id='legacyImportCommitBtn' style='margin-top:6px'>Confirmer l'import</button>" : "");
+  }
+  if (legacyImportAnalyzeBtn) legacyImportAnalyzeBtn.addEventListener("click", function(){
+    var input = $("#legacyImportFileInput");
+    var file = input.files && input.files[0];
+    if (!file) return toast("Choisissez d'abord un fichier .xlsx ou .xlsm");
+    legacyImportAnalyzeBtn.disabled = true;
+    $("#legacyImportSummary").innerHTML = "<p class='chart-sub'>Analyse en cours…</p>";
+    fetch("/api/admin/legacy-import", {
+      method: "POST",
+      headers: {"X-Auth-Token": state.token, "Content-Type": "application/octet-stream"},
+      body: file
+    }).then(function(r){ return r.json(); }).then(function(res){
+      legacyImportAnalyzeBtn.disabled = false;
+      if (!res.ok) { $("#legacyImportSummary").innerHTML = ""; return toast("Analyse impossible (fichier invalide ?)"); }
+      renderLegacyImportSummary(res.summary, true);
+      var commitBtn = $("#legacyImportCommitBtn");
+      if (commitBtn) commitBtn.addEventListener("click", function(){
+        if (!confirm("Créer " + res.summary.employeesToCreate + " employé(s), " + res.summary.vehiclesToCreate + " véhicule(s) et " + res.summary.dossiersToCreate + " dossier(s) ? Une sauvegarde est prise automatiquement avant, mais mieux vaut vérifier les avertissements ci-dessus d'abord. Continuer ?")) return;
+        commitBtn.disabled = true;
+        fetch("/api/admin/legacy-import?commit=1", {
+          method: "POST",
+          headers: {"X-Auth-Token": state.token, "Content-Type": "application/octet-stream"},
+          body: file
+        }).then(function(r){ return r.json(); }).then(function(res2){
+          if (!res2.ok) { commitBtn.disabled = false; return toast("Import impossible"); }
+          toast("Import terminé, rechargement…");
+          setTimeout(function(){ location.reload(); }, 1200);
+        }).catch(function(){ commitBtn.disabled = false; toast("Erreur réseau"); });
+      });
+    }).catch(function(){ legacyImportAnalyzeBtn.disabled = false; toast("Erreur réseau"); });
   });
 
   // ---------- drag & drop reordering ----------

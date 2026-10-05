@@ -20,6 +20,7 @@ const path = require('path');
 const fs = require('fs');
 const { execFile } = require('child_process');
 const Database = require('better-sqlite3');
+const legacyImport = require('./lib/legacyImport');
 
 const PORT = process.env.PORT || 3000;
 // Overridable so the automated test suite can point at a disposable
@@ -908,6 +909,102 @@ app.post('/api/backups/restore', requireAuth, requireAdmin, express.raw({ type: 
   fs.writeFileSync(RESTORE_PENDING_PATH, buf);
   res.json({ ok: true, message: 'Fichier reçu, redémarrage du serveur pour appliquer la restauration…' });
   setTimeout(() => { db.close(); process.exit(0); }, 300);
+});
+
+// ---------- legacy Excel planning import (one-time migration tool) ----------
+// Reads the old pre-app spreadsheet (one tab per month, one chantier per
+// column-pair per day — see lib/legacyImport.js for the format) and turns it
+// into employees/vehicles/dossiers/assignments. Always run once as a dry
+// run (no ?commit=1) first: it returns counts and warnings without writing
+// anything, so the operator can sanity-check the numbers before committing.
+// Safe to re-run — employees/vehicles are matched by name and dossiers by
+// their N° dossier, so anything already imported is skipped, not duplicated.
+app.post('/api/admin/legacy-import', requireAuth, requireAdmin, express.raw({ type: 'application/octet-stream', limit: '50mb' }), (req, res) => {
+  const commit = req.query.commit === '1';
+  let parsed;
+  try {
+    parsed = legacyImport.parseLegacyWorkbook(req.body);
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: 'parse_failed', message: err.message });
+  }
+
+  const empIdByKey = new Map(
+    db.prepare('SELECT id, name FROM employees').all().map(e => [legacyImport.normKey(e.name), e.id])
+  );
+  const vehIdByKey = new Map(
+    db.prepare('SELECT id, name FROM vehicles').all().map(v => [legacyImport.normKey(v.name), v.id])
+  );
+  const existingDossierNumbers = new Set(
+    db.prepare("SELECT dossierNumber FROM dossiers WHERE dossierNumber != ''").all().map(r => r.dossierNumber)
+  );
+
+  const newEmployees = [];
+  for (const e of parsed.employees) {
+    const key = legacyImport.normKey(e.name);
+    if (empIdByKey.has(key)) continue;
+    const id = crypto.randomUUID();
+    empIdByKey.set(key, id);
+    newEmployees.push({ id, company: e.company, name: e.name });
+  }
+  const newVehicles = [];
+  for (const v of parsed.vehicles) {
+    const key = legacyImport.normKey(v.name);
+    if (vehIdByKey.has(key)) continue;
+    const id = crypto.randomUUID();
+    vehIdByKey.set(key, id);
+    newVehicles.push({ id, name: v.name });
+  }
+  let dossiersSkippedAlreadyPresent = 0;
+  const newDossiers = [];
+  for (const d of parsed.dossiers) {
+    if (d.dossierNumber && existingDossierNumbers.has(d.dossierNumber)) { dossiersSkippedAlreadyPresent++; continue; }
+    newDossiers.push(d);
+  }
+
+  const summary = {
+    employeesToCreate: newEmployees.length,
+    vehiclesToCreate: newVehicles.length,
+    dossiersToCreate: newDossiers.length,
+    assignmentsToCreate: newDossiers.reduce((n, d) => n + d.days.length, 0),
+    dossiersSkippedAlreadyPresent,
+    warnings: parsed.warnings,
+  };
+
+  if (!commit) return res.json({ ok: true, preview: true, summary });
+
+  runBackup(); // safety snapshot before this bulk write — see Admin > Sauvegardes to restore from it
+
+  // A per-row action_log entry (recordAction) for every one of ~3000+ rows
+  // would only ever keep the last ACTION_LOG_LIMIT of them anyway (see
+  // recordAction above) and would slow this transaction down for nothing —
+  // the pre-import backup above is the real undo path for a bulk import.
+  const tx = db.transaction(() => {
+    for (const e of newEmployees) saveEmployeeRow({ id: e.id, company: e.company, name: e.name, active: true, order: 0 });
+    for (const v of newVehicles) saveVehicleRow({ id: v.id, name: v.name, active: true, order: 0 });
+    for (const d of newDossiers) {
+      const dossierId = crypto.randomUUID();
+      saveDossierRow({
+        id: dossierId, client: d.client, dossierNumber: d.dossierNumber,
+        startDate: d.startDate, endDate: d.endDate,
+        addressFrom: d.addressFrom, addressTo: d.addressTo, volume: d.volume,
+        coordinator: d.coordinator, task: d.task, comment: d.comment, moveType: d.moveType,
+        createdAt: Date.parse(d.startDate + 'T00:00:00Z') || Date.now(),
+        workWeekends: d.workWeekends, plannedEmployees: d.plannedEmployees,
+        plannedFourgon: d.plannedFourgon, plannedPL: d.plannedPL, plannedVL: d.plannedVL,
+      });
+      for (const day of d.days) {
+        saveAssignmentRow({
+          id: crypto.randomUUID(), dossierId, date: day.date,
+          employees: day.crew.map(name => empIdByKey.get(legacyImport.normKey(name))).filter(Boolean),
+          vehicleIds: day.vehicles.map(name => vehIdByKey.get(legacyImport.normKey(name))).filter(Boolean),
+          arrivalTime: day.arrivalTime, slot: day.slot,
+        });
+      }
+    }
+  });
+  tx();
+  broadcast();
+  res.json({ ok: true, committed: true, summary });
 });
 
 // Catches anything a route handler throws synchronously (an async handler's

@@ -55,6 +55,11 @@ Détente (casse-briques à 200 niveaux, Tetris).
       récupération sur crash process (log + sortie propre pour que
       systemd redémarre), middleware d'erreur Express global, purge de
       l'historique par dossier au-delà de 200 entrées
+- [x] Admin : import de l'ancien planning Excel (.xlsx/.xlsm, un onglet par
+      mois) — recrée employés/véhicules/dossiers/affectations manquants,
+      aperçu (comptage + avertissements) avant confirmation, sauvegarde
+      automatique avant d'écrire, ré-import sans danger pour les
+      employés/véhicules/dossiers numérotés déjà présents
 
 ## Volontairement pas fait (à confirmer avant de s'y lancer)
 

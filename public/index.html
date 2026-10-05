@@ -273,6 +273,7 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 .chip{display:inline-flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:4px 6px 4px 10px;font-size:12.5px}
 .chip.conflict{border-color:var(--danger);background:var(--danger-bg)}
 .chip.chip-pl{border-color:#c0362c;background:#fde2e1;color:#7a1f1b;font-weight:700}
+.chip-emp-name{font-weight:700}
 .info-field select{width:100%;border:1px solid var(--border);background:var(--surface);color:var(--fg);border-radius:6px;padding:5px 7px;font:inherit;font-size:12.5px;font-weight:700}
 .info-field select.slot-J{background:var(--chip-j);color:#fff;border-color:var(--chip-j)}
 .info-field select.slot-M{background:var(--chip-m);color:#fff;border-color:var(--chip-m)}
@@ -1357,7 +1358,14 @@ body.has-top-banner .topbar{top:40px}
 
   // ---------- dossier / assignment helpers ----------
   function activeDossiersOn(dateStr){
-    return state.dossiers.filter(function(d){ return d.startDate <= dateStr && dateStr <= d.endDate; });
+    return state.dossiers.filter(function(d){
+      if (d.startDate > dateStr || dateStr > d.endDate) return false;
+      // A dossier spanning a weekend (e.g. starts one week, ends the next)
+      // shouldn't show staff/vehicles as deployed on the Sat/Sun in between
+      // unless "travail le week-end" is actually ticked for it.
+      if (!d.workWeekends && isWeekend(parseDate(dateStr))) return false;
+      return true;
+    });
   }
   function assignmentFor(dossierId, dateStr){
     var found = state.assignments.find(function(a){ return a.dossierId === dossierId && a.date === dateStr; });
@@ -2667,7 +2675,7 @@ body.has-top-banner .topbar{top:40px}
     (assignment.employees||[]).forEach(function(a){
       var isConflict = conflicts.employees.indexOf(a.employeeId) !== -1;
       var chip = el("span", {class:"chip"+(isConflict?" conflict":"")});
-      chip.appendChild(el("span", {text: empName(a.employeeId)}));
+      chip.appendChild(el("span", {class:"chip-emp-name", text: empName(a.employeeId)}));
       chip.appendChild(el("button", {class:"edit-only", text:"✕", onclick: function(){
         var updated = (assignment.employees||[]).filter(function(x){ return x.employeeId !== a.employeeId; });
         saveAssignment(assignment, {employees: updated});

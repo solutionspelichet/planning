@@ -37,4 +37,19 @@ test.describe('Pas de débordement horizontal de la page sur mobile (390px)', ()
     await page.waitForTimeout(500);
     await assertNoPageOverflow(page);
   });
+
+  test('Détente (menu, casse-briques, Tetris)', async ({ page }) => {
+    await login(page);
+    await page.click('[data-tab="detente"]');
+    await page.waitForTimeout(400);
+    await assertNoPageOverflow(page);
+    await page.click('[data-game="arcade"]');
+    await page.waitForTimeout(400);
+    await assertNoPageOverflow(page);
+    await page.click('#arcBackBtn');
+    await page.waitForTimeout(200);
+    await page.click('[data-game="tetris"]');
+    await page.waitForTimeout(400);
+    await assertNoPageOverflow(page);
+  });
 });

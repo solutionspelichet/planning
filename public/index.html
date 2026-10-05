@@ -316,8 +316,10 @@ table.dispo th,table.dispo td{border-bottom:1px solid var(--border)}
 table.dispo thead th{position:sticky;top:0;background:var(--surface);z-index:2;padding:6px 3px;text-align:center;font-weight:700;color:var(--fg-muted);font-size:11px}
 table.dispo thead th.weekend{background:var(--weekend)}
 td.dispo-daycol,th.dispo-daycol{width:26px;min-width:26px;text-align:center}
-.dispo-name-col{position:sticky;left:0;background:var(--surface);z-index:1;padding:5px 10px;min-width:180px;border-right:1px solid var(--border);font-size:12.5px;white-space:nowrap}
+.dispo-name-col{position:sticky;left:0;background:var(--surface);z-index:1;padding:5px 10px;width:var(--dispo-name-col-width,180px);min-width:var(--dispo-name-col-width,180px);max-width:var(--dispo-name-col-width,180px);overflow:hidden;text-overflow:ellipsis;border-right:1px solid var(--border);font-size:12.5px;white-space:nowrap}
 thead th.dispo-name-col{z-index:3}
+.dispo-resize-handle{position:absolute;top:0;right:0;bottom:0;width:6px;cursor:col-resize;touch-action:none}
+.dispo-resize-handle:hover,.dispo-resize-handle.dragging{background:var(--accent)}
 tr.dispo-sep td{background:var(--bg);font-weight:800;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--fg-muted);padding:6px 10px;position:sticky;left:0}
 td.dispo-cell{cursor:pointer}
 .dispo-swatch{display:block;margin:3px auto;width:18px;height:18px;border-radius:5px}
@@ -358,6 +360,8 @@ table.week-table th,table.week-table td{padding:8px 6px;text-align:center;border
 table.week-table th{color:var(--fg-muted);font-weight:700;font-size:11px}
 table.week-table td.week-metric-label{text-align:left;color:var(--fg-muted);font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}
 table.week-table th.week-today,table.week-table td.week-today{background:var(--bg)}
+table.week-table th.week-compare-col,table.week-table td.week-compare-col{background:var(--weekend);border-left:2px solid var(--border);font-style:italic;color:var(--fg-muted)}
+table.week-table tr.week-sub td.week-compare-col{font-style:normal}
 table.week-table td.week-daynum{font-size:10.5px;color:var(--fg-muted);font-weight:400}
 table.week-table tr.week-sub td{color:var(--fg-muted);font-size:11.5px;font-weight:400}
 table.week-table tr.week-sub td.week-metric-label{padding-left:16px;text-transform:none;font-weight:400}
@@ -700,7 +704,7 @@ body.has-top-banner .topbar{top:40px}
       </div>
     </div>
 
-    <h2 style="font-size:15px;margin:28px 0 12px">Cette semaine</h2>
+    <h2 style="font-size:15px;margin:28px 0 12px" id="dashMobilizationTitle">Cette semaine</h2>
     <div class="chart-card">
       <div style="overflow-x:auto"><div id="dashWeekTable"></div></div>
     </div>
@@ -726,6 +730,10 @@ body.has-top-banner .topbar{top:40px}
       <h3>Véhicules monopolisés par mois (véhicule-jours)</h3>
       <div class="type-filter" id="filterVehicles"></div>
       <div id="dashChartVehicles"></div>
+    </div>
+    <div class="chart-card">
+      <h3>Volume transporté par mois (m³)</h3>
+      <div id="dashChartVolume"></div>
     </div>
   </div>
 
@@ -1782,7 +1790,9 @@ body.has-top-banner .topbar{top:40px}
 
     var table = el("table", {class:"dispo"});
     var thead = el("thead"); var headRow = el("tr");
-    headRow.appendChild(el("th", {class:"dispo-name-col", text: MONTHS_FR[month]+" "+year}));
+    var nameTh = el("th", {class:"dispo-name-col", text: MONTHS_FR[month]+" "+year});
+    attachDispoColumnResize(nameTh);
+    headRow.appendChild(nameTh);
     for (var d=1; d<=nDays; d++){
       var dow = new Date(year,month,d).getDay(); var isWeekend = dow===0||dow===6;
       var th = el("th", {class:"dispo-daycol"+(isWeekend?" weekend":"")});
@@ -2288,6 +2298,18 @@ body.has-top-banner .topbar{top:40px}
     });
     document.body.appendChild(pop);
   }
+  // Sum of the "prévu" (forecast) fields across a day's active dossiers —
+  // the week view's headcount/vehicle badges pair this against the actual
+  // assigned count (empCountOn/vehCountOn), the same planned-vs-allocated
+  // comparison resourceMismatchWarnings already does per dossier, just
+  // aggregated for the whole day.
+  function plannedEmpOn(dateStr){
+    return activeDossiersOn(dateStr).reduce(function(sum, d){ return sum + (parseInt(d.plannedEmployees, 10) || 0); }, 0);
+  }
+  function plannedVehOn(dateStr, type){
+    var field = type === "Fourgon" ? "plannedFourgon" : type === "PL" ? "plannedPL" : "plannedVL";
+    return activeDossiersOn(dateStr).reduce(function(sum, d){ return sum + (parseInt(d[field], 10) || 0); }, 0);
+  }
   var WEEK_CHIP_MAX = 6;
   function renderWeekView(){
     var host = $("#weekGrid"); if (!host) return;
@@ -2315,9 +2337,10 @@ body.has-top-banner .topbar{top:40px}
       head.addEventListener("click", function(dateStr){ return function(){ goToDayFromWeek(dateStr); }; }(day.dateStr));
       col.appendChild(head);
       var empMobilized = empCountOn(day.dateStr, null, null);
-      if (empMobilized){
+      var empPlanned = plannedEmpOn(day.dateStr);
+      if (empMobilized || empPlanned){
         var empRow = el("div", {class:"week-day-empcount"}, [
-          el("span", {class:"week-day-empcount-item", text: empMobilized + " pers."})
+          el("span", {class:"week-day-empcount-item", title:"assigné / prévu", text: empMobilized + "/" + empPlanned + " pers."})
         ]);
         col.appendChild(empRow);
       }
@@ -2325,7 +2348,8 @@ body.has-top-banner .topbar{top:40px}
       VEHICLE_TYPES.forEach(function(t){
         if (!vehTotalsByType[t]) return; // skip types with no fleet at all
         var used = vehCountOn(day.dateStr, vehTypeMap, t);
-        vehRow.appendChild(el("span", {class:"week-day-vehcount-item"+(used>vehTotalsByType[t]?" over":""), text: used+"/"+vehTotalsByType[t]+" "+t}));
+        var planned = plannedVehOn(day.dateStr, t);
+        vehRow.appendChild(el("span", {class:"week-day-vehcount-item"+(used>vehTotalsByType[t]?" over":""), title:"assigné / prévu (flotte disponible : "+vehTotalsByType[t]+")", text: used+"/"+planned+" "+t}));
       });
       if (vehRow.childNodes.length) col.appendChild(vehRow);
       if (canEdit()){
@@ -3092,10 +3116,10 @@ body.has-top-banner .topbar{top:40px}
     wrap.appendChild(ul);
     return wrap;
   }
-  function renderPrintCard(dossier, dateStr){
+  function renderPrintCard(dossier, dateStr, orderIndex){
     var assignment = assignmentFor(dossier.id, dateStr);
     var card = el("div", {class:"print-card"});
-    card.appendChild(el("h3", {text: (dossier.dossierNumber ? dossier.dossierNumber + " — " : "") + (dossier.client || "Client")}));
+    card.appendChild(el("h3", {text: (orderIndex ? orderIndex + ". " : "") + (dossier.dossierNumber ? dossier.dossierNumber + " — " : "") + (dossier.client || "Client")}));
     card.appendChild(printField("N° dossier", dossier.dossierNumber));
     card.appendChild(printField("Départ", dossier.addressFrom));
     card.appendChild(printField("Arrivée", dossier.addressTo));
@@ -3130,7 +3154,7 @@ body.has-top-banner .topbar{top:40px}
         var page = el("div", {class:"print-page"});
         page.appendChild(el("div", {class:"print-title", text:titleText}));
         var grid = el("div", {class:"print-grid"});
-        chunk.forEach(function(dossier){ grid.appendChild(renderPrintCard(dossier, state.selectedDate)); });
+        chunk.forEach(function(dossier){ grid.appendChild(renderPrintCard(dossier, state.selectedDate, clientOrderIndex(dossiersToday, dossier))); });
         page.appendChild(grid);
         area.appendChild(page);
       }
@@ -3267,13 +3291,65 @@ body.has-top-banner .topbar{top:40px}
   if (exportWeekPdfBtn) exportWeekPdfBtn.addEventListener("click", exportWeekPdf);
 
   // ---------- Disponibilités ----------
+  // Width of the sticky name column shared by both Gantt-style "dispo"
+  // tables (Effectifs/Véhicules and Vacances & Garage) — dragged via the
+  // handle on the header cell, applied as a CSS var so every cell in the
+  // column (header + body, both tables) stays in sync, and remembered per
+  // device so it doesn't reset every time the table re-renders.
+  var DISPO_NAME_COL_KEY = "pe_dispo_name_col_width_v1";
+  function getDispoNameColWidth(){
+    try {
+      var v = parseInt(localStorage.getItem(DISPO_NAME_COL_KEY), 10);
+      if (v >= 80 && v <= 500) return v;
+    } catch (err) { /* localStorage unavailable — fall back to the default */ }
+    return 180;
+  }
+  function applyDispoNameColWidth(px){
+    document.documentElement.style.setProperty("--dispo-name-col-width", Math.round(px) + "px");
+  }
+  function persistDispoNameColWidth(px){
+    try { localStorage.setItem(DISPO_NAME_COL_KEY, String(Math.round(Math.max(80, Math.min(500, px))))); } catch (err) { /* ignore */ }
+  }
+  function attachDispoColumnResize(th){
+    var handle = el("div", {class:"dispo-resize-handle", title:"Glisser pour redimensionner la colonne"});
+    th.appendChild(handle);
+    var startX, startWidth, current;
+    function onMove(ev){
+      var x = ev.touches ? ev.touches[0].clientX : ev.clientX;
+      current = Math.max(80, Math.min(500, startWidth + (x - startX)));
+      applyDispoNameColWidth(current);
+    }
+    function onUp(){
+      handle.classList.remove("dragging");
+      if (current != null) persistDispoNameColWidth(current);
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.removeEventListener("touchmove", onMove);
+      document.removeEventListener("touchend", onUp);
+    }
+    function onDown(ev){
+      ev.preventDefault();
+      handle.classList.add("dragging");
+      startX = ev.touches ? ev.touches[0].clientX : ev.clientX;
+      startWidth = th.getBoundingClientRect().width;
+      current = null;
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+      document.addEventListener("touchmove", onMove, {passive:false});
+      document.addEventListener("touchend", onUp);
+    }
+    handle.addEventListener("mousedown", onDown);
+    handle.addEventListener("touchstart", onDown, {passive:false});
+  }
   function renderAvailability(){
     var host = $("#dispoTableHost");
     var year = state.cursor.getFullYear(), month = state.cursor.getMonth();
     var nDays = new Date(year, month+1, 0).getDate();
     var table = el("table", {class:"dispo"});
     var thead = el("thead"); var headRow = el("tr");
-    headRow.appendChild(el("th", {class:"dispo-name-col", text: MONTHS_FR[month]+" "+year}));
+    var nameTh = el("th", {class:"dispo-name-col", text: MONTHS_FR[month]+" "+year});
+    attachDispoColumnResize(nameTh);
+    headRow.appendChild(nameTh);
     for (var d=1; d<=nDays; d++){
       var dow = new Date(year,month,d).getDay(); var isWeekend = dow===0||dow===6;
       var th = el("th", {class:"dispo-daycol"+(isWeekend?" weekend":"")});
@@ -3349,6 +3425,17 @@ body.has-top-banner .topbar{top:40px}
     });
     return arr;
   }
+  function volumeByMonth(year, type){
+    var arr = new Array(12).fill(0);
+    for (var m=0; m<12; m++){
+      var b = monthBounds(year, m);
+      state.dossiers.forEach(function(d){
+        if (d.startDate <= b.end && d.endDate >= b.start && (!type || d.moveType === type)) arr[m] += parseFloat(d.volume) || 0;
+      });
+      arr[m] = Math.round(arr[m]*10)/10;
+    }
+    return arr;
+  }
   function vehDaysByMonth(year, type){
     var arr = new Array(12).fill(0);
     var vehTypeMap = {}; state.vehicles.forEach(function(v){ vehTypeMap[v.id] = v.type; });
@@ -3373,7 +3460,9 @@ body.has-top-banner .topbar{top:40px}
       resThisEmp: empDaysByMonth(thisYear, empCompany),
       resLastEmp: empDaysByMonth(lastYear, empCompany),
       resThisVeh: vehDaysByMonth(thisYear, vehType),
-      resLastVeh: vehDaysByMonth(lastYear, vehType)
+      resLastVeh: vehDaysByMonth(lastYear, vehType),
+      volThis: volumeByMonth(thisYear, dossierType),
+      volLast: volumeByMonth(lastYear, dossierType)
     };
   }
   function todayStats(){
@@ -3465,38 +3554,121 @@ body.has-top-banner .topbar{top:40px}
     });
     return Object.keys(set).length;
   }
-  function renderWeekTable(){
+  // Same calendar date one year back (29 Feb falls back to 28 Feb) — the
+  // Dashboard's "comparatif" columns compare a period to the same dates
+  // last year, not to the prior period.
+  function dateMinusYear(dateStr){
+    var d = parseDate(dateStr);
+    var year = d.getFullYear() - 1, month = d.getMonth(), day = d.getDate();
+    var daysInMonth = new Date(year, month+1, 0).getDate();
+    if (day > daysInMonth) day = daysInMonth;
+    return fmtDate(new Date(year, month, day));
+  }
+  function shiftDatesByYear(dateStrs){ return dateStrs.map(dateMinusYear); }
+  // Dedup-across-dates versions of dossierCountOn/empCountOn/vehCountOn —
+  // used wherever a Dashboard column spans more than one day (a week, a
+  // month, or their year-ago comparatif), so a multi-day dossier or a
+  // resource used on several of those days only counts once.
+  function dossierCountOverDates(dateStrs, moveType){
+    var set = {};
+    dateStrs.forEach(function(ds){
+      activeDossiersOn(ds).forEach(function(d){ if (!moveType || d.moveType === moveType) set[d.id] = 1; });
+    });
+    return Object.keys(set).length;
+  }
+  function empCountOverDates(dateStrs, empCompanyMap, company){
+    var set = {};
+    dateStrs.forEach(function(ds){
+      activeDossiersOn(ds).forEach(function(d){
+        var a = assignmentFor(d.id, ds);
+        (a.employees||[]).forEach(function(x){ if (!company || empCompanyMap[x.employeeId]===company) set[x.employeeId]=1; });
+      });
+    });
+    return Object.keys(set).length;
+  }
+  function vehCountOverDates(dateStrs, vehTypeMap, type){
+    var set = {};
+    dateStrs.forEach(function(ds){
+      activeDossiersOn(ds).forEach(function(d){
+        var a = assignmentFor(d.id, ds);
+        (a.vehicleIds||[]).forEach(function(vid){ if (!type || vehTypeMap[vid]===type) set[vid]=1; });
+      });
+    });
+    return Object.keys(set).length;
+  }
+  function dossierCountsByTypeOverDates(dateStrs){
+    var set = {};
+    dateStrs.forEach(function(ds){ activeDossiersOn(ds).forEach(function(d){ set[d.id] = d; }); });
+    var counts = {};
+    PLANNING_FILTER_TYPES.forEach(function(t){ counts[t.key] = 0; });
+    Object.keys(set).forEach(function(id){
+      var key = planningFilterKey(set[id]);
+      counts[key] = (counts[key]||0) + 1;
+    });
+    return counts;
+  }
+  // Columns for the mobilization table, shaped by the Dashboard's Jour/
+  // Semaine/Mois toggle: the "native" breakdown for that period (1 day, the
+  // 7 days of the week, or the whole month as one aggregate), plus one
+  // trailing "comparatif" column for the same dates last year.
+  function mobilizationColumns(){
+    var mode = state.dashboardViewMode, todayStr = state.selectedDate;
+    if (mode === "week"){
+      var weekDates = getWeekDates(todayStr);
+      var cols = weekDates.map(function(ds){
+        var d = parseDate(ds);
+        return {
+          label: DOW_FR[d.getDay()===0?6:d.getDay()-1],
+          sublabel: String(d.getDate())+" "+MONTHS_SHORT_FR[d.getMonth()],
+          dates: [ds], isToday: ds===todayStr, compare:false
+        };
+      });
+      cols.push({label:"Même semaine", sublabel:"l'an dernier", dates: shiftDatesByYear(weekDates), isToday:false, compare:true});
+      return cols;
+    }
+    if (mode === "month"){
+      var monthDates = getMonthDates(todayStr), d0 = parseDate(todayStr);
+      return [
+        {label: MONTHS_FR[d0.getMonth()], sublabel:String(d0.getFullYear()), dates: monthDates, isToday:false, compare:false},
+        {label:"Même mois", sublabel:"l'an dernier", dates: shiftDatesByYear(monthDates), isToday:false, compare:true}
+      ];
+    }
+    var d = parseDate(todayStr);
+    return [
+      {label: DOW_FR[d.getDay()===0?6:d.getDay()-1], sublabel:String(d.getDate())+" "+MONTHS_SHORT_FR[d.getMonth()], dates:[todayStr], isToday:true, compare:false},
+      {label:"Même jour", sublabel:"l'an dernier", dates:[dateMinusYear(todayStr)], isToday:false, compare:true}
+    ];
+  }
+  function renderMobilizationTable(){
     var host = $("#dashWeekTable");
-    var weekDates = getWeekDates(state.selectedDate);
-    var todayStr = state.selectedDate;
+    var cols = mobilizationColumns();
     var empCompanyMap = {}; state.employees.forEach(function(e){ empCompanyMap[e.id] = e.company; });
     var vehTypeMap = {}; state.vehicles.forEach(function(v){ vehTypeMap[v.id] = v.type; });
     var table = el("table", {class:"week-table"});
     var thead = el("thead"); var headRow = el("tr");
     headRow.appendChild(el("th", {text:""}));
-    weekDates.forEach(function(ds){
-      var d = parseDate(ds);
-      var th = el("th", {class: ds===todayStr ? "week-today" : ""});
-      th.appendChild(document.createTextNode(DOW_FR[d.getDay()===0?6:d.getDay()-1]));
-      th.appendChild(el("div", {class:"week-daynum", text:String(d.getDate())+" "+MONTHS_SHORT_FR[d.getMonth()]}));
+    cols.forEach(function(col){
+      var th = el("th", {class: (col.isToday ? "week-today" : "") + (col.compare ? " week-compare-col" : "")});
+      th.appendChild(document.createTextNode(col.label));
+      th.appendChild(el("div", {class:"week-daynum", text: col.sublabel}));
       headRow.appendChild(th);
     });
     thead.appendChild(headRow); table.appendChild(thead);
     var tbody = el("tbody");
-    var groups = [{label:"Chantiers", fn:function(ds){ return dossierCountOn(ds); }, sub:false, kind:"dossiers"}];
-    MOVE_TYPES.forEach(function(t){ groups.push({label:"— "+t, fn:function(ds){ return dossierCountOn(ds, t); }, sub:true}); });
-    groups.push({label:"Effectif mobilisé", fn:function(ds){ return empCountOn(ds, empCompanyMap); }, sub:false, kind:"emp"});
-    getCompanies().forEach(function(co){ groups.push({label:"— "+co.name, fn:function(ds){ return empCountOn(ds, empCompanyMap, co.id); }, sub:true}); });
-    groups.push({label:"Véhicules mobilisés", fn:function(ds){ return vehCountOn(ds, vehTypeMap); }, sub:false, kind:"veh"});
-    VEHICLE_TYPES.forEach(function(t){ groups.push({label:"— "+t, fn:function(ds){ return vehCountOn(ds, vehTypeMap, t); }, sub:true}); });
+    var groups = [{label:"Chantiers", fn:function(dates){ return dossierCountOverDates(dates); }, sub:false, kind:"dossiers"}];
+    MOVE_TYPES.forEach(function(t){ groups.push({label:"— "+t, fn:function(dates){ return dossierCountOverDates(dates, t); }, sub:true}); });
+    groups.push({label:"Effectif mobilisé", fn:function(dates){ return empCountOverDates(dates, empCompanyMap); }, sub:false, kind:"emp"});
+    getCompanies().forEach(function(co){ groups.push({label:"— "+co.name, fn:function(dates){ return empCountOverDates(dates, empCompanyMap, co.id); }, sub:true}); });
+    groups.push({label:"Véhicules mobilisés", fn:function(dates){ return vehCountOverDates(dates, vehTypeMap); }, sub:false, kind:"veh"});
+    VEHICLE_TYPES.forEach(function(t){ groups.push({label:"— "+t, fn:function(dates){ return vehCountOverDates(dates, vehTypeMap, t); }, sub:true}); });
     groups.forEach(function(r){
       var row = el("tr", {class: (r.sub ? "week-sub" : "week-main") + (r.kind ? " week-row-"+r.kind : "")});
       row.appendChild(el("td", {class:"week-metric-label", text:r.label}));
-      weekDates.forEach(function(ds){
-        var td = el("td", {class: ds===todayStr ? "week-today" : "", text:String(r.fn(ds))});
-        if (!r.sub){
+      cols.forEach(function(col){
+        var td = el("td", {class: (col.isToday ? "week-today " : "") + (col.compare ? "week-compare-col" : ""), text:String(r.fn(col.dates))});
+        if (!r.sub && col.dates.length === 1){
           td.style.cursor = "pointer";
-          td.addEventListener("click", function(ds){ return function(){ state.selectedDate = ds; state.vgSelectedDate = ds; setTab("planning"); renderCalendar(); renderDayPanel(); renderVgCalendar(); renderVgDayPanel(); }; }(ds));
+          td.addEventListener("click", function(ds){ return function(){ state.selectedDate = ds; state.vgSelectedDate = ds; setTab("planning"); renderCalendar(); renderDayPanel(); renderVgCalendar(); renderVgDayPanel(); }; }(col.dates[0]));
         }
         row.appendChild(td);
       });
@@ -3565,27 +3737,21 @@ body.has-top-banner .topbar{top:40px}
   }
   function renderTypeDistribution(){
     var host = $("#dashTypeDistribution"); if (!host) return;
-    var year = state.cursor.getFullYear(), month = state.cursor.getMonth();
-    $("#dashTypeMonthLabel").textContent = MONTHS_FR[month] + " " + year;
-    var nDays = new Date(year, month+1, 0).getDate();
-    var counts = {};
-    PLANNING_FILTER_TYPES.forEach(function(t){ counts[t.key] = 0; });
-    for (var day = 1; day <= nDays; day++){
-      activeDossiersOn(fmtDate(new Date(year, month, day))).forEach(function(d){
-        var key = planningFilterKey(d);
-        counts[key] = (counts[key] || 0) + 1;
-      });
-    }
+    var mode = state.dashboardViewMode, todayStr = state.selectedDate;
+    var dateStrs = mode === "week" ? getWeekDates(todayStr) : mode === "month" ? getMonthDates(todayStr) : [todayStr];
+    $("#dashTypeMonthLabel").textContent = dashboardStats().dateStr;
+    var counts = dossierCountsByTypeOverDates(dateStrs);
+    var lastYearCounts = dossierCountsByTypeOverDates(shiftDatesByYear(dateStrs));
     var max = Math.max.apply(null, [1].concat(Object.keys(counts).map(function(k){ return counts[k]; })));
     host.innerHTML = "";
     PLANNING_FILTER_TYPES.forEach(function(t){
-      var count = counts[t.key] || 0;
+      var count = counts[t.key] || 0, lastYearCount = lastYearCounts[t.key] || 0;
       var row = el("div", {class:"type-dist-row"});
       row.appendChild(el("div", {class:"type-dist-label", text:t.label}));
       var barWrap = el("div", {class:"type-dist-bar-wrap"});
       barWrap.appendChild(el("div", {class:"type-dist-bar", style:"width:" + Math.round(count/max*100) + "%;background:" + t.color}));
       row.appendChild(barWrap);
-      row.appendChild(el("div", {class:"type-dist-count", text:String(count)}));
+      row.appendChild(el("div", {class:"type-dist-count", text: count + " (vs " + lastYearCount + " l'an dernier)"}));
       host.appendChild(row);
     });
   }
@@ -3602,7 +3768,9 @@ body.has-top-banner .topbar{top:40px}
     $("#dashViewDayBtn").classList.toggle("active", state.dashboardViewMode === "day");
     $("#dashViewWeekBtn").classList.toggle("active", state.dashboardViewMode === "week");
     $("#dashViewMonthBtn").classList.toggle("active", state.dashboardViewMode === "month");
-    renderWeekTable();
+    var mobilizationTitles = {day:"Aujourd'hui", week:"Cette semaine", month:"Ce mois"};
+    $("#dashMobilizationTitle").textContent = mobilizationTitles[state.dashboardViewMode] || mobilizationTitles.day;
+    renderMobilizationTable();
     renderTypeDistribution();
     $("#dashYearLabels").textContent = "Cette année (" + d.thisYear + ") comparée à l'année précédente (" + d.lastYear + ")";
     renderTypeFilter("filterDossiers", "dossiers", dossierFilterOptions());
@@ -3617,6 +3785,9 @@ body.has-top-banner .topbar{top:40px}
     renderGroupedBarChart("dashChartVehicles", MONTHS_SHORT_FR,
       {name:String(d.thisYear), values:d.resThisVeh, color:"var(--accent)"},
       {name:String(d.lastYear), values:d.resLastVeh, color:"var(--fg-muted)"});
+    renderGroupedBarChart("dashChartVolume", MONTHS_SHORT_FR,
+      {name:String(d.thisYear), values:d.volThis, color:"var(--accent)"},
+      {name:String(d.lastYear), values:d.volLast, color:"var(--fg-muted)"});
   }
 
   // ---------- Effectifs ----------
@@ -4469,6 +4640,7 @@ body.has-top-banner .topbar{top:40px}
     renderDow();
     setupDragReordering();
     syncTopbarHeight();
+    applyDispoNameColWidth(getDispoNameColWidth());
     if ("onLine" in navigator && !navigator.onLine) setOfflineBanner(true);
     if (loadSession()) enterApp();
   }

@@ -4492,42 +4492,86 @@ body.has-top-banner .topbar{top:40px}
   var tetrisBackBtn = $("#tetrisBackBtn"); if (tetrisBackBtn) tetrisBackBtn.addEventListener("click", detenteShowMenu);
 
   // ---------- Détente : casse-briques ----------
-  // ARC_MAX_LEVEL distinct brick layouts, Arkanoid-style — clearing one
-  // advances to the next (faster ball, same score/lives) instead of ending
-  // the game; clearing the last one does end it.
-  var ARC_ROWS = 5, ARC_COLS = 9, ARC_MAX_LEVEL = 6;
+  // ARC_MAX_LEVEL procedurally-generated brick layouts, Arkanoid-style —
+  // clearing one advances to the next (same score/lives) instead of ending
+  // the game; clearing the last one does end it. With 200 of them, levels
+  // are generated from a formula (shape + row count + brick toughness, all
+  // functions of the level number) rather than hand-drawn one by one — the
+  // same level number always reproduces the same layout, but consecutive
+  // levels vary enough not to feel identical.
+  var ARC_ROWS = 5, ARC_COLS = 9, ARC_MAX_LEVEL = 200;
   var ARC_COLORS = ["#c1443a","#c98a1b","#2f9e5c","#3467b8","#7a4fc4"];
+  var ARC_TOUGH_SHADES = ["#5a5f66","#8a8f96","#c3c7cc"]; // darkest = most hits left
   var arc = {
     canvas:null, ctx:null, running:false, over:false, rafId:null, level:1,
     paddle:{x:300, w:90, h:12, speed:7},
     ball:{x:350, y:300, r:7, dx:0, dy:0, launched:false},
     bricks:[], score:0, lives:3, best:0, keys:{left:false, right:false}
   };
-  // true/false per cell, laid over ARC_ROWS x ARC_COLS (ARC_MAX_LEVEL gets
-  // an extra row instead of a distinct shape — it's the "dense/fast" level).
-  function arcLevelHasBrick(level, r, c, rows, cols){
-    switch (level){
-      case 2: return c >= r && c <= cols-1-r; // pyramide
-      case 3: return (r+c) % 2 === 0; // damier
-      case 4: var midR=(rows-1)/2, midC=(cols-1)/2; return Math.abs(r-midR)+Math.abs(c-midC) <= Math.max(midR,midC); // losange
-      case 5: return c < 2 || c >= cols-2 || r === Math.floor(rows/2); // colonnes latérales + barre centrale
-      default: return true; // niveau 1 (classique) et niveau 6 (grille pleine + rangée en plus)
-    }
+  // A handful of named shapes, cycled every 5 levels (same shape, growing
+  // row count / toughness) so the set of 200 feels like a long, varied
+  // campaign instead of 200 near-identical screens.
+  var ARC_SHAPES = [
+    function full(){ return true; },
+    function checkerboard(r, c){ return (r + c) % 2 === 0; },
+    function pyramid(r, c, rows, cols){ return c >= r && c <= cols - 1 - r; },
+    function diamond(r, c, rows, cols){
+      var midR = (rows - 1) / 2, midC = (cols - 1) / 2;
+      return Math.abs(r - midR) + Math.abs(c - midC) <= Math.max(midR, midC);
+    },
+    function columns(r, c){ return c % 3 !== 1; },
+    function stripes(r){ return r % 2 === 0; },
+    function frame(r, c, rows, cols){ return r === 0 || r === rows - 1 || c === 0 || c === cols - 1; },
+    function cross(r, c, rows, cols){ return r === Math.floor(rows / 2) || c === Math.floor(cols / 2); }
+  ];
+  function arcRowsForLevel(level){
+    return Math.min(ARC_ROWS + 6, ARC_ROWS + Math.floor((level - 1) / 25));
+  }
+  function arcToughnessForLevel(level){
+    return level > 150 ? 3 : level > 60 ? 2 : 1;
   }
   function arcBuildBricks(level){
-    var cols = ARC_COLS, rows = level >= ARC_MAX_LEVEL ? ARC_ROWS + 1 : ARC_ROWS;
+    var cols = ARC_COLS, rows = arcRowsForLevel(level);
+    var shape = ARC_SHAPES[Math.floor((level - 1) / 5) % ARC_SHAPES.length];
+    var maxTough = arcToughnessForLevel(level);
     var brickW = (arc.canvas.width - 20) / cols - 6;
     var bricks = [];
     for (var r=0; r<rows; r++){
       for (var c=0; c<cols; c++){
-        if (!arcLevelHasBrick(level, r, c, rows, cols)) continue;
-        bricks.push({x: 10 + c*(brickW+6), y: 40 + r*22, w:brickW, h:16, alive:true, color:ARC_COLORS[r%ARC_COLORS.length]});
+        if (!shape(r, c, rows, cols)) continue;
+        // Roughly 1 brick in 4 gets the level's full toughness, spread out
+        // deterministically (not random) so a given level always looks the same.
+        var hp = maxTough > 1 && (r + c + level) % 4 === 0 ? maxTough : 1;
+        var baseColor = ARC_COLORS[r % ARC_COLORS.length];
+        bricks.push({
+          x: 10 + c*(brickW+6), y: 40 + r*22, w:brickW, h:16, alive:true,
+          hp:hp, maxHp:hp, baseColor:baseColor,
+          color: hp > 1 ? ARC_TOUGH_SHADES[0] : baseColor // freshest = darkest shade
+        });
+      }
+    }
+    // A sparse shape (frame/cross) on a small grid could theoretically come
+    // up empty-ish — guarantee every level has something to actually break.
+    if (bricks.length < 5) return arcBuildFullGrid(level, rows, cols, brickW);
+    return bricks;
+  }
+  function arcBuildFullGrid(level, rows, cols, brickW){
+    var bricks = [];
+    for (var r=0; r<rows; r++){
+      for (var c=0; c<cols; c++){
+        var baseColor = ARC_COLORS[r % ARC_COLORS.length];
+        bricks.push({x: 10 + c*(brickW+6), y: 40 + r*22, w:brickW, h:16, alive:true, hp:1, maxHp:1, baseColor:baseColor, color:baseColor});
       }
     }
     return bricks;
   }
+  // Ball speed grows with level but flattens out after level 61 — the
+  // original uncapped +12%/level formula would have made the ball faster
+  // than the paddle/bricks could realistically react to well before
+  // level 20, let alone 200.
   function arcSpeedForLevel(level){
-    var mult = 1 + (level-1) * 0.12;
+    var steps = Math.min(level - 1, 60);
+    var mult = 1 + steps * 0.02;
     return {dx: 3.2*mult, dy: 3.6*mult, bounce: 4.5*mult};
   }
   function arcResetBall(){
@@ -4570,9 +4614,15 @@ body.has-top-banner .topbar{top:40px}
     arc.bricks.forEach(function(brick){
       if (!brick.alive) return;
       if (b.x + b.r > brick.x && b.x - b.r < brick.x+brick.w && b.y + b.r > brick.y && b.y - b.r < brick.y+brick.h){
-        brick.alive = false;
         b.dy *= -1;
-        arc.score += 10;
+        brick.hp--;
+        if (brick.hp <= 0){
+          brick.alive = false;
+          arc.score += 10 * brick.maxHp;
+        } else {
+          arc.score += 5;
+          brick.color = ARC_TOUGH_SHADES[Math.min(ARC_TOUGH_SHADES.length-1, brick.maxHp - brick.hp)];
+        }
         $("#arcScore").textContent = String(arc.score);
       }
     });

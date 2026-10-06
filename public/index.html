@@ -2479,13 +2479,16 @@ body.has-top-banner .topbar{top:40px}
   function renderDossierCardPreview(){
     var host = $("#dossierCardPreview"); if (!host) return;
     var today = new Date().toISOString().slice(0, 10);
+    var previewEndDate = new Date(today); previewEndDate.setDate(previewEndDate.getDate() + 2);
     var sampleDossier = {
       id: "__preview__",
       client: "Client exemple",
       dossierNumber: "DOS-2026-001",
       startDate: today,
-      endDate: today,
-      workWeekends: false,
+      // Spans a few days (not a single-day job) so the "Même équipe tous
+      // les jours" field — hidden for 1-day dossiers — also shows up here.
+      endDate: previewEndDate.toISOString().slice(0, 10),
+      workWeekends: true,
       sameResourcesAllDays: false,
       moveType: MOVE_TYPES[0] || "",
       addressFrom: "Rue du Lac 12, Genève",
@@ -3172,18 +3175,25 @@ body.has-top-banner .topbar{top:40px}
       if (!node) return;
       node.classList.add(cfg.width === "narrow" ? "narrow" : "wide");
       if (cfg.color) {
-        // Color only the value-holding control(s) — input/select/textarea,
-        // the chips list, the date range — not the whole field including
-        // its label: "Volume en rouge" should color the number box, not
-        // also the word "VOLUME" above it. Skip controls that already
-        // carry their own meaningful color (slot J/M/A, GM/transit dépôt
-        // address highlighting).
-        node.querySelectorAll("input, select, textarea, .chips, .date-range").forEach(function(ctrl){
-          var hasOwnColor = Array.prototype.some.call(ctrl.classList, function(c){ return /^(slot-|addr-)/.test(c); });
-          if (hasOwnColor) return;
-          ctrl.style.background = cfg.color;
-          ctrl.style.borderRadius = "6px";
-        });
+        if (node.classList.contains("info-field") || node.querySelector(".section-label")) {
+          // Color only the value-holding control(s) — input/select/
+          // textarea, the chips list, the date range — not the field's
+          // label: "Volume en rouge" should color the number box, not
+          // also the word "VOLUME" above it. A custom color always wins
+          // over a control's own automatic color (slot J/M/A, GM/transit
+          // dépôt address highlighting) — the admin picked it on purpose.
+          node.querySelectorAll("input, select, textarea, .chips, .date-range").forEach(function(ctrl){
+            ctrl.style.background = cfg.color;
+            ctrl.style.borderRadius = "6px";
+          });
+        } else {
+          // "Travail le week-end" / "Même équipe tous les jours" are a bare
+          // checkbox + description, with no separate field-name label to
+          // avoid — color the whole row.
+          node.style.background = cfg.color;
+          node.style.borderRadius = "6px";
+          node.style.padding = "4px 6px";
+        }
       }
       fieldsZone.appendChild(node);
     });

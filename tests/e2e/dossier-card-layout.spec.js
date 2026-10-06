@@ -122,4 +122,34 @@ test.describe('Settings : mise en page de la fiche chantier', () => {
     const enabledCount = await preview.locator('input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])').count();
     expect(enabledCount).toBe(0);
   });
+
+  // Regression test: a custom field color must show on every field, including
+  // ones that normally carry their own automatic color (Créneau's J/M/A chip
+  // color) or that aren't wrapped in a plain label+input box (the bare
+  // checkbox+text rows "Travail le week-end" and "Même équipe tous les
+  // jours"). The preview's sample dossier spans 3 days and has a slot
+  // preassigned specifically so both of those can be exercised here.
+  test('la couleur personnalisée s\'applique même aux champs créneau et case à cocher', async ({ page }) => {
+    await login(page);
+    await page.click('[data-tab="settings"]');
+    await page.waitForSelector('#dossierFieldLayoutList .dossier-field-row', { timeout: 10000 });
+    const preview = page.locator('#dossierCardPreview .dossier-card');
+
+    await page.locator('.dossier-field-row', { hasText: 'Créneau' }).click();
+    await page.locator('#dossierFieldDetail input[type=color]').fill('#ff8800');
+    const slotBg = await preview.locator('select.slot-J').evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(slotBg).toBe('rgb(255, 136, 0)');
+
+    await page.locator('.dossier-field-row', { hasText: 'Travail le week-end' }).click();
+    await page.locator('#dossierFieldDetail input[type=color]').fill('#00aaff');
+    const weekendRowBg = await preview.locator('label.copy-all-days', { hasText: 'Travail le week-end' }).evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(weekendRowBg).toBe('rgb(0, 170, 255)');
+
+    await page.locator('.dossier-field-row', { hasText: 'Même équipe tous les jours' }).click();
+    await page.locator('#dossierFieldDetail input[type=color]').fill('#cc00cc');
+    const sameDaysRow = preview.locator('label.copy-all-days', { hasText: 'Même équipe' });
+    await expect(sameDaysRow).toBeVisible();
+    const sameDaysBg = await sameDaysRow.evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(sameDaysBg).toBe('rgb(204, 0, 204)');
+  });
 });

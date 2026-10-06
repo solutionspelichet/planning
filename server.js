@@ -7,12 +7,20 @@
 // No plaintext password is ever stored: only a per-user random salt + a
 // salted SHA-256 hash.
 
+// Nothing in the deploy pipeline (systemd service, deploy workflow) sets
+// NODE_ENV, so Express defaults to its "development" mode in production —
+// among other things, that includes the real error stack trace in any
+// unhandled route error's response body. Default to production here unless
+// something explicitly overrides it (e.g. a future dev-mode script).
+if (!process.env.NODE_ENV) process.env.NODE_ENV = 'production';
+
 const express = require('express');
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
 const { execFile } = require('child_process');
 const Database = require('better-sqlite3');
+const legacyImport = require('./lib/legacyImport');
 
 const PORT = process.env.PORT || 3000;
 // Overridable so the automated test suite can point at a disposable
@@ -131,6 +139,16 @@ db.exec(`
     changedBy TEXT DEFAULT '',
     changedAt INTEGER NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS legacy_import_batches (
+    id TEXT PRIMARY KEY,
+    createdAt INTEGER NOT NULL,
+    createdBy TEXT DEFAULT '',
+    summaryJson TEXT NOT NULL,
+    employeeIdsJson TEXT NOT NULL,
+    vehicleIdsJson TEXT NOT NULL,
+    dossierIdsJson TEXT NOT NULL,
+    undoneAt INTEGER
+  );
   CREATE TABLE IF NOT EXISTS action_log (
     id TEXT PRIMARY KEY,
     entityType TEXT NOT NULL,
@@ -248,6 +266,32 @@ function scheduleBackups() {
   }, 30 * 1000);
 }
 scheduleBackups();
+
+// SQLite doesn't reclaim space from deleted rows on its own — dossier_history
+// and action_log entries get pruned (see recordDossierHistory/recordAction)
+// but the freed pages stay in the file until something VACUUMs it. Safe to
+// run against the live, open connection (SQLite handles this internally, the
+// same way VACUUM INTO above safely snapshots a live database); scheduled
+// for the dead of night once a month rather than piggybacking on
+// BACKUP_HOURS, since this is a different concern (file compaction, not
+// snapshotting) with no reason to share that schedule.
+function scheduleMonthlyVacuum() {
+  let lastRunMonthKey = '';
+  setInterval(() => {
+    const now = new Date();
+    if (now.getDate() !== 1 || now.getHours() !== 3 || now.getMinutes() !== 0) return;
+    const key = now.toISOString().slice(0, 7); // one run per calendar month
+    if (key === lastRunMonthKey) return;
+    lastRunMonthKey = key;
+    try {
+      db.exec('VACUUM');
+      console.log('Monthly VACUUM completed.');
+    } catch (err) {
+      console.error('Monthly VACUUM failed:', err.message);
+    }
+  }, 30 * 1000);
+}
+scheduleMonthlyVacuum();
 
 // ---------- password / sessions ----------
 // Passwords are hashed with scrypt (salted, deliberately slow — unlike a
@@ -391,6 +435,17 @@ const app = express();
 // Docker-gateway address for every visitor.
 app.set('trust proxy', 1);
 app.use(express.json({ limit: '2mb' }));
+// Baseline hardening headers. No Content-Security-Policy here on purpose —
+// the app loads Google Fonts and a vendored script alongside its own inline
+// <script>/<style>, and getting a CSP wrong silently breaks rendering
+// rather than failing loudly, so it isn't worth retrofitting without being
+// able to click through every tab after.
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Unauthenticated on purpose — an external uptime monitor (see
@@ -473,6 +528,12 @@ const DOSSIER_HISTORY_FIELDS = [
   'client', 'dossierNumber', 'startDate', 'endDate', 'addressFrom', 'addressTo',
   'volume', 'seller', 'coordinator', 'task', 'comment', 'moveType'
 ];
+// Per dossier, not global — unlike action_log, a long-lived dossier that
+// gets edited often shouldn't have its own history crowded out by unrelated
+// dossiers' entries. A dossier is deleted wholesale (and its history with
+// it, see removeDossierRow) long before 200 tracked-field edits pile up on
+// one, so this is a ceiling against pathological cases, not a normal trim.
+const DOSSIER_HISTORY_LIMIT_PER_DOSSIER = 200;
 function recordDossierHistory(oldRow, newValues, changedBy) {
   const changes = DOSSIER_HISTORY_FIELDS
     .map(field => ({ field, oldValue: (oldRow ? oldRow[field] : '') || '', newValue: newValues[field] || '' }))
@@ -482,9 +543,15 @@ function recordDossierHistory(oldRow, newValues, changedBy) {
     INSERT INTO dossier_history (id, dossierId, field, oldValue, newValue, changedBy, changedAt)
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
+  const trim = db.prepare(`
+    DELETE FROM dossier_history WHERE dossierId = ? AND id NOT IN (
+      SELECT id FROM dossier_history WHERE dossierId = ? ORDER BY changedAt DESC LIMIT ?
+    )
+  `);
   const now = Date.now();
   const tx = db.transaction(() => {
     changes.forEach(c => insert.run(crypto.randomUUID(), newValues.id, c.field, c.oldValue, c.newValue, changedBy, now));
+    trim.run(newValues.id, newValues.id, DOSSIER_HISTORY_LIMIT_PER_DOSSIER);
   });
   tx();
 }
@@ -854,4 +921,182 @@ app.post('/api/backups/restore', requireAuth, requireAdmin, express.raw({ type: 
   setTimeout(() => { db.close(); process.exit(0); }, 300);
 });
 
+// ---------- legacy Excel planning import (one-time migration tool) ----------
+// Reads the old pre-app spreadsheet (one tab per month, one chantier per
+// column-pair per day — see lib/legacyImport.js for the format) and turns it
+// into employees/vehicles/dossiers/assignments. Always run once as a dry
+// run (no ?commit=1) first: it returns counts and warnings without writing
+// anything, so the operator can sanity-check the numbers before committing.
+// Safe to re-run — employees/vehicles are matched by name and dossiers by
+// their N° dossier, so anything already imported is skipped, not duplicated.
+app.post('/api/admin/legacy-import', requireAuth, requireAdmin, express.raw({ type: 'application/octet-stream', limit: '50mb' }), (req, res) => {
+  const commit = req.query.commit === '1';
+  let parsed;
+  try {
+    parsed = legacyImport.parseLegacyWorkbook(req.body);
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: 'parse_failed', message: err.message });
+  }
+
+  const empIdByKey = new Map(
+    db.prepare('SELECT id, name FROM employees').all().map(e => [legacyImport.normKey(e.name), e.id])
+  );
+  const vehIdByKey = new Map(
+    db.prepare('SELECT id, name FROM vehicles').all().map(v => [legacyImport.normKey(v.name), v.id])
+  );
+  const existingDossierNumbers = new Set(
+    db.prepare("SELECT dossierNumber FROM dossiers WHERE dossierNumber != ''").all().map(r => r.dossierNumber)
+  );
+
+  const newEmployees = [];
+  for (const e of parsed.employees) {
+    const key = legacyImport.normKey(e.name);
+    if (empIdByKey.has(key)) continue;
+    const id = crypto.randomUUID();
+    empIdByKey.set(key, id);
+    newEmployees.push({ id, company: e.company, name: e.name });
+  }
+  const newVehicles = [];
+  for (const v of parsed.vehicles) {
+    const key = legacyImport.normKey(v.name);
+    if (vehIdByKey.has(key)) continue;
+    const id = crypto.randomUUID();
+    vehIdByKey.set(key, id);
+    newVehicles.push({ id, name: v.name });
+  }
+  let dossiersSkippedAlreadyPresent = 0;
+  const newDossiers = [];
+  for (const d of parsed.dossiers) {
+    if (d.dossierNumber && existingDossierNumbers.has(d.dossierNumber)) { dossiersSkippedAlreadyPresent++; continue; }
+    newDossiers.push(d);
+  }
+
+  const summary = {
+    employeesToCreate: newEmployees.length,
+    vehiclesToCreate: newVehicles.length,
+    dossiersToCreate: newDossiers.length,
+    assignmentsToCreate: newDossiers.reduce((n, d) => n + d.days.length, 0),
+    dossiersSkippedAlreadyPresent,
+    warnings: parsed.warnings,
+  };
+
+  if (!commit) return res.json({ ok: true, preview: true, summary });
+
+  runBackup(); // safety snapshot before this bulk write — see Admin > Sauvegardes to restore from it
+
+  // A per-row action_log entry (recordAction) for every one of ~3000+ rows
+  // would only ever keep the last ACTION_LOG_LIMIT of them anyway (see
+  // recordAction above) and would slow this transaction down for nothing —
+  // instead, every id this import creates is recorded as one
+  // legacy_import_batches row below, so the whole import (employees,
+  // vehicles, dossiers and their assignments) can be undone as one action
+  // from the Admin tab without discarding unrelated changes made since.
+  const dossierIds = [];
+  const tx = db.transaction(() => {
+    for (const e of newEmployees) saveEmployeeRow({ id: e.id, company: e.company, name: e.name, active: true, order: 0 });
+    for (const v of newVehicles) saveVehicleRow({ id: v.id, name: v.name, active: true, order: 0 });
+    for (const d of newDossiers) {
+      const dossierId = crypto.randomUUID();
+      dossierIds.push(dossierId);
+      saveDossierRow({
+        id: dossierId, client: d.client, dossierNumber: d.dossierNumber,
+        startDate: d.startDate, endDate: d.endDate,
+        addressFrom: d.addressFrom, addressTo: d.addressTo, volume: d.volume,
+        coordinator: d.coordinator, task: d.task, comment: d.comment, moveType: d.moveType,
+        createdAt: Date.parse(d.startDate + 'T00:00:00Z') || Date.now(),
+        workWeekends: d.workWeekends, plannedEmployees: d.plannedEmployees,
+        plannedFourgon: d.plannedFourgon, plannedPL: d.plannedPL, plannedVL: d.plannedVL,
+      });
+      for (const day of d.days) {
+        saveAssignmentRow({
+          id: crypto.randomUUID(), dossierId, date: day.date,
+          employees: day.crew.map(name => empIdByKey.get(legacyImport.normKey(name))).filter(Boolean),
+          vehicleIds: day.vehicles.map(name => vehIdByKey.get(legacyImport.normKey(name))).filter(Boolean),
+          arrivalTime: day.arrivalTime, slot: day.slot,
+        });
+      }
+    }
+  });
+  tx();
+
+  const importBatchId = crypto.randomUUID();
+  db.prepare(`
+    INSERT INTO legacy_import_batches (id, createdAt, createdBy, summaryJson, employeeIdsJson, vehicleIdsJson, dossierIdsJson)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    importBatchId, Date.now(), req.session.username, JSON.stringify(summary),
+    JSON.stringify(newEmployees.map(e => e.id)), JSON.stringify(newVehicles.map(v => v.id)), JSON.stringify(dossierIds)
+  );
+
+  broadcast();
+  res.json({ ok: true, committed: true, summary, importBatchId });
+});
+
+function rowToLegacyImportBatch(r) {
+  return {
+    id: r.id, createdAt: r.createdAt, createdBy: r.createdBy || '',
+    summary: JSON.parse(r.summaryJson), undoneAt: r.undoneAt || null,
+  };
+}
+app.get('/api/admin/legacy-import/batches', requireAuth, requireAdmin, (req, res) => {
+  const batches = db.prepare('SELECT * FROM legacy_import_batches ORDER BY createdAt DESC LIMIT 20').all().map(rowToLegacyImportBatch);
+  res.json({ ok: true, batches });
+});
+// Deletes exactly what one import created — the employees, vehicles and
+// dossiers (which cascades to their own assignments/history via
+// removeDossierRow) whose ids this batch recorded — rather than restoring
+// the pre-import backup, which would also discard any unrelated changes
+// made in the meantime. An employee/vehicle this import created that got
+// used on a dossier from a later, separate action is still removed; that
+// later dossier is left referencing an id that no longer exists, the same
+// way deleting an employee from the Effectifs tab already behaves.
+app.post('/api/admin/legacy-import/batches/:id/undo', requireAuth, requireAdmin, (req, res) => {
+  const batch = db.prepare('SELECT * FROM legacy_import_batches WHERE id = ?').get(req.params.id);
+  if (!batch) return res.status(404).json({ ok: false, error: 'not_found' });
+  if (batch.undoneAt) return res.json({ ok: false, error: 'already_undone' });
+
+  runBackup(); // safety snapshot before this bulk delete too
+
+  const tx = db.transaction(() => {
+    for (const id of JSON.parse(batch.dossierIdsJson)) removeDossierRow(id);
+    for (const id of JSON.parse(batch.employeeIdsJson)) removeEmployeeRow(id);
+    for (const id of JSON.parse(batch.vehicleIdsJson)) removeVehicleRow(id);
+    db.prepare('UPDATE legacy_import_batches SET undoneAt = ? WHERE id = ?').run(Date.now(), batch.id);
+  });
+  tx();
+
+  broadcast();
+  res.json({ ok: true });
+});
+
+// Catches anything a route handler throws synchronously (an async handler's
+// rejection won't land here — none of the routes above pass errors to
+// next(), they all catch and respond themselves) and whatever Express's own
+// routing/body-parsing could still throw. Replaces Express's default error
+// page, which would otherwise show the real stack trace in NODE_ENV=production's
+// absence up to now (see the NODE_ENV default near the top of this file).
+app.use((err, req, res, next) => {
+  console.error('Unhandled request error:', err);
+  if (res.headersSent) return next(err);
+  // Respect a client-error status already on the error (e.g. malformed
+  // JSON body from express.json() carries .status = 400) rather than
+  // reporting every error as a 500, server-side, problem.
+  res.status(err.status || err.statusCode || 500).json({ ok: false, error: 'server_error' });
+});
+
 app.listen(PORT, () => console.log('Planning Effectifs listening on port ' + PORT));
+
+// A synchronous throw that still somehow misses every try/catch and the
+// Express error handler above leaves the process in an unknown state —
+// Node's own guidance is to log and exit rather than keep serving requests,
+// and let systemd's Restart=always (see README) bring it back up clean.
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception — exiting so systemd can restart cleanly:', err);
+  process.exit(1);
+});
+// An unhandled promise rejection is almost always scoped to one request's
+// async chain rather than corrupting shared state, so this just logs it for
+// visibility instead of taking the whole server down with it.
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled promise rejection:', reason);
+});

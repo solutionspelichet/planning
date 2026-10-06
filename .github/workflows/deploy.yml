@@ -3,6 +3,11 @@ name: Deploy to VPS
 on:
   push:
     branches: [main-63nl54]
+  # So a PR (Dependabot's dependency bumps included) runs the e2e suite and
+  # shows green/red before anyone merges it, instead of only finding out
+  # after the merge triggers a real deploy.
+  pull_request:
+    branches: [main-63nl54]
 
 # Two deploys were landing close together (e.g. two commits pushed at once)
 # and running their "deploy" jobs concurrently — their pre-deploy backups
@@ -44,6 +49,7 @@ jobs:
 
   deploy:
     needs: test
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -75,15 +81,36 @@ jobs:
           target: "/opt/planning-app/public"
           strip_components: 1
 
-      - name: Copy server.js
+      # server.js's own require()s reach into lib/ (e.g. lib/legacyImport.js)
+      # and package.json/package-lock.json name its npm dependencies — all
+      # three need to land on the VPS alongside server.js, not just the one
+      # file, or a require() for anything added after the initial deploy
+      # fails at startup with the service already stopped (see the "Install
+      # dependencies" step below for why an npm dependency needs the same
+      # treatment).
+      - name: Copy server.js, lib/ and package files
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPS_HOST }}
           port: ${{ secrets.VPS_PORT }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          source: "server.js"
+          source: "server.js,lib,package.json,package-lock.json"
           target: "/opt/planning-app"
+
+      # Every deploy, not just ones that touch package.json: a prior deploy
+      # could have shipped a server.js that already requires a new
+      # dependency while this step didn't exist yet, so "only run npm ci
+      # when the lockfile changed" can't catch it retroactively. `npm ci` on
+      # an already-up-to-date node_modules is a quick no-op.
+      - name: Install dependencies on the VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_PORT }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: cd /opt/planning-app && npm ci --omit=dev
 
       - name: Restart planning-app service
         uses: appleboy/ssh-action@v1.0.3

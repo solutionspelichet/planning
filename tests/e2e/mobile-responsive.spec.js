@@ -37,4 +37,28 @@ test.describe('Pas de débordement horizontal de la page sur mobile (390px)', ()
     await page.waitForTimeout(500);
     await assertNoPageOverflow(page);
   });
+
+  test('Settings (mise en page fiche chantier à 3 colonnes)', async ({ page }) => {
+    await login(page);
+    await page.click('[data-tab="settings"]');
+    await page.waitForSelector('#dossierFieldLayoutList .dossier-field-row', { timeout: 10000 });
+    await assertNoPageOverflow(page);
+    await page.locator('.dossier-field-row', { hasText: 'Volume' }).click();
+    await assertNoPageOverflow(page);
+  });
+
+  test('Détente (menu, casse-briques, Tetris)', async ({ page }) => {
+    await login(page);
+    await page.click('[data-tab="detente"]');
+    await page.waitForTimeout(400);
+    await assertNoPageOverflow(page);
+    await page.click('[data-game="arcade"]');
+    await page.waitForTimeout(400);
+    await assertNoPageOverflow(page);
+    await page.click('#arcBackBtn');
+    await page.waitForTimeout(200);
+    await page.click('[data-game="tetris"]');
+    await page.waitForTimeout(400);
+    await assertNoPageOverflow(page);
+  });
 });

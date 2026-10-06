@@ -34,13 +34,81 @@ test.describe('Zen Attitude et Détente', () => {
     await page.click('#zenStartBtn');
   });
 
-  test('le casse-briques se charge avec ses briques et son HUD', async ({ page }) => {
+  test('le menu Détente propose les deux jeux', async ({ page }) => {
     await login(page);
     await page.click('[data-tab="detente"]');
+    await page.waitForTimeout(400);
+    await expect(page.locator('#detenteMenu')).toBeVisible();
+    await expect(page.locator('[data-game="arcade"]')).toBeVisible();
+    await expect(page.locator('[data-game="tetris"]')).toBeVisible();
+    await expect(page.locator('#detenteArcadeScreen')).toBeHidden();
+    await expect(page.locator('#detenteTetrisScreen')).toBeHidden();
+  });
+
+  test('le casse-briques se charge avec ses niveaux, briques et HUD', async ({ page }) => {
+    await login(page);
+    await page.click('[data-tab="detente"]');
+    await page.waitForTimeout(400);
+    await page.click('[data-game="arcade"]');
     await page.waitForTimeout(600);
+    await expect(page.locator('#detenteMenu')).toBeHidden();
+    await expect(page.locator('#arcLevel')).toHaveText('1');
     await expect(page.locator('#arcScore')).toHaveText('0');
     await expect(page.locator('#arcLives')).toHaveText('3');
     await expect(page.locator('#arcCanvas')).toBeVisible();
+
+    await page.click('#arcBackBtn');
+    await page.waitForTimeout(200);
+    await expect(page.locator('#detenteMenu')).toBeVisible();
+  });
+
+  test('Tetris se charge avec sa grille, la pièce suivante et son HUD', async ({ page }) => {
+    await login(page);
+    await page.click('[data-tab="detente"]');
+    await page.waitForTimeout(400);
+    await page.click('[data-game="tetris"]');
+    await page.waitForTimeout(600);
+    await expect(page.locator('#detenteMenu')).toBeHidden();
+    await expect(page.locator('#tetrisLevel')).toHaveText('1');
+    await expect(page.locator('#tetrisScore')).toHaveText('0');
+    await expect(page.locator('#tetrisLines')).toHaveText('0');
+    await expect(page.locator('#tetrisCanvas')).toBeVisible();
+    await expect(page.locator('#tetrisNextCanvas')).toBeVisible();
+
+    // Moving and rotating the falling piece shouldn't throw or freeze the loop.
+    await page.locator('#tetrisCanvas').click();
+    await page.keyboard.press('ArrowLeft');
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('ArrowRight');
+    await page.waitForTimeout(300);
+    await expect(page.locator('#tetrisCanvas')).toBeVisible();
+
+    // The on-screen touch controls (mobile) work the same way.
+    await page.click('#tetrisBtnRotate');
+    await page.click('#tetrisBtnDown');
+    await page.waitForTimeout(200);
+
+    await page.click('#tetrisBackBtn');
+    await page.waitForTimeout(200);
+    await expect(page.locator('#detenteMenu')).toBeVisible();
+  });
+
+  test('Tetris : une chute forcée verrouille la pièce et relance le jeu sans erreur', async ({ page }) => {
+    const errors = [];
+    page.on('pageerror', (err) => errors.push(String(err)));
+    await login(page);
+    await page.click('[data-tab="detente"]');
+    await page.waitForTimeout(400);
+    await page.click('[data-game="tetris"]');
+    await page.waitForTimeout(400);
+    // Hard-drop several times in a row — enough to lock multiple pieces
+    // and exercise line-clear / next-piece-spawn without crashing.
+    for (let i = 0; i < 15; i++) {
+      await page.click('#tetrisBtnDrop');
+      await page.waitForTimeout(80);
+    }
+    await page.waitForTimeout(300);
+    expect(errors).toEqual([]);
   });
 });
 

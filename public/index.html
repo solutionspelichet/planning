@@ -23,6 +23,7 @@
   --reason-conges:#3467b8; --reason-maladie:#c1443a; --reason-recup:#1f8a70;
   --reason-entretien:#c98a1b; --reason-reparation:#7a4fc4; --reason-accident:#c1443a;
   --type-depot:#3d8b8b; --type-archivage:#8b6b45;
+  --addr-gm:#e2534d; --addr-transit:#3fa15a;
   --type-border-width:10px; --slot-header-pad:10px;
 }
 @media (prefers-color-scheme: dark){
@@ -35,6 +36,7 @@
     --reason-conges:#5b8fe0; --reason-maladie:#e0685c; --reason-recup:#3cb495;
     --reason-entretien:#e0a940; --reason-reparation:#a284e8; --reason-accident:#e0685c;
     --type-depot:#4ba3a3; --type-archivage:#a6855f;
+    --addr-gm:#e2534d; --addr-transit:#3fa15a;
   }
 }
 :root[data-theme="dark"]{
@@ -46,6 +48,7 @@
   --reason-conges:#5b8fe0; --reason-maladie:#e0685c; --reason-recup:#3cb495;
   --reason-entretien:#e0a940; --reason-reparation:#a284e8; --reason-accident:#e0685c;
   --type-depot:#4ba3a3; --type-archivage:#a6855f;
+  --addr-gm:#e2534d; --addr-transit:#3fa15a;
 }
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:'Public Sans',system-ui,sans-serif;margin:0}
@@ -53,6 +56,11 @@ body{background:var(--bg);color:var(--fg);font-family:'Public Sans',system-ui,sa
 h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0}
 [hidden]{display:none!important}
 .view-only .edit-only{display:none!important}
+/* Role "user": only the Planning tab, and only its main calendar + jobsite
+   day/week panel with Aujourd'hui/Jour/Semaine/Imprimer — see canEdit()'s
+   .view-only, which this class piggybacks on since it's already exactly
+   "role === user" for the whole time the app is usable. */
+.view-only .user-hide{display:none!important}
 
 .topbar{position:sticky;top:0;z-index:30;background:var(--bg);padding-top:16px;padding-bottom:12px;
   border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;align-items:center;gap:14px;justify-content:space-between}
@@ -273,6 +281,7 @@ h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0
 .chip{display:inline-flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:4px 6px 4px 10px;font-size:12.5px}
 .chip.conflict{border-color:var(--danger);background:var(--danger-bg)}
 .chip.chip-pl{border-color:#c0362c;background:#fde2e1;color:#7a1f1b;font-weight:700}
+.chip-emp-name{font-weight:700}
 .info-field select{width:100%;border:1px solid var(--border);background:var(--surface);color:var(--fg);border-radius:6px;padding:5px 7px;font:inherit;font-size:12.5px;font-weight:700}
 .info-field select.slot-J{background:var(--chip-j);color:#fff;border-color:var(--chip-j)}
 .info-field select.slot-M{background:var(--chip-m);color:#fff;border-color:var(--chip-m)}
@@ -315,8 +324,10 @@ table.dispo th,table.dispo td{border-bottom:1px solid var(--border)}
 table.dispo thead th{position:sticky;top:0;background:var(--surface);z-index:2;padding:6px 3px;text-align:center;font-weight:700;color:var(--fg-muted);font-size:11px}
 table.dispo thead th.weekend{background:var(--weekend)}
 td.dispo-daycol,th.dispo-daycol{width:26px;min-width:26px;text-align:center}
-.dispo-name-col{position:sticky;left:0;background:var(--surface);z-index:1;padding:5px 10px;min-width:180px;border-right:1px solid var(--border);font-size:12.5px;white-space:nowrap}
+.dispo-name-col{position:sticky;left:0;background:var(--surface);z-index:1;padding:5px 10px;width:var(--dispo-name-col-width,180px);min-width:var(--dispo-name-col-width,180px);max-width:var(--dispo-name-col-width,180px);overflow:hidden;text-overflow:ellipsis;border-right:1px solid var(--border);font-size:12.5px;white-space:nowrap}
 thead th.dispo-name-col{z-index:3}
+.dispo-resize-handle{position:absolute;top:0;right:0;bottom:0;width:6px;cursor:col-resize;touch-action:none}
+.dispo-resize-handle:hover,.dispo-resize-handle.dragging{background:var(--accent)}
 tr.dispo-sep td{background:var(--bg);font-weight:800;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--fg-muted);padding:6px 10px;position:sticky;left:0}
 td.dispo-cell{cursor:pointer}
 .dispo-swatch{display:block;margin:3px auto;width:18px;height:18px;border-radius:5px}
@@ -328,6 +339,9 @@ td.dispo-cell{cursor:pointer}
 .stat-label{font-size:12px;color:var(--fg-muted);margin-top:4px}
 .chart-sub{font-size:12px;color:var(--fg-muted);margin:0 0 14px}
 .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:16px}
+.dashboard-widgets{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;align-items:start;margin-bottom:16px}
+.dashboard-widgets > .chart-card{margin-bottom:0}
+.dashboard-widgets > .wide{grid-column:1/-1}
 
 .zen-wrap{display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start}
 .zen-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px}
@@ -345,9 +359,21 @@ td.dispo-cell{cursor:pointer}
 .zen-sound-controls{display:flex;flex-direction:column;gap:14px}
 
 .arcade-wrap{max-width:740px}
-.arcade-hud{display:flex;gap:20px;align-items:center;margin-bottom:10px;font-size:13px}
+.arcade-hud{display:flex;gap:20px;align-items:center;flex-wrap:wrap;margin-bottom:10px;font-size:13px}
 .arcade-hud button{margin-left:auto}
 #arcCanvas{background:#0f1115;border-radius:12px;border:1px solid var(--border);display:block;max-width:100%;height:auto;touch-action:none}
+.detente-game-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;max-width:600px}
+.detente-game-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center}
+.detente-game-icon{font-size:40px;line-height:1;margin-bottom:6px}
+.detente-game-card h3{margin:4px 0}
+.detente-best{font-size:12.5px;color:var(--fg-muted);margin:6px 0 14px}
+.tetris-layout{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
+#tetrisCanvas{background:#0f1115;border-radius:12px;border:1px solid var(--border);display:block;max-width:100%;height:auto;touch-action:none}
+.tetris-side{display:flex;flex-direction:column;gap:10px;width:140px}
+#tetrisNextCanvas{background:#0f1115;border-radius:8px;border:1px solid var(--border)}
+.tetris-touch-controls{display:flex;flex-direction:column;gap:6px}
+.tetris-touch-row{display:flex;gap:6px}
+.tetris-touch-row button{flex:1;padding:10px 0;font-size:16px;margin-left:0}
 .chart-card h3{font-size:12.5px;font-weight:700;margin:0 0 10px;color:var(--fg-muted);text-transform:uppercase;letter-spacing:.03em}
 .chart-legend{display:flex;gap:14px;font-size:11.5px;color:var(--fg-muted);margin-top:6px}
 .chart-legend span{display:flex;align-items:center;gap:5px}
@@ -357,6 +383,8 @@ table.week-table th,table.week-table td{padding:8px 6px;text-align:center;border
 table.week-table th{color:var(--fg-muted);font-weight:700;font-size:11px}
 table.week-table td.week-metric-label{text-align:left;color:var(--fg-muted);font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}
 table.week-table th.week-today,table.week-table td.week-today{background:var(--bg)}
+table.week-table th.week-compare-col,table.week-table td.week-compare-col{background:var(--weekend);border-left:2px solid var(--border);font-style:italic;color:var(--fg-muted)}
+table.week-table tr.week-sub td.week-compare-col{font-style:normal}
 table.week-table td.week-daynum{font-size:10.5px;color:var(--fg-muted);font-weight:400}
 table.week-table tr.week-sub td{color:var(--fg-muted);font-size:11.5px;font-weight:400}
 table.week-table tr.week-sub td.week-metric-label{padding-left:16px;text-transform:none;font-weight:400}
@@ -378,13 +406,24 @@ table.week-table tr.week-row-veh td.week-metric-label{border-left:4px solid var(
 .next-day-toggle{display:flex;align-items:center;gap:8px;font:inherit;font-size:14px;font-weight:700;
   background:none;border:none;color:var(--fg);cursor:pointer;padding:0 0 10px;width:100%;text-align:left}
 .next-day-toggle:hover{color:var(--accent)}
-.address-stack{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
-.address-stack .info-field textarea,.info-field.wide textarea{width:100%;font-size:13px;font-weight:700;padding:7px 9px;font-family:inherit;
-  border:1px solid var(--border);background:var(--surface);color:var(--fg);border-radius:6px;resize:vertical}
+.info-field.wide textarea{width:100%;font-size:13px;font-weight:700;padding:7px 9px;font-family:inherit;
+  border:1px solid var(--border);background:var(--surface);color:var(--fg);border-radius:6px;resize:none;overflow:hidden;min-height:44px}
 .info-field.wide{width:100%;margin-bottom:8px}
-.info-field.wide textarea{resize:none;overflow:hidden;min-height:44px}
-.address-field textarea.addr-gm{background:#fde2e1;border-color:#e2534d;color:#7a1f1b}
-.address-field textarea.addr-transit{background:#e1f5e6;border-color:#3fa15a;color:#1d5c32}
+.address-field textarea.addr-gm{background:color-mix(in srgb, var(--addr-gm) 16%, var(--surface));border-color:var(--addr-gm);color:color-mix(in srgb, var(--addr-gm) 65%, black)}
+.address-field textarea.addr-transit{background:color-mix(in srgb, var(--addr-transit) 16%, var(--surface));border-color:var(--addr-transit);color:color-mix(in srgb, var(--addr-transit) 65%, black)}
+.dossier-fields-zone{display:grid;grid-template-columns:repeat(auto-fill,minmax(95px,1fr));gap:6px 8px}
+.dossier-fields-zone > .wide{grid-column:1/-1}
+.dossier-card-preview-frame{max-width:420px;pointer-events:none;user-select:none}
+.dossier-card-preview-frame .dossier-card{cursor:default}
+.layout-editor-3col{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;align-items:start;margin-top:10px}
+.layout-editor-col{min-width:0}
+.dossier-field-row{cursor:pointer}
+.dossier-field-row.selected{background:var(--accent);color:var(--accent-fg)}
+.dossier-field-row.selected .emp-name{color:inherit}
+.field-hidden-badge{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--fg-muted);flex:none}
+.dossier-field-row.selected .field-hidden-badge{color:inherit;opacity:.8}
+.layout-editor-detail{background:var(--weekend);border-radius:10px;padding:10px 12px}
+.layout-editor-detail h4{margin:0 0 6px;font-size:13px}
 td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
 .draggable-row{cursor:grab}
 .draggable-row:active{cursor:grabbing}
@@ -500,13 +539,13 @@ body.has-top-banner .topbar{top:40px}
     </div>
     <div class="tabs" id="tabBar">
       <button class="tab-btn active" data-tab="planning">Planning</button>
-      <button class="tab-btn" data-tab="effectifs">Effectifs</button>
-      <button class="tab-btn" data-tab="vehicules">Véhicules</button>
-      <button class="tab-btn" data-tab="vacances">Vacances &amp; Garage</button>
-      <button class="tab-btn" data-tab="dashboard">Dashboard</button>
-      <button class="tab-btn" data-tab="zen">🧘 Zen Attitude</button>
-      <button class="tab-btn" data-tab="detente">🎮 Détente</button>
-      <button class="tab-btn" data-tab="settings">Settings</button>
+      <button class="tab-btn user-hide" data-tab="effectifs">Effectifs</button>
+      <button class="tab-btn user-hide" data-tab="vehicules">Véhicules</button>
+      <button class="tab-btn user-hide" data-tab="vacances">Vacances &amp; Garage</button>
+      <button class="tab-btn user-hide" data-tab="dashboard">Dashboard</button>
+      <button class="tab-btn user-hide" data-tab="zen">🧘 Zen Attitude</button>
+      <button class="tab-btn user-hide" data-tab="detente">🎮 Détente</button>
+      <button class="tab-btn user-hide" data-tab="settings">Settings</button>
       <button class="tab-btn edit-only" data-tab="admin" id="adminTabBtn">Admin</button>
     </div>
     <div class="search-wrap">
@@ -535,7 +574,7 @@ body.has-top-banner .topbar{top:40px}
           <div class="cal-dow" id="calDow"></div>
           <div class="cal-days" id="calDays"></div>
         </div>
-        <div class="calendar">
+        <div class="calendar user-hide">
           <h3 class="calendar-label">Vacances, Congés et Immobilisation</h3>
           <div class="cal-head">
             <button id="vgPrevMonth" aria-label="Mois précédent">‹</button>
@@ -545,7 +584,7 @@ body.has-top-banner .topbar{top:40px}
           <div class="cal-dow" id="vgCalDow"></div>
           <div class="cal-days" id="vgCalDays"></div>
         </div>
-        <div class="calendar">
+        <div class="calendar user-hide">
           <h3 style="font-size:12.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--fg-muted);margin-bottom:10px">
             Congés &amp; Garage — <span id="vgDayTitle">—</span>
           </h3>
@@ -561,9 +600,9 @@ body.has-top-banner .topbar{top:40px}
               <button type="button" class="view-mode-btn active" id="viewModeDayBtn">Jour</button>
               <button type="button" class="view-mode-btn" id="viewModeWeekBtn">Semaine</button>
             </div>
-            <button class="btn btn-ghost" id="exportCsvBtn">⬇ Export CSV (mois)</button>
-            <button class="btn btn-ghost" id="exportPdfBtn">📄 Export PDF (jour)</button>
-            <button class="btn btn-ghost" id="exportWeekPdfBtn">📄 Export PDF (semaine)</button>
+            <button class="btn btn-ghost user-hide" id="exportCsvBtn">⬇ Export CSV (mois)</button>
+            <button class="btn btn-ghost user-hide" id="exportPdfBtn">📄 Export PDF (jour)</button>
+            <button class="btn btn-ghost user-hide" id="exportWeekPdfBtn">📄 Export PDF (semaine)</button>
             <button class="btn btn-ghost" id="printDayBtn">🖨 Imprimer</button>
             <button class="btn edit-only" id="newDossierBtn">+ Nouveau dossier</button>
           </div>
@@ -665,6 +704,27 @@ body.has-top-banner .topbar{top:40px}
     </div>
     <div class="settings-preview" id="settingsPreview"></div>
     <div class="company-grid" id="settingsGroups" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr))"></div>
+    <div class="chart-card edit-only" style="margin-top:16px">
+      <h3 style="margin-bottom:4px">Mise en page : fiche chantier</h3>
+      <p class="chart-sub" style="margin-bottom:10px">Glissez pour réordonner les champs à gauche, cliquez sur l'un d'eux pour régler sa largeur, sa couleur de fond ou le masquer, et suivez le résultat dans l'aperçu. S'applique à toutes les fiches, dans Planning.</p>
+      <div class="layout-editor-3col">
+        <div class="layout-editor-col">
+          <ul class="emp-list" id="dossierFieldLayoutList"></ul>
+          <button class="btn btn-ghost" id="resetDossierFieldLayoutBtn" style="margin-top:10px">Réinitialiser cette mise en page</button>
+        </div>
+        <div class="layout-editor-col layout-editor-detail" id="dossierFieldDetail"></div>
+        <div class="layout-editor-col">
+          <p class="chart-sub" style="margin:0 0 6px">Aperçu (données fictives, en lecture seule) :</p>
+          <div class="dossier-card-preview-frame" id="dossierCardPreview"></div>
+        </div>
+      </div>
+    </div>
+    <div class="chart-card edit-only" style="margin-top:16px">
+      <h3 style="margin-bottom:4px">Mise en page : Dashboard</h3>
+      <p class="chart-sub" style="margin-bottom:10px">Glissez pour réordonner les widgets, pleine largeur ou demi-largeur (côte à côte), une couleur de fond, ou décochez pour le masquer.</p>
+      <ul class="emp-list" id="dashboardLayoutList"></ul>
+      <button class="btn btn-ghost" id="resetDashboardLayoutBtn" style="margin-top:10px">Réinitialiser cette mise en page</button>
+    </div>
     <div class="day-panel-actions edit-only" style="margin-top:16px">
       <button class="btn" id="saveSettingsBtn">Enregistrer</button>
       <button class="btn btn-ghost" id="resetSettingsBtn">Réinitialiser les valeurs par défaut</button>
@@ -680,51 +740,58 @@ body.has-top-banner .topbar{top:40px}
         <button type="button" class="view-mode-btn" id="dashViewMonthBtn">Mois</button>
       </div>
     </div>
-    <div class="stat-grid">
-      <div class="stat-card">
-        <div class="stat-value" id="dashDossiers">0</div>
-        <div class="stat-label">Chantiers actifs</div>
+    <div class="dashboard-widgets" id="dashboardWidgets">
+      <div class="stat-grid" data-widget="stats">
+        <div class="stat-card">
+          <div class="stat-value" id="dashDossiers">0</div>
+          <div class="stat-label">Chantiers actifs</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="dashEmployees">0</div>
+          <div class="stat-label">Ressources humaines monopolisées</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="dashVehicles">0</div>
+          <div class="stat-label">Véhicules monopolisés</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="dashVolume">0</div>
+          <div class="stat-label">Volume total (m³)</div>
+        </div>
       </div>
-      <div class="stat-card">
-        <div class="stat-value" id="dashEmployees">0</div>
-        <div class="stat-label">Ressources humaines monopolisées</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" id="dashVehicles">0</div>
-        <div class="stat-label">Véhicules monopolisés</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" id="dashVolume">0</div>
-        <div class="stat-label">Volume total (m³)</div>
-      </div>
-    </div>
 
-    <h2 style="font-size:15px;margin:28px 0 12px">Cette semaine</h2>
-    <div class="chart-card">
-      <div style="overflow-x:auto"><div id="dashWeekTable"></div></div>
-    </div>
+      <div class="chart-card" data-widget="mobilization">
+        <h2 style="font-size:15px;margin:0 0 12px" id="dashMobilizationTitle">Cette semaine</h2>
+        <div style="overflow-x:auto"><div id="dashWeekTable"></div></div>
+      </div>
 
-    <h2 style="font-size:15px;margin:28px 0 4px">Évolution sur l'année</h2>
-    <p class="chart-sub" id="dashYearLabels">—</p>
-
-    <div class="chart-card">
-      <h3>Répartition par type — <span id="dashTypeMonthLabel">—</span></h3>
-      <div id="dashTypeDistribution"></div>
-    </div>
-    <div class="chart-card">
-      <h3>Nombre de chantiers par mois</h3>
-      <div class="type-filter" id="filterDossiers"></div>
-      <div id="dashChartDossiers"></div>
-    </div>
-    <div class="chart-card">
-      <h3>Ressources humaines monopolisées par mois (personne-jours)</h3>
-      <div class="type-filter" id="filterEmployees"></div>
-      <div id="dashChartEmployees"></div>
-    </div>
-    <div class="chart-card">
-      <h3>Véhicules monopolisés par mois (véhicule-jours)</h3>
-      <div class="type-filter" id="filterVehicles"></div>
-      <div id="dashChartVehicles"></div>
+      <div class="chart-card" data-widget="typeDistribution">
+        <h3>Répartition par type — <span id="dashTypeMonthLabel">—</span></h3>
+        <div id="dashTypeDistribution"></div>
+      </div>
+      <div class="chart-card" data-widget="chartDossiers">
+        <p class="chart-sub dash-year-caption">—</p>
+        <h3>Nombre de chantiers par mois</h3>
+        <div class="type-filter" id="filterDossiers"></div>
+        <div id="dashChartDossiers"></div>
+      </div>
+      <div class="chart-card" data-widget="chartEmployees">
+        <p class="chart-sub dash-year-caption">—</p>
+        <h3>Ressources humaines monopolisées par mois (personne-jours)</h3>
+        <div class="type-filter" id="filterEmployees"></div>
+        <div id="dashChartEmployees"></div>
+      </div>
+      <div class="chart-card" data-widget="chartVehicles">
+        <p class="chart-sub dash-year-caption">—</p>
+        <h3>Véhicules monopolisés par mois (véhicule-jours)</h3>
+        <div class="type-filter" id="filterVehicles"></div>
+        <div id="dashChartVehicles"></div>
+      </div>
+      <div class="chart-card" data-widget="chartVolume">
+        <p class="chart-sub dash-year-caption">—</p>
+        <h3>Volume transporté par mois (m³)</h3>
+        <div id="dashChartVolume"></div>
+      </div>
     </div>
   </div>
 
@@ -759,6 +826,16 @@ body.has-top-banner .topbar{top:40px}
           <input type="file" id="restoreFileInput" accept=".db" style="flex:1 1 100%">
           <button id="restoreBtn">Restaurer</button>
         </div>
+      </div>
+      <div class="company-card">
+        <h3><span>Importer un ancien planning (Excel)</span></h3>
+        <p class="chart-sub" style="margin:0 0 10px">Lit un fichier .xlsx/.xlsm au format de l'ancien planning (onglet EFFECTIFS + un onglet par mois) et recrée les employés, véhicules, dossiers et affectations manquants. Les employés/véhicules sont reconnus par leur nom et les dossiers par leur n° — importer deux fois le même fichier ne duplique rien, sauf les quelques chantiers sans numéro de dossier.</p>
+        <div class="add-row edit-only" style="flex-wrap:wrap">
+          <input type="file" id="legacyImportFileInput" accept=".xlsx,.xlsm" style="flex:1 1 100%">
+          <button id="legacyImportAnalyzeBtn">Analyser</button>
+        </div>
+        <div id="legacyImportSummary" style="margin-top:12px"></div>
+        <div id="legacyImportBatches" style="margin-top:12px"></div>
       </div>
       <div class="company-card">
         <h3><span>Archives</span></h3>
@@ -819,15 +896,67 @@ body.has-top-banner .topbar{top:40px}
   </div>
 
   <div class="view" id="view-detente" hidden>
-    <div class="arcade-wrap">
+    <div class="detente-menu" id="detenteMenu">
+      <h2 style="font-size:15px;margin:0 0 12px">Choisis un jeu</h2>
+      <div class="detente-game-grid">
+        <div class="detente-game-card">
+          <div class="detente-game-icon">🧱</div>
+          <h3>Casse-briques</h3>
+          <p class="chart-sub">6 niveaux, de plus en plus rapides.</p>
+          <p class="detente-best">Record : <b id="detenteArcBest">0</b></p>
+          <button class="btn" type="button" data-game="arcade">▶ Jouer</button>
+        </div>
+        <div class="detente-game-card">
+          <div class="detente-game-icon">🟦</div>
+          <h3>Tetris</h3>
+          <p class="chart-sub">Empilez, alignez, effacez des lignes.</p>
+          <p class="detente-best">Record : <b id="detenteTetrisBest">0</b></p>
+          <button class="btn" type="button" data-game="tetris">▶ Jouer</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="arcade-wrap" id="detenteArcadeScreen" hidden>
       <div class="arcade-hud">
+        <button class="btn btn-ghost" type="button" id="arcBackBtn">← Jeux</button>
+        <span>Niveau : <b id="arcLevel">1</b></span>
         <span>Score : <b id="arcScore">0</b></span>
         <span>Vies : <b id="arcLives">3</b></span>
         <span>Record : <b id="arcBest">0</b></span>
-        <button class="btn btn-ghost" id="arcRestartBtn">↺ Recommencer</button>
+        <button class="btn btn-ghost" type="button" id="arcRestartBtn">↺ Recommencer</button>
       </div>
       <canvas id="arcCanvas" width="700" height="480"></canvas>
       <p class="chart-sub" style="margin-top:8px">Flèches ← → ou souris pour déplacer la raquette · clic ou Espace pour lancer la balle</p>
+    </div>
+
+    <div class="arcade-wrap" id="detenteTetrisScreen" hidden>
+      <div class="arcade-hud">
+        <button class="btn btn-ghost" type="button" id="tetrisBackBtn">← Jeux</button>
+        <span>Niveau : <b id="tetrisLevel">1</b></span>
+        <span>Score : <b id="tetrisScore">0</b></span>
+        <span>Lignes : <b id="tetrisLines">0</b></span>
+        <span>Record : <b id="tetrisBest">0</b></span>
+        <button class="btn btn-ghost" type="button" id="tetrisRestartBtn">↺ Recommencer</button>
+      </div>
+      <div class="tetris-layout">
+        <canvas id="tetrisCanvas" width="300" height="600"></canvas>
+        <div class="tetris-side">
+          <p class="chart-sub" style="margin:0 0 4px">Suivant</p>
+          <canvas id="tetrisNextCanvas" width="100" height="100"></canvas>
+          <div class="tetris-touch-controls">
+            <div class="tetris-touch-row">
+              <button class="btn btn-ghost" type="button" id="tetrisBtnLeft">←</button>
+              <button class="btn btn-ghost" type="button" id="tetrisBtnRotate">⟳</button>
+              <button class="btn btn-ghost" type="button" id="tetrisBtnRight">→</button>
+            </div>
+            <div class="tetris-touch-row">
+              <button class="btn btn-ghost" type="button" id="tetrisBtnDown">↓</button>
+              <button class="btn btn-ghost" type="button" id="tetrisBtnDrop">⤓</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="chart-sub" style="margin-top:8px">← → pour déplacer · ↑ pour pivoter · ↓ pour accélérer · Espace pour chuter</p>
     </div>
   </div>
 </div>
@@ -904,6 +1033,10 @@ body.has-top-banner .topbar{top:40px}
       {key:"type-depot", label:"Dépôt", type:"color", def:"#3d8b8b"},
       {key:"type-archivage", label:"Archivage", type:"color", def:"#8b6b45"}
     ]},
+    {group:"Adresse de départ/arrivée (selon le texte saisi)", items:[
+      {key:"addr-gm", label:"Texte exactement « GM »", type:"color", def:"#e2534d"},
+      {key:"addr-transit", label:"Texte contenant « transit depot »", type:"color", def:"#3fa15a"}
+    ]},
     {group:"Motifs d'absence du personnel", items:[
       {key:"reason-conges", label:"Congés", type:"color", def:"#3467b8"},
       {key:"reason-maladie", label:"Maladie", type:"color", def:"#c1443a"},
@@ -931,6 +1064,101 @@ body.has-top-banner .topbar{top:40px}
       {key:"cal-heat-red", label:"Rouge à partir de", type:"number", def:60, min:1, max:500, unit:"pers."}
     ]}
   ];
+  // ---------- customizable dossier-card layout (Settings) ----------
+  // Every field below the card's fixed header (type + client name) can be
+  // reordered, resized (narrow = packs two per row like the old .info-grid
+  // did, wide = its own full row) and given an accent color from Settings.
+  // The header itself and the capacity/absence warnings stay fixed — they're
+  // the card's identity and its alerts, not configurable content.
+  var DOSSIER_CARD_FIELDS_DEFAULT = [
+    {id:"dossierNumber", width:"wide", visible:true, color:""},
+    {id:"dateRange", width:"wide", visible:true, color:""},
+    {id:"workWeekends", width:"wide", visible:true, color:""},
+    {id:"slot", width:"wide", visible:true, color:""},
+    {id:"addressFrom", width:"wide", visible:true, color:""},
+    {id:"addressTo", width:"wide", visible:true, color:""},
+    {id:"volume", width:"narrow", visible:true, color:""},
+    {id:"seller", width:"narrow", visible:true, color:""},
+    {id:"coordinator", width:"narrow", visible:true, color:""},
+    {id:"plannedEmployees", width:"narrow", visible:true, color:""},
+    {id:"plannedFourgon", width:"narrow", visible:true, color:""},
+    {id:"plannedPL", width:"narrow", visible:true, color:""},
+    {id:"plannedVL", width:"narrow", visible:true, color:""},
+    {id:"task", width:"wide", visible:true, color:""},
+    {id:"comment", width:"wide", visible:true, color:""},
+    {id:"arrivalTime", width:"narrow", visible:true, color:""},
+    {id:"sameDaysToggle", width:"wide", visible:true, color:""},
+    {id:"employeesChips", width:"wide", visible:true, color:""},
+    {id:"vehiclesChips", width:"wide", visible:true, color:""}
+  ];
+  var DOSSIER_CARD_FIELD_LABELS = {
+    dossierNumber:"N° dossier", dateRange:"Dates (du / au)", workWeekends:"Travail le week-end",
+    slot:"Créneau", addressFrom:"Adresse de départ", addressTo:"Adresse d'arrivée",
+    volume:"Volume", seller:"Vendeur", coordinator:"Coordinatrice",
+    plannedEmployees:"Effectif prévu", plannedFourgon:"Fourgons prévus", plannedPL:"PL prévus", plannedVL:"VL prévus",
+    task:"Tâche à réaliser", comment:"Commentaire", arrivalTime:"Heure d'arrivée (jour)",
+    sameDaysToggle:"Même équipe tous les jours", employeesChips:"Effectif (équipe)", vehiclesChips:"Véhicules"
+  };
+  // Shared by the dossier-card fields and the Dashboard widgets below —
+  // both are just "an ordered list of {id, width, visible, color}" stored
+  // as one JSON settings value, reconciled against whichever registry
+  // (defaults + labels) they belong to.
+  function parseFieldLayoutConfig(raw, defaults, labelsMap){
+    var parsed = null;
+    if (raw) { try { parsed = JSON.parse(raw); } catch(e){ parsed = null; } }
+    if (!Array.isArray(parsed)) return defaults.map(function(f){ return Object.assign({}, f); });
+    var seen = {};
+    var result = [];
+    parsed.forEach(function(f){
+      if (!f || !labelsMap[f.id] || seen[f.id]) return;
+      seen[f.id] = true;
+      result.push({id:f.id, width: f.width==="narrow"?"narrow":"wide", visible: f.visible!==false, color: f.color||""});
+    });
+    // An id added to the app after this config was saved — append it at the
+    // end with its default so it doesn't just silently disappear.
+    defaults.forEach(function(def){
+      if (!seen[def.id]) result.push(Object.assign({}, def));
+    });
+    return result;
+  }
+  function parseDossierCardFieldConfig(raw){ return parseFieldLayoutConfig(raw, DOSSIER_CARD_FIELDS_DEFAULT, DOSSIER_CARD_FIELD_LABELS); }
+  function getDossierCardFieldConfig(){ return parseDossierCardFieldConfig(state.settings["dossierCardFields"]); }
+
+  // ---------- customizable Dashboard layout (Settings) ----------
+  var DASHBOARD_WIDGETS_DEFAULT = [
+    {id:"stats", width:"wide", visible:true, color:""},
+    {id:"mobilization", width:"wide", visible:true, color:""},
+    {id:"typeDistribution", width:"wide", visible:true, color:""},
+    {id:"chartDossiers", width:"wide", visible:true, color:""},
+    {id:"chartEmployees", width:"wide", visible:true, color:""},
+    {id:"chartVehicles", width:"wide", visible:true, color:""},
+    {id:"chartVolume", width:"wide", visible:true, color:""}
+  ];
+  var DASHBOARD_WIDGET_LABELS = {
+    stats:"Chiffres clés", mobilization:"Tableau de mobilisation", typeDistribution:"Répartition par type",
+    chartDossiers:"Nombre de chantiers par mois", chartEmployees:"Ressources humaines par mois",
+    chartVehicles:"Véhicules par mois", chartVolume:"Volume transporté par mois"
+  };
+  function parseDashboardWidgetConfig(raw){ return parseFieldLayoutConfig(raw, DASHBOARD_WIDGETS_DEFAULT, DASHBOARD_WIDGET_LABELS); }
+  function getDashboardWidgetConfig(){ return parseDashboardWidgetConfig(state.settings["dashboardLayout"]); }
+  // Dashboard widgets are static markup (each already has its own render
+  // function targeting fixed ids inside it) — layout only needs to move the
+  // existing wrapper nodes into the configured order/width/color, not
+  // rebuild their contents.
+  function applyDashboardLayout(){
+    var host = $("#dashboardWidgets"); if (!host) return;
+    var byId = {};
+    $all("[data-widget]", host).forEach(function(w){ byId[w.dataset.widget] = w; });
+    getDashboardWidgetConfig().forEach(function(cfg){
+      var w = byId[cfg.id]; if (!w) return;
+      w.hidden = !cfg.visible;
+      w.classList.remove("wide", "narrow");
+      w.classList.add(cfg.width === "narrow" ? "narrow" : "wide");
+      w.style.background = cfg.color || "";
+      host.appendChild(w);
+    });
+  }
+
   var CODE_LOAD = {J:1, M:0.5, A:0.5};
   var MONTHS_FR = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
   var DOW_FR = ["L","M","M","J","V","S","D"];
@@ -1030,6 +1258,9 @@ body.has-top-banner .topbar{top:40px}
   function toast(msg){
     var t = $("#toast"); t.textContent = msg; t.classList.add("show");
     clearTimeout(toast._t); toast._t = setTimeout(function(){ t.classList.remove("show"); }, 2500);
+  }
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, function(c){ return ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]; });
   }
   function fmtDate(d){ return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); }
   function parseDate(s){ var p = s.split("-").map(Number); return new Date(p[0], p[1]-1, p[2]); }
@@ -1166,6 +1397,8 @@ body.has-top-banner .topbar{top:40px}
       case "health": p = request("GET", "/api/health"); break;
       case "searchArchive": p = request("GET", "/api/dossiers/archive?q=" + encodeURIComponent(extra.q || "")); break;
       case "runBackup": p = request("POST", "/api/backups/run"); break;
+      case "legacyImportBatches": p = request("GET", "/api/admin/legacy-import/batches"); break;
+      case "undoLegacyImportBatch": p = request("POST", "/api/admin/legacy-import/batches/" + encodeURIComponent(extra.id) + "/undo"); break;
       default: p = Promise.resolve({ok:false, error:"unknown_action"});
     }
     return p.then(function(res){
@@ -1306,6 +1539,7 @@ body.has-top-banner .topbar{top:40px}
     if (state.activeTab === "vacances") { renderAbsenceSelects(); renderAbsenceList(); renderDowntimeList(); renderVacAvailability(); }
     if (state.activeTab === "settings") renderSettingsTab();
     if (state.role === "admin") { renderUsers(); renderBackups(); renderDriveSyncStatus(); renderDiskStatus(); }
+    if (state.role === "admin" && state.activeTab === "admin") renderLegacyImportBatches();
   }
   function refreshAll(){
     var prevConflictCount = computeTodayConflictCount();
@@ -1332,6 +1566,10 @@ body.has-top-banner .topbar{top:40px}
 
   // ---------- tabs ----------
   function setTab(tab){
+    // Belt-and-suspenders: the tab buttons for anything but Planning are
+    // already hidden for role "user" (see the .user-hide CSS rule), but
+    // nothing stops a direct setTab("dashboard") call from the console.
+    if (state.role === "user" && tab !== "planning") tab = "planning";
     state.activeTab = tab;
     $all(".tab-btn").forEach(function(b){ b.classList.toggle("active", b.dataset.tab === tab); });
     $("#view-planning").hidden = tab !== "planning";
@@ -1344,20 +1582,27 @@ body.has-top-banner .topbar{top:40px}
     $("#view-zen").hidden = tab !== "zen";
     $("#view-detente").hidden = tab !== "detente";
     if (tab === "dashboard") renderDashboard();
-    if (tab === "admin") renderFullActionLog();
+    if (tab === "admin") { renderFullActionLog(); renderLegacyImportBatches(); }
     if (tab === "vacances") { renderAbsenceSelects(); renderAbsenceList(); renderDowntimeList(); renderVacAvailability(); }
-    if (tab === "settings") renderSettingsTab();
-    else applySettingsToRoot(state.settings); // leaving Settings: drop any unsaved live-preview changes
+    if (tab === "settings") renderSettingsTab(Object.assign({}, state.settings)); // entering Settings: always start from a fresh draft
+    else { state.settingsDraft = null; applySettingsToRoot(state.settings); } // leaving Settings: drop any unsaved live-preview changes
     if (tab === "zen") renderZenPatternSelect();
     else if (zenAudio.playing) zenStopSound();
-    if (tab === "detente") arcStart();
-    else if (arc.running){ arc.running = false; cancelAnimationFrame(arc.rafId); }
+    if (tab === "detente") detenteShowMenu();
+    else detenteStopActive();
   }
   $all(".tab-btn").forEach(function(b){ b.addEventListener("click", function(){ setTab(b.dataset.tab); }); });
 
   // ---------- dossier / assignment helpers ----------
   function activeDossiersOn(dateStr){
-    return state.dossiers.filter(function(d){ return d.startDate <= dateStr && dateStr <= d.endDate; });
+    return state.dossiers.filter(function(d){
+      if (d.startDate > dateStr || dateStr > d.endDate) return false;
+      // A dossier spanning a weekend (e.g. starts one week, ends the next)
+      // shouldn't show staff/vehicles as deployed on the Sat/Sun in between
+      // unless "travail le week-end" is actually ticked for it.
+      if (!d.workWeekends && isWeekend(parseDate(dateStr))) return false;
+      return true;
+    });
   }
   function assignmentFor(dossierId, dateStr){
     var found = state.assignments.find(function(a){ return a.dossierId === dossierId && a.date === dateStr; });
@@ -1774,7 +2019,9 @@ body.has-top-banner .topbar{top:40px}
 
     var table = el("table", {class:"dispo"});
     var thead = el("thead"); var headRow = el("tr");
-    headRow.appendChild(el("th", {class:"dispo-name-col", text: MONTHS_FR[month]+" "+year}));
+    var nameTh = el("th", {class:"dispo-name-col", text: MONTHS_FR[month]+" "+year});
+    attachDispoColumnResize(nameTh);
+    headRow.appendChild(nameTh);
     for (var d=1; d<=nDays; d++){
       var dow = new Date(year,month,d).getDay(); var isWeekend = dow===0||dow===6;
       var th = el("th", {class:"dispo-daycol"+(isWeekend?" weekend":"")});
@@ -2019,6 +2266,8 @@ body.has-top-banner .topbar{top:40px}
     ["DEPOT","ARCHIVAGE"].forEach(function(k){
       host.appendChild(el("span", {class:"settings-swatch", style:"background:var(--type-"+k.toLowerCase()+")", text: k==="DEPOT"?"Dépôt":"Archivage"}));
     });
+    host.appendChild(el("span", {class:"settings-swatch", style:"background:var(--addr-gm)", text:"Adresse GM"}));
+    host.appendChild(el("span", {class:"settings-swatch", style:"background:var(--addr-transit)", text:"Adresse transit dépôt"}));
     var card = el("div", {class:"dossier-card settings-mini-card slot-M"});
     var previewMode = settingValue(state.settingsDraft, {key:"card-bg-mode", def:"none"});
     var previewColorVar = previewMode === "type" ? "var(--chip-gm)" : previewMode === "slot" ? "var(--chip-m)" : null;
@@ -2029,9 +2278,15 @@ body.has-top-banner .topbar{top:40px}
   }
   // presetDraft lets the reset button hand over fresh defaults without this
   // function immediately clobbering them with the still-saved state.settings.
+  // When called with no argument — which happens on every live refresh (SSE
+  // "changed" push or the slow-poll fallback, both firing on ANY client's
+  // write anywhere in the app, not just Settings) — keep the existing draft
+  // instead of reseeding it from state.settings, otherwise an unrelated
+  // background write would silently wipe whatever the admin is mid-editing.
   function renderSettingsTab(presetDraft){
     renderNotifStatus();
-    state.settingsDraft = presetDraft || Object.assign({}, state.settings);
+    if (presetDraft) state.settingsDraft = presetDraft;
+    else if (!state.settingsDraft) state.settingsDraft = Object.assign({}, state.settings);
     applySettingsToRoot(state.settingsDraft);
     renderSettingsPreview();
     var host = $("#settingsGroups"); if (!host) return;
@@ -2082,7 +2337,203 @@ body.has-top-banner .topbar{top:40px}
       });
       host.appendChild(card);
     });
+    renderDossierFieldLayoutEditor();
+    renderDashboardLayoutEditor();
+    renderDossierCardPreview();
   }
+  // Shared by both layout editors in Settings (dossier-card fields and
+  // Dashboard widgets) — same row shape (visible / order / width / color)
+  // over whichever settings key and registry it's handed.
+  function renderFieldLayoutEditor(hostId, rowClass, settingsKey, defaults, labelsMap, onChange){
+    var host = $("#" + hostId); if (!host) return;
+    var raw = state.settingsDraft[settingsKey];
+    if (raw === undefined) raw = state.settings[settingsKey];
+    var config = parseFieldLayoutConfig(raw, defaults, labelsMap);
+    host.innerHTML = "";
+    config.forEach(function(f){
+      var row = el("li", {class:"emp-row " + rowClass});
+      if (canEdit()){ row.draggable = true; row.dataset.id = f.id; row.classList.add("draggable-row"); }
+      var visChk = el("input", {type:"checkbox"});
+      visChk.checked = f.visible;
+      visChk.disabled = !canEdit();
+      visChk.title = "Afficher";
+      visChk.addEventListener("change", function(){ f.visible = visChk.checked; state.settingsDraft[settingsKey] = JSON.stringify(config); if (onChange) onChange(); });
+      row.appendChild(visChk);
+      row.appendChild(el("span", {class:"emp-name", text: labelsMap[f.id] || f.id}));
+      var widthSel = el("select", {});
+      widthSel.disabled = !canEdit();
+      [["wide","Pleine largeur"], ["narrow","Étroit"]].forEach(function(pair){
+        var opt = el("option", {value:pair[0], text:pair[1]});
+        if (pair[0] === f.width) opt.setAttribute("selected","selected");
+        widthSel.appendChild(opt);
+      });
+      widthSel.addEventListener("change", function(){ f.width = widthSel.value; state.settingsDraft[settingsKey] = JSON.stringify(config); if (onChange) onChange(); });
+      row.appendChild(widthSel);
+      var colorInput = el("input", {type:"color", value: f.color || "#888888"});
+      colorInput.disabled = !canEdit();
+      colorInput.title = "Couleur de fond (optionnelle)";
+      colorInput.addEventListener("input", function(){ f.color = colorInput.value; state.settingsDraft[settingsKey] = JSON.stringify(config); if (onChange) onChange(); });
+      row.appendChild(colorInput);
+      if (f.color){
+        row.appendChild(el("button", {class:"icon-btn edit-only", title:"Retirer la couleur", text:"✕", onclick: function(){
+          f.color = ""; state.settingsDraft[settingsKey] = JSON.stringify(config);
+          renderFieldLayoutEditor(hostId, rowClass, settingsKey, defaults, labelsMap, onChange);
+          if (onChange) onChange();
+        }}));
+      }
+      host.appendChild(row);
+    });
+  }
+  function renderDashboardLayoutEditor(){
+    renderFieldLayoutEditor("dashboardLayoutList", "dashboard-field-row", "dashboardLayout", DASHBOARD_WIDGETS_DEFAULT, DASHBOARD_WIDGET_LABELS);
+  }
+  function currentDossierFieldConfig(){
+    var raw = state.settingsDraft["dossierCardFields"];
+    if (raw === undefined) raw = state.settings["dossierCardFields"];
+    return parseDossierCardFieldConfig(raw);
+  }
+  // Three-column layout: this list is just the reorderable catalogue of
+  // fields (what can be customized) — clicking one selects it for editing
+  // in the detail column, which holds the actual values (visible/width/
+  // color). Kept separate from the generic checkbox+select+color row used
+  // by the Dashboard editor, which the user didn't ask to split up.
+  function renderDossierFieldLayoutList(){
+    var host = $("#dossierFieldLayoutList"); if (!host) return;
+    var config = currentDossierFieldConfig();
+    if (!config.some(function(f){ return f.id === state.dossierFieldLayoutSelectedId; })){
+      state.dossierFieldLayoutSelectedId = config.length ? config[0].id : null;
+    }
+    host.innerHTML = "";
+    config.forEach(function(f){
+      var row = el("li", {class:"emp-row dossier-field-row" + (f.id === state.dossierFieldLayoutSelectedId ? " selected" : "")});
+      if (canEdit()){ row.draggable = true; row.dataset.id = f.id; row.classList.add("draggable-row"); }
+      row.appendChild(el("span", {class:"emp-name", text: DOSSIER_CARD_FIELD_LABELS[f.id] || f.id}));
+      if (!f.visible) row.appendChild(el("span", {class:"field-hidden-badge", text:"masqué"}));
+      row.addEventListener("click", function(){
+        state.dossierFieldLayoutSelectedId = f.id;
+        renderDossierFieldLayoutList();
+        renderDossierFieldDetail();
+      });
+      host.appendChild(row);
+    });
+  }
+  // The detail column: visible/width/color for whichever field is selected
+  // in the list column.
+  function renderDossierFieldDetail(){
+    var host = $("#dossierFieldDetail"); if (!host) return;
+    var config = currentDossierFieldConfig();
+    var f = config.find(function(x){ return x.id === state.dossierFieldLayoutSelectedId; });
+    host.innerHTML = "";
+    if (!f){ host.appendChild(el("p", {class:"chart-sub", text:"Sélectionnez un champ à gauche."})); return; }
+    host.appendChild(el("h4", {text: DOSSIER_CARD_FIELD_LABELS[f.id] || f.id}));
+    function persist(){ state.settingsDraft["dossierCardFields"] = JSON.stringify(config); }
+
+    var visRow = el("div", {class:"settings-row"});
+    visRow.appendChild(el("label", {text:"Afficher ce champ"}));
+    var visChk = el("input", {type:"checkbox"});
+    visChk.checked = f.visible;
+    visChk.disabled = !canEdit();
+    visChk.addEventListener("change", function(){
+      f.visible = visChk.checked; persist();
+      renderDossierFieldLayoutList(); renderDossierCardPreview();
+    });
+    visRow.appendChild(visChk);
+    host.appendChild(visRow);
+
+    var widthRow = el("div", {class:"settings-row"});
+    widthRow.appendChild(el("label", {text:"Largeur"}));
+    var widthSel = el("select", {});
+    widthSel.disabled = !canEdit();
+    [["wide","Pleine largeur"], ["narrow","Étroit"]].forEach(function(pair){
+      var opt = el("option", {value:pair[0], text:pair[1]});
+      if (pair[0] === f.width) opt.setAttribute("selected","selected");
+      widthSel.appendChild(opt);
+    });
+    widthSel.addEventListener("change", function(){ f.width = widthSel.value; persist(); renderDossierCardPreview(); });
+    widthRow.appendChild(widthSel);
+    host.appendChild(widthRow);
+
+    var colorRow = el("div", {class:"settings-row"});
+    colorRow.appendChild(el("label", {text:"Couleur de fond"}));
+    var colorInput = el("input", {type:"color", value: f.color || "#888888"});
+    colorInput.disabled = !canEdit();
+    colorInput.addEventListener("input", function(){ f.color = colorInput.value; persist(); renderDossierCardPreview(); });
+    colorRow.appendChild(colorInput);
+    if (f.color){
+      colorRow.appendChild(el("button", {class:"icon-btn edit-only", title:"Retirer la couleur", text:"✕", onclick: function(){
+        f.color = ""; persist();
+        renderDossierFieldDetail(); renderDossierCardPreview();
+      }}));
+    }
+    host.appendChild(colorRow);
+  }
+  function renderDossierFieldLayoutEditor(){
+    renderDossierFieldLayoutList();
+    renderDossierFieldDetail();
+  }
+  // Read-only live preview of a dossier card inside Settings, using fake
+  // data and the real renderDossierCard() so the preview matches exactly
+  // what Planning will show. All inputs/buttons get disabled on top of
+  // the frame's own pointer-events:none (belt and suspenders — a disabled
+  // native input also can't be tabbed to or focused via JS).
+  function renderDossierCardPreview(){
+    var host = $("#dossierCardPreview"); if (!host) return;
+    var today = new Date().toISOString().slice(0, 10);
+    var previewEndDate = new Date(today); previewEndDate.setDate(previewEndDate.getDate() + 2);
+    var sampleDossier = {
+      id: "__preview__",
+      client: "Client exemple",
+      dossierNumber: "DOS-2026-001",
+      startDate: today,
+      // Spans a few days (not a single-day job) so the "Même équipe tous
+      // les jours" field — hidden for 1-day dossiers — also shows up here.
+      endDate: previewEndDate.toISOString().slice(0, 10),
+      workWeekends: true,
+      sameResourcesAllDays: false,
+      moveType: MOVE_TYPES[0] || "",
+      addressFrom: "Rue du Lac 12, Genève",
+      addressTo: "Avenue de la Gare 4, Lausanne",
+      volume: "25",
+      seller: "AB",
+      coordinator: "CD",
+      plannedEmployees: 3,
+      plannedFourgon: 1,
+      plannedPL: 0,
+      plannedVL: 1,
+      task: "Chargement\nLivraison",
+      comment: "Exemple d'aperçu en direct."
+    };
+    var sampleAssignment = {
+      id: "__preview__", dossierId: "__preview__", date: today,
+      employees: (state.employees||[]).slice(0, 2).map(function(e){ return {employeeId: e.id}; }),
+      vehicleIds: (state.vehicles||[]).slice(0, 1).map(function(v){ return v.id; }),
+      arrivalTime: "07:30", slot: "J"
+    };
+    var fakeConflicts = {employees: [], vehicles: []};
+    var draftRaw = state.settingsDraft["dossierCardFields"];
+    if (draftRaw === undefined) draftRaw = state.settings["dossierCardFields"];
+    var draftConfig = parseDossierCardFieldConfig(draftRaw);
+    host.innerHTML = "";
+    var card = renderDossierCard(sampleDossier, fakeConflicts, today, null, sampleAssignment, draftConfig);
+    card.querySelectorAll("input, select, textarea, button").forEach(function(elm){ elm.disabled = true; });
+    host.appendChild(card);
+  }
+  var resetDossierFieldLayoutBtn = $("#resetDossierFieldLayoutBtn");
+  if (resetDossierFieldLayoutBtn) resetDossierFieldLayoutBtn.addEventListener("click", function(){
+    if (!canEdit()) return;
+    state.settingsDraft["dossierCardFields"] = JSON.stringify(DOSSIER_CARD_FIELDS_DEFAULT);
+    state.dossierFieldLayoutSelectedId = null;
+    renderDossierFieldLayoutEditor();
+    renderDossierCardPreview();
+    toast("Mise en page par défaut rétablie — cliquez Enregistrer pour confirmer");
+  });
+  var resetDashboardLayoutBtn = $("#resetDashboardLayoutBtn");
+  if (resetDashboardLayoutBtn) resetDashboardLayoutBtn.addEventListener("click", function(){
+    if (!canEdit()) return;
+    state.settingsDraft["dashboardLayout"] = JSON.stringify(DASHBOARD_WIDGETS_DEFAULT);
+    renderDashboardLayoutEditor();
+    toast("Mise en page par défaut rétablie — cliquez Enregistrer pour confirmer");
+  });
   var saveSettingsBtn = $("#saveSettingsBtn");
   if (saveSettingsBtn) saveSettingsBtn.addEventListener("click", function(){
     if (!canEdit()) return;
@@ -2280,6 +2731,18 @@ body.has-top-banner .topbar{top:40px}
     });
     document.body.appendChild(pop);
   }
+  // Sum of the "prévu" (forecast) fields across a day's active dossiers —
+  // the week view's headcount/vehicle badges pair this against the actual
+  // assigned count (empCountOn/vehCountOn), the same planned-vs-allocated
+  // comparison resourceMismatchWarnings already does per dossier, just
+  // aggregated for the whole day.
+  function plannedEmpOn(dateStr){
+    return activeDossiersOn(dateStr).reduce(function(sum, d){ return sum + (parseInt(d.plannedEmployees, 10) || 0); }, 0);
+  }
+  function plannedVehOn(dateStr, type){
+    var field = type === "Fourgon" ? "plannedFourgon" : type === "PL" ? "plannedPL" : "plannedVL";
+    return activeDossiersOn(dateStr).reduce(function(sum, d){ return sum + (parseInt(d[field], 10) || 0); }, 0);
+  }
   var WEEK_CHIP_MAX = 6;
   function renderWeekView(){
     var host = $("#weekGrid"); if (!host) return;
@@ -2307,9 +2770,10 @@ body.has-top-banner .topbar{top:40px}
       head.addEventListener("click", function(dateStr){ return function(){ goToDayFromWeek(dateStr); }; }(day.dateStr));
       col.appendChild(head);
       var empMobilized = empCountOn(day.dateStr, null, null);
-      if (empMobilized){
+      var empPlanned = plannedEmpOn(day.dateStr);
+      if (empMobilized || empPlanned){
         var empRow = el("div", {class:"week-day-empcount"}, [
-          el("span", {class:"week-day-empcount-item", text: empMobilized + " pers."})
+          el("span", {class:"week-day-empcount-item", title:"assigné / prévu", text: empMobilized + "/" + empPlanned + " pers."})
         ]);
         col.appendChild(empRow);
       }
@@ -2317,7 +2781,8 @@ body.has-top-banner .topbar{top:40px}
       VEHICLE_TYPES.forEach(function(t){
         if (!vehTotalsByType[t]) return; // skip types with no fleet at all
         var used = vehCountOn(day.dateStr, vehTypeMap, t);
-        vehRow.appendChild(el("span", {class:"week-day-vehcount-item"+(used>vehTotalsByType[t]?" over":""), text: used+"/"+vehTotalsByType[t]+" "+t}));
+        var planned = plannedVehOn(day.dateStr, t);
+        vehRow.appendChild(el("span", {class:"week-day-vehcount-item"+(used>vehTotalsByType[t]?" over":""), title:"assigné / prévu (flotte disponible : "+vehTotalsByType[t]+")", text: used+"/"+planned+" "+t}));
       });
       if (vehRow.childNodes.length) col.appendChild(vehRow);
       if (canEdit()){
@@ -2458,8 +2923,8 @@ body.has-top-banner .topbar{top:40px}
     var totalLabel = (Math.round(total*10)/10).toString().replace(".", ",");
     return "Volume " + dossier.volume + " m³ > capacité des véhicules assignés (" + totalLabel + " m³)";
   }
-  function renderDossierCard(dossier, conflicts, dateStr, orderIndex){
-    var assignment = assignmentFor(dossier.id, dateStr);
+  function renderDossierCard(dossier, conflicts, dateStr, orderIndex, presetAssignment, presetFieldConfig){
+    var assignment = presetAssignment || assignmentFor(dossier.id, dateStr);
     var autoKind = autoDossierKind(dossier);
     // Border-left color now follows the slot (J/A/M); the move type moved up
     // to the full-width header (see typeHeader below), swapping their roles.
@@ -2505,74 +2970,8 @@ body.has-top-banner .topbar{top:40px}
       card.appendChild(el("div", {class:"capacity-warning", text:"🚫 " + msg}));
     });
 
-    var numberField = el("div", {class:"info-field wide", style:"margin-bottom:8px"});
-    numberField.appendChild(el("label", {text:"N° dossier"}));
-    var numberInput = el("input", {value: dossier.dossierNumber || "", placeholder:"N° dossier", style:"text-transform:uppercase"});
-    numberInput.disabled = !canEdit();
-    numberInput.addEventListener("input", function(){
-      var pos = numberInput.selectionStart;
-      numberInput.value = numberInput.value.toUpperCase();
-      try { numberInput.setSelectionRange(pos, pos); } catch(e){}
-    });
-    numberInput.addEventListener("change", function(){ saveDossierMeta(dossier, {dossierNumber: numberInput.value.toUpperCase()}); });
-    numberField.appendChild(numberInput);
-    card.appendChild(numberField);
-    if (dossier.dossierNumber && state.dossiers.some(function(d){ return d.id !== dossier.id && d.dossierNumber === dossier.dossierNumber; })){
-      card.appendChild(el("div", {class:"capacity-warning", text:"⚠ Le N° " + dossier.dossierNumber + " est déjà utilisé par un autre dossier"}));
-    }
-
-    var range = el("div", {class:"date-range"});
-    range.appendChild(el("span", {text:"Du"}));
-    var startInput = el("input", {type:"date", value: dossier.startDate});
-    startInput.disabled = !canEdit();
-    startInput.addEventListener("change", function(){
-      if (startInput.value && startInput.value <= dossier.endDate) saveDossierMeta(dossier, {startDate: startInput.value});
-      else { toast("La date de début doit précéder la fin"); startInput.value = dossier.startDate; }
-    });
-    range.appendChild(startInput);
-    range.appendChild(el("span", {text:"au"}));
-    var endInput = el("input", {type:"date", value: dossier.endDate});
-    endInput.disabled = !canEdit();
-    endInput.addEventListener("change", function(){
-      if (endInput.value && endInput.value >= dossier.startDate) saveDossierMeta(dossier, {endDate: endInput.value});
-      else { toast("La date de fin doit suivre le début"); endInput.value = dossier.endDate; }
-    });
-    range.appendChild(endInput);
-    card.appendChild(range);
-
-    if (canEdit()){
-      var weekendRow = el("label", {class:"copy-all-days"});
-      var weekendChk = el("input", {type:"checkbox"});
-      weekendChk.checked = !!dossier.workWeekends;
-      weekendChk.addEventListener("change", function(){
-        saveDossierMeta(dossier, {workWeekends: weekendChk.checked});
-      });
-      weekendRow.appendChild(weekendChk);
-      weekendRow.appendChild(document.createTextNode("Travail le week-end (compte les samedis/dimanches dans la durée)"));
-      card.appendChild(weekendRow);
-    }
-
-    var slotField = el("div", {class:"info-field wide"});
-    slotField.appendChild(el("label", {text:"Créneau"}));
-    var slotSel = el("select", {class: assignment.slot ? "slot-"+assignment.slot : ""});
-    slotSel.disabled = !canEdit();
-    [["", "—"], ["J","J — JOURNÉE"], ["M","M — MATIN"], ["A","A — APRÈS-MIDI"]].forEach(function(pair){
-      var opt = el("option", {value:pair[0], text:pair[1]});
-      if (pair[0] === (assignment.slot||"")) opt.setAttribute("selected","selected");
-      slotSel.appendChild(opt);
-    });
-    slotSel.addEventListener("change", function(){
-      slotSel.className = slotSel.value ? "slot-"+slotSel.value : "";
-      card.classList.remove("slot-J", "slot-M", "slot-A");
-      if (!autoKind && slotSel.value) card.classList.add("slot-"+slotSel.value);
-      applyDossierBg(card, dossier, Object.assign({}, assignment, {slot: slotSel.value}), autoKind);
-      saveAssignment(assignment, {slot: slotSel.value});
-    });
-    slotField.appendChild(slotSel);
-    card.appendChild(slotField);
-
-    function infoField(labelText, key, placeholder, narrow, wide){
-      var field = el("div", {class:"info-field" + (narrow?" narrow":"") + (wide?" wide":"")});
+    function infoField(labelText, key, placeholder){
+      var field = el("div", {class:"info-field"});
       field.appendChild(el("label", {text:labelText}));
       var input = el("input", {value: dossier[key]||"", placeholder: placeholder||""});
       input.disabled = !canEdit();
@@ -2581,7 +2980,7 @@ body.has-top-banner .topbar{top:40px}
       return field;
     }
     function plannedField(labelText, key){
-      var field = el("div", {class:"info-field narrow"});
+      var field = el("div", {class:"info-field"});
       field.appendChild(el("label", {text:labelText}));
       var input = el("input", {type:"number", min:"0", value: dossier[key] ? String(dossier[key]) : ""});
       input.disabled = !canEdit();
@@ -2609,23 +3008,9 @@ body.has-top-banner .topbar{top:40px}
       field.appendChild(input);
       return field;
     }
-    var addressStack = el("div", {class:"address-stack"});
-    addressStack.appendChild(addressField("Adresse de départ", "addressFrom"));
-    addressStack.appendChild(addressField("Adresse d'arrivée", "addressTo"));
-    card.appendChild(addressStack);
-
-    var infoGrid = el("div", {class:"info-grid"});
-    infoGrid.appendChild(infoField("Volume", "volume", "m³", true));
-    infoGrid.appendChild(infoField("Vendeur", "seller", "Initiales", true));
-    infoGrid.appendChild(infoField("Coordinatrice", "coordinator", "Initiales", true));
-    infoGrid.appendChild(plannedField("Effectif prévu", "plannedEmployees"));
-    infoGrid.appendChild(plannedField("Fourgons prévus", "plannedFourgon"));
-    infoGrid.appendChild(plannedField("PL prévus", "plannedPL"));
-    infoGrid.appendChild(plannedField("VL prévus", "plannedVL"));
-    card.appendChild(infoGrid);
     function autoGrow(ta){ ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; }
     function textareaField(labelText, key, placeholder){
-      var field = el("div", {class:"info-field wide"});
+      var field = el("div", {class:"info-field"});
       field.appendChild(el("label", {text:labelText}));
       var input = el("textarea", {rows:"2", placeholder: placeholder||""});
       input.value = dossier[key]||"";
@@ -2636,61 +3021,183 @@ body.has-top-banner .topbar{top:40px}
       setTimeout(function(){ autoGrow(input); }, 0);
       return field;
     }
-    card.appendChild(textareaField("Tâche à réaliser (une par ligne)", "task", "Ex. chargement, livraison, garde-meuble…"));
-    card.appendChild(textareaField("Commentaire", "comment", "Notes diverses…"));
 
-    var dayFields = el("div", {class:"day-fields"});
-    var timeField = el("div", {class:"info-field narrow"});
-    timeField.appendChild(el("label", {text:"Arrivée sur site"}));
-    var timeInput = el("input", {type:"time", value: assignment.arrivalTime || ""});
-    timeInput.disabled = !canEdit();
-    timeInput.addEventListener("change", function(){ saveAssignment(assignment, {arrivalTime: timeInput.value}); });
-    timeField.appendChild(timeInput);
-    dayFields.appendChild(timeField);
-    card.appendChild(dayFields);
-
-    if (totalDays > 1 && canEdit()){
-      var copyRow = el("label", {class:"copy-all-days"});
-      var copyChk = el("input", {type:"checkbox"});
-      copyChk.checked = !!dossier.sameResourcesAllDays;
-      copyChk.addEventListener("change", function(){
-        saveDossierMeta(dossier, {sameResourcesAllDays: copyChk.checked});
-        if (copyChk.checked) copyAssignmentToAllDays(dossier, assignment, totalDays);
-      });
-      copyRow.appendChild(copyChk);
-      copyRow.appendChild(document.createTextNode("Même équipe et véhicules tous les jours (copie sur les " + totalDays + " jours)"));
-      card.appendChild(copyRow);
-    }
-
-    card.appendChild(el("div", {class:"section-label", text: totalDays>1 ? "Effectif de ce jour" : "Effectif"}));
-    var empChips = el("div", {class:"chips"});
-    (assignment.employees||[]).forEach(function(a){
-      var isConflict = conflicts.employees.indexOf(a.employeeId) !== -1;
-      var chip = el("span", {class:"chip"+(isConflict?" conflict":"")});
-      chip.appendChild(el("span", {text: empName(a.employeeId)}));
-      chip.appendChild(el("button", {class:"edit-only", text:"✕", onclick: function(){
-        var updated = (assignment.employees||[]).filter(function(x){ return x.employeeId !== a.employeeId; });
-        saveAssignment(assignment, {employees: updated});
-      }}));
-      empChips.appendChild(chip);
+    // One renderer per customizable field id (see DOSSIER_CARD_FIELD_LABELS)
+    // — returning null skips the field entirely (e.g. an edit-only toggle
+    // while read-only), same as the fixed blocks used to be wrapped in an
+    // `if` before this became configurable.
+    var FIELD_RENDERERS = {
+      dossierNumber: function(){
+        var field = el("div", {class:"info-field"});
+        field.appendChild(el("label", {text:"N° dossier"}));
+        var numberInput = el("input", {value: dossier.dossierNumber || "", placeholder:"N° dossier", style:"text-transform:uppercase"});
+        numberInput.disabled = !canEdit();
+        numberInput.addEventListener("input", function(){
+          var pos = numberInput.selectionStart;
+          numberInput.value = numberInput.value.toUpperCase();
+          try { numberInput.setSelectionRange(pos, pos); } catch(e){}
+        });
+        numberInput.addEventListener("change", function(){ saveDossierMeta(dossier, {dossierNumber: numberInput.value.toUpperCase()}); });
+        field.appendChild(numberInput);
+        if (dossier.dossierNumber && state.dossiers.some(function(d){ return d.id !== dossier.id && d.dossierNumber === dossier.dossierNumber; })){
+          field.appendChild(el("div", {class:"capacity-warning", text:"⚠ Le N° " + dossier.dossierNumber + " est déjà utilisé par un autre dossier"}));
+        }
+        return field;
+      },
+      dateRange: function(){
+        var field = el("div", {class:"info-field"});
+        var range = el("div", {class:"date-range"});
+        range.appendChild(el("span", {text:"Du"}));
+        var startInput = el("input", {type:"date", value: dossier.startDate});
+        startInput.disabled = !canEdit();
+        startInput.addEventListener("change", function(){
+          if (startInput.value && startInput.value <= dossier.endDate) saveDossierMeta(dossier, {startDate: startInput.value});
+          else { toast("La date de début doit précéder la fin"); startInput.value = dossier.startDate; }
+        });
+        range.appendChild(startInput);
+        range.appendChild(el("span", {text:"au"}));
+        var endInput = el("input", {type:"date", value: dossier.endDate});
+        endInput.disabled = !canEdit();
+        endInput.addEventListener("change", function(){
+          if (endInput.value && endInput.value >= dossier.startDate) saveDossierMeta(dossier, {endDate: endInput.value});
+          else { toast("La date de fin doit suivre le début"); endInput.value = dossier.endDate; }
+        });
+        range.appendChild(endInput);
+        field.appendChild(range);
+        return field;
+      },
+      workWeekends: function(){
+        if (!canEdit()) return null;
+        var weekendRow = el("label", {class:"copy-all-days"});
+        var weekendChk = el("input", {type:"checkbox"});
+        weekendChk.checked = !!dossier.workWeekends;
+        weekendChk.addEventListener("change", function(){ saveDossierMeta(dossier, {workWeekends: weekendChk.checked}); });
+        weekendRow.appendChild(weekendChk);
+        weekendRow.appendChild(document.createTextNode("Travail le week-end (compte les samedis/dimanches dans la durée)"));
+        return weekendRow;
+      },
+      slot: function(){
+        var slotField = el("div", {class:"info-field"});
+        slotField.appendChild(el("label", {text:"Créneau"}));
+        var slotSel = el("select", {class: assignment.slot ? "slot-"+assignment.slot : ""});
+        slotSel.disabled = !canEdit();
+        [["", "—"], ["J","J — JOURNÉE"], ["M","M — MATIN"], ["A","A — APRÈS-MIDI"]].forEach(function(pair){
+          var opt = el("option", {value:pair[0], text:pair[1]});
+          if (pair[0] === (assignment.slot||"")) opt.setAttribute("selected","selected");
+          slotSel.appendChild(opt);
+        });
+        slotSel.addEventListener("change", function(){
+          slotSel.className = slotSel.value ? "slot-"+slotSel.value : "";
+          card.classList.remove("slot-J", "slot-M", "slot-A");
+          if (!autoKind && slotSel.value) card.classList.add("slot-"+slotSel.value);
+          applyDossierBg(card, dossier, Object.assign({}, assignment, {slot: slotSel.value}), autoKind);
+          saveAssignment(assignment, {slot: slotSel.value});
+        });
+        slotField.appendChild(slotSel);
+        return slotField;
+      },
+      addressFrom: function(){ return addressField("Adresse de départ", "addressFrom"); },
+      addressTo: function(){ return addressField("Adresse d'arrivée", "addressTo"); },
+      volume: function(){ return infoField("Volume", "volume", "m³"); },
+      seller: function(){ return infoField("Vendeur", "seller", "Initiales"); },
+      coordinator: function(){ return infoField("Coordinatrice", "coordinator", "Initiales"); },
+      plannedEmployees: function(){ return plannedField("Effectif prévu", "plannedEmployees"); },
+      plannedFourgon: function(){ return plannedField("Fourgons prévus", "plannedFourgon"); },
+      plannedPL: function(){ return plannedField("PL prévus", "plannedPL"); },
+      plannedVL: function(){ return plannedField("VL prévus", "plannedVL"); },
+      task: function(){ return textareaField("Tâche à réaliser (une par ligne)", "task", "Ex. chargement, livraison, garde-meuble…"); },
+      comment: function(){ return textareaField("Commentaire", "comment", "Notes diverses…"); },
+      arrivalTime: function(){
+        var timeField = el("div", {class:"info-field"});
+        timeField.appendChild(el("label", {text:"Arrivée sur site"}));
+        var timeInput = el("input", {type:"time", value: assignment.arrivalTime || ""});
+        timeInput.disabled = !canEdit();
+        timeInput.addEventListener("change", function(){ saveAssignment(assignment, {arrivalTime: timeInput.value}); });
+        timeField.appendChild(timeInput);
+        return timeField;
+      },
+      sameDaysToggle: function(){
+        if (totalDays <= 1 || !canEdit()) return null;
+        var copyRow = el("label", {class:"copy-all-days"});
+        var copyChk = el("input", {type:"checkbox"});
+        copyChk.checked = !!dossier.sameResourcesAllDays;
+        copyChk.addEventListener("change", function(){
+          saveDossierMeta(dossier, {sameResourcesAllDays: copyChk.checked});
+          if (copyChk.checked) copyAssignmentToAllDays(dossier, assignment, totalDays);
+        });
+        copyRow.appendChild(copyChk);
+        copyRow.appendChild(document.createTextNode("Même équipe et véhicules tous les jours (copie sur les " + totalDays + " jours)"));
+        return copyRow;
+      },
+      employeesChips: function(){
+        var wrap = el("div", {});
+        wrap.appendChild(el("div", {class:"section-label", text: totalDays>1 ? "Effectif de ce jour" : "Effectif"}));
+        var empChips = el("div", {class:"chips"});
+        (assignment.employees||[]).forEach(function(a){
+          var isConflict = conflicts.employees.indexOf(a.employeeId) !== -1;
+          var chip = el("span", {class:"chip"+(isConflict?" conflict":"")});
+          chip.appendChild(el("span", {class:"chip-emp-name", text: empName(a.employeeId)}));
+          chip.appendChild(el("button", {class:"edit-only", text:"✕", onclick: function(){
+            var updated = (assignment.employees||[]).filter(function(x){ return x.employeeId !== a.employeeId; });
+            saveAssignment(assignment, {employees: updated});
+          }}));
+          empChips.appendChild(chip);
+        });
+        empChips.appendChild(el("button", {class:"add-chip edit-only", text:"+ Ajouter", onclick: function(ev){ openEmployeePicker(ev.target, assignment); }}));
+        wrap.appendChild(empChips);
+        return wrap;
+      },
+      vehiclesChips: function(){
+        var wrap = el("div", {});
+        wrap.appendChild(el("div", {class:"section-label", text: totalDays>1 ? "Véhicules de ce jour" : "Véhicules"}));
+        var vehChips = el("div", {class:"chips"});
+        (assignment.vehicleIds||[]).forEach(function(vid){
+          var isConflict = conflicts.vehicles.indexOf(vid) !== -1;
+          var chip = el("span", {class:"chip"+(isConflict?" conflict":"")+(isVehPL(vid)?" chip-pl":"")});
+          chip.appendChild(el("span", {text: vehName(vid)}));
+          chip.appendChild(el("button", {class:"edit-only", text:"✕", onclick: function(){
+            var updated = (assignment.vehicleIds||[]).filter(function(x){ return x !== vid; });
+            saveAssignment(assignment, {vehicleIds: updated});
+          }}));
+          vehChips.appendChild(chip);
+        });
+        vehChips.appendChild(el("button", {class:"add-chip edit-only", text:"+ Ajouter", onclick: function(ev){ openVehiclePicker(ev.target, assignment); }}));
+        wrap.appendChild(vehChips);
+        return wrap;
+      }
+    };
+    var fieldsZone = el("div", {class:"dossier-fields-zone"});
+    (presetFieldConfig || getDossierCardFieldConfig()).forEach(function(cfg){
+      if (!cfg.visible) return;
+      var renderer = FIELD_RENDERERS[cfg.id];
+      if (!renderer) return;
+      var node = renderer();
+      if (!node) return;
+      node.classList.add(cfg.width === "narrow" ? "narrow" : "wide");
+      if (cfg.color) {
+        if (node.classList.contains("info-field") || node.querySelector(".section-label")) {
+          // Color only the value-holding control(s) — input/select/
+          // textarea, the chips list, the date range — not the field's
+          // label: "Volume en rouge" should color the number box, not
+          // also the word "VOLUME" above it. A custom color always wins
+          // over a control's own automatic color (slot J/M/A, GM/transit
+          // dépôt address highlighting) — the admin picked it on purpose.
+          node.querySelectorAll("input, select, textarea, .chips, .date-range").forEach(function(ctrl){
+            ctrl.style.background = cfg.color;
+            ctrl.style.borderRadius = "6px";
+          });
+        } else {
+          // "Travail le week-end" / "Même équipe tous les jours" are a bare
+          // checkbox + description, with no separate field-name label to
+          // avoid — color the whole row.
+          node.style.background = cfg.color;
+          node.style.borderRadius = "6px";
+          node.style.padding = "4px 6px";
+        }
+      }
+      fieldsZone.appendChild(node);
     });
-    empChips.appendChild(el("button", {class:"add-chip edit-only", text:"+ Ajouter", onclick: function(ev){ openEmployeePicker(ev.target, assignment); }}));
-    card.appendChild(empChips);
-
-    card.appendChild(el("div", {class:"section-label", text: totalDays>1 ? "Véhicules de ce jour" : "Véhicules"}));
-    var vehChips = el("div", {class:"chips"});
-    (assignment.vehicleIds||[]).forEach(function(vid){
-      var isConflict = conflicts.vehicles.indexOf(vid) !== -1;
-      var chip = el("span", {class:"chip"+(isConflict?" conflict":"")+(isVehPL(vid)?" chip-pl":"")});
-      chip.appendChild(el("span", {text: vehName(vid)}));
-      chip.appendChild(el("button", {class:"edit-only", text:"✕", onclick: function(){
-        var updated = (assignment.vehicleIds||[]).filter(function(x){ return x !== vid; });
-        saveAssignment(assignment, {vehicleIds: updated});
-      }}));
-      vehChips.appendChild(chip);
-    });
-    vehChips.appendChild(el("button", {class:"add-chip edit-only", text:"+ Ajouter", onclick: function(ev){ openVehiclePicker(ev.target, assignment); }}));
-    card.appendChild(vehChips);
+    card.appendChild(fieldsZone);
 
     var foot = el("div", {class:"dossier-foot"});
     foot.appendChild(el("button", {class:"link-btn history-btn", text:"Historique", onclick: function(ev){ openHistoryPopover(ev.target, dossier); }}));
@@ -3084,10 +3591,10 @@ body.has-top-banner .topbar{top:40px}
     wrap.appendChild(ul);
     return wrap;
   }
-  function renderPrintCard(dossier, dateStr){
+  function renderPrintCard(dossier, dateStr, orderIndex){
     var assignment = assignmentFor(dossier.id, dateStr);
     var card = el("div", {class:"print-card"});
-    card.appendChild(el("h3", {text: (dossier.dossierNumber ? dossier.dossierNumber + " — " : "") + (dossier.client || "Client")}));
+    card.appendChild(el("h3", {text: (orderIndex ? orderIndex + ". " : "") + (dossier.dossierNumber ? dossier.dossierNumber + " — " : "") + (dossier.client || "Client")}));
     card.appendChild(printField("N° dossier", dossier.dossierNumber));
     card.appendChild(printField("Départ", dossier.addressFrom));
     card.appendChild(printField("Arrivée", dossier.addressTo));
@@ -3122,7 +3629,7 @@ body.has-top-banner .topbar{top:40px}
         var page = el("div", {class:"print-page"});
         page.appendChild(el("div", {class:"print-title", text:titleText}));
         var grid = el("div", {class:"print-grid"});
-        chunk.forEach(function(dossier){ grid.appendChild(renderPrintCard(dossier, state.selectedDate)); });
+        chunk.forEach(function(dossier){ grid.appendChild(renderPrintCard(dossier, state.selectedDate, clientOrderIndex(dossiersToday, dossier))); });
         page.appendChild(grid);
         area.appendChild(page);
       }
@@ -3259,13 +3766,65 @@ body.has-top-banner .topbar{top:40px}
   if (exportWeekPdfBtn) exportWeekPdfBtn.addEventListener("click", exportWeekPdf);
 
   // ---------- Disponibilités ----------
+  // Width of the sticky name column shared by both Gantt-style "dispo"
+  // tables (Effectifs/Véhicules and Vacances & Garage) — dragged via the
+  // handle on the header cell, applied as a CSS var so every cell in the
+  // column (header + body, both tables) stays in sync, and remembered per
+  // device so it doesn't reset every time the table re-renders.
+  var DISPO_NAME_COL_KEY = "pe_dispo_name_col_width_v1";
+  function getDispoNameColWidth(){
+    try {
+      var v = parseInt(localStorage.getItem(DISPO_NAME_COL_KEY), 10);
+      if (v >= 80 && v <= 500) return v;
+    } catch (err) { /* localStorage unavailable — fall back to the default */ }
+    return 180;
+  }
+  function applyDispoNameColWidth(px){
+    document.documentElement.style.setProperty("--dispo-name-col-width", Math.round(px) + "px");
+  }
+  function persistDispoNameColWidth(px){
+    try { localStorage.setItem(DISPO_NAME_COL_KEY, String(Math.round(Math.max(80, Math.min(500, px))))); } catch (err) { /* ignore */ }
+  }
+  function attachDispoColumnResize(th){
+    var handle = el("div", {class:"dispo-resize-handle", title:"Glisser pour redimensionner la colonne"});
+    th.appendChild(handle);
+    var startX, startWidth, current;
+    function onMove(ev){
+      var x = ev.touches ? ev.touches[0].clientX : ev.clientX;
+      current = Math.max(80, Math.min(500, startWidth + (x - startX)));
+      applyDispoNameColWidth(current);
+    }
+    function onUp(){
+      handle.classList.remove("dragging");
+      if (current != null) persistDispoNameColWidth(current);
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.removeEventListener("touchmove", onMove);
+      document.removeEventListener("touchend", onUp);
+    }
+    function onDown(ev){
+      ev.preventDefault();
+      handle.classList.add("dragging");
+      startX = ev.touches ? ev.touches[0].clientX : ev.clientX;
+      startWidth = th.getBoundingClientRect().width;
+      current = null;
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+      document.addEventListener("touchmove", onMove, {passive:false});
+      document.addEventListener("touchend", onUp);
+    }
+    handle.addEventListener("mousedown", onDown);
+    handle.addEventListener("touchstart", onDown, {passive:false});
+  }
   function renderAvailability(){
     var host = $("#dispoTableHost");
     var year = state.cursor.getFullYear(), month = state.cursor.getMonth();
     var nDays = new Date(year, month+1, 0).getDate();
     var table = el("table", {class:"dispo"});
     var thead = el("thead"); var headRow = el("tr");
-    headRow.appendChild(el("th", {class:"dispo-name-col", text: MONTHS_FR[month]+" "+year}));
+    var nameTh = el("th", {class:"dispo-name-col", text: MONTHS_FR[month]+" "+year});
+    attachDispoColumnResize(nameTh);
+    headRow.appendChild(nameTh);
     for (var d=1; d<=nDays; d++){
       var dow = new Date(year,month,d).getDay(); var isWeekend = dow===0||dow===6;
       var th = el("th", {class:"dispo-daycol"+(isWeekend?" weekend":"")});
@@ -3341,6 +3900,17 @@ body.has-top-banner .topbar{top:40px}
     });
     return arr;
   }
+  function volumeByMonth(year, type){
+    var arr = new Array(12).fill(0);
+    for (var m=0; m<12; m++){
+      var b = monthBounds(year, m);
+      state.dossiers.forEach(function(d){
+        if (d.startDate <= b.end && d.endDate >= b.start && (!type || d.moveType === type)) arr[m] += parseFloat(d.volume) || 0;
+      });
+      arr[m] = Math.round(arr[m]*10)/10;
+    }
+    return arr;
+  }
   function vehDaysByMonth(year, type){
     var arr = new Array(12).fill(0);
     var vehTypeMap = {}; state.vehicles.forEach(function(v){ vehTypeMap[v.id] = v.type; });
@@ -3365,7 +3935,9 @@ body.has-top-banner .topbar{top:40px}
       resThisEmp: empDaysByMonth(thisYear, empCompany),
       resLastEmp: empDaysByMonth(lastYear, empCompany),
       resThisVeh: vehDaysByMonth(thisYear, vehType),
-      resLastVeh: vehDaysByMonth(lastYear, vehType)
+      resLastVeh: vehDaysByMonth(lastYear, vehType),
+      volThis: volumeByMonth(thisYear, dossierType),
+      volLast: volumeByMonth(lastYear, dossierType)
     };
   }
   function todayStats(){
@@ -3457,38 +4029,121 @@ body.has-top-banner .topbar{top:40px}
     });
     return Object.keys(set).length;
   }
-  function renderWeekTable(){
+  // Same calendar date one year back (29 Feb falls back to 28 Feb) — the
+  // Dashboard's "comparatif" columns compare a period to the same dates
+  // last year, not to the prior period.
+  function dateMinusYear(dateStr){
+    var d = parseDate(dateStr);
+    var year = d.getFullYear() - 1, month = d.getMonth(), day = d.getDate();
+    var daysInMonth = new Date(year, month+1, 0).getDate();
+    if (day > daysInMonth) day = daysInMonth;
+    return fmtDate(new Date(year, month, day));
+  }
+  function shiftDatesByYear(dateStrs){ return dateStrs.map(dateMinusYear); }
+  // Dedup-across-dates versions of dossierCountOn/empCountOn/vehCountOn —
+  // used wherever a Dashboard column spans more than one day (a week, a
+  // month, or their year-ago comparatif), so a multi-day dossier or a
+  // resource used on several of those days only counts once.
+  function dossierCountOverDates(dateStrs, moveType){
+    var set = {};
+    dateStrs.forEach(function(ds){
+      activeDossiersOn(ds).forEach(function(d){ if (!moveType || d.moveType === moveType) set[d.id] = 1; });
+    });
+    return Object.keys(set).length;
+  }
+  function empCountOverDates(dateStrs, empCompanyMap, company){
+    var set = {};
+    dateStrs.forEach(function(ds){
+      activeDossiersOn(ds).forEach(function(d){
+        var a = assignmentFor(d.id, ds);
+        (a.employees||[]).forEach(function(x){ if (!company || empCompanyMap[x.employeeId]===company) set[x.employeeId]=1; });
+      });
+    });
+    return Object.keys(set).length;
+  }
+  function vehCountOverDates(dateStrs, vehTypeMap, type){
+    var set = {};
+    dateStrs.forEach(function(ds){
+      activeDossiersOn(ds).forEach(function(d){
+        var a = assignmentFor(d.id, ds);
+        (a.vehicleIds||[]).forEach(function(vid){ if (!type || vehTypeMap[vid]===type) set[vid]=1; });
+      });
+    });
+    return Object.keys(set).length;
+  }
+  function dossierCountsByTypeOverDates(dateStrs){
+    var set = {};
+    dateStrs.forEach(function(ds){ activeDossiersOn(ds).forEach(function(d){ set[d.id] = d; }); });
+    var counts = {};
+    PLANNING_FILTER_TYPES.forEach(function(t){ counts[t.key] = 0; });
+    Object.keys(set).forEach(function(id){
+      var key = planningFilterKey(set[id]);
+      counts[key] = (counts[key]||0) + 1;
+    });
+    return counts;
+  }
+  // Columns for the mobilization table, shaped by the Dashboard's Jour/
+  // Semaine/Mois toggle: the "native" breakdown for that period (1 day, the
+  // 7 days of the week, or the whole month as one aggregate), plus one
+  // trailing "comparatif" column for the same dates last year.
+  function mobilizationColumns(){
+    var mode = state.dashboardViewMode, todayStr = state.selectedDate;
+    if (mode === "week"){
+      var weekDates = getWeekDates(todayStr);
+      var cols = weekDates.map(function(ds){
+        var d = parseDate(ds);
+        return {
+          label: DOW_FR[d.getDay()===0?6:d.getDay()-1],
+          sublabel: String(d.getDate())+" "+MONTHS_SHORT_FR[d.getMonth()],
+          dates: [ds], isToday: ds===todayStr, compare:false
+        };
+      });
+      cols.push({label:"Même semaine", sublabel:"l'an dernier", dates: shiftDatesByYear(weekDates), isToday:false, compare:true});
+      return cols;
+    }
+    if (mode === "month"){
+      var monthDates = getMonthDates(todayStr), d0 = parseDate(todayStr);
+      return [
+        {label: MONTHS_FR[d0.getMonth()], sublabel:String(d0.getFullYear()), dates: monthDates, isToday:false, compare:false},
+        {label:"Même mois", sublabel:"l'an dernier", dates: shiftDatesByYear(monthDates), isToday:false, compare:true}
+      ];
+    }
+    var d = parseDate(todayStr);
+    return [
+      {label: DOW_FR[d.getDay()===0?6:d.getDay()-1], sublabel:String(d.getDate())+" "+MONTHS_SHORT_FR[d.getMonth()], dates:[todayStr], isToday:true, compare:false},
+      {label:"Même jour", sublabel:"l'an dernier", dates:[dateMinusYear(todayStr)], isToday:false, compare:true}
+    ];
+  }
+  function renderMobilizationTable(){
     var host = $("#dashWeekTable");
-    var weekDates = getWeekDates(state.selectedDate);
-    var todayStr = state.selectedDate;
+    var cols = mobilizationColumns();
     var empCompanyMap = {}; state.employees.forEach(function(e){ empCompanyMap[e.id] = e.company; });
     var vehTypeMap = {}; state.vehicles.forEach(function(v){ vehTypeMap[v.id] = v.type; });
     var table = el("table", {class:"week-table"});
     var thead = el("thead"); var headRow = el("tr");
     headRow.appendChild(el("th", {text:""}));
-    weekDates.forEach(function(ds){
-      var d = parseDate(ds);
-      var th = el("th", {class: ds===todayStr ? "week-today" : ""});
-      th.appendChild(document.createTextNode(DOW_FR[d.getDay()===0?6:d.getDay()-1]));
-      th.appendChild(el("div", {class:"week-daynum", text:String(d.getDate())+" "+MONTHS_SHORT_FR[d.getMonth()]}));
+    cols.forEach(function(col){
+      var th = el("th", {class: (col.isToday ? "week-today" : "") + (col.compare ? " week-compare-col" : "")});
+      th.appendChild(document.createTextNode(col.label));
+      th.appendChild(el("div", {class:"week-daynum", text: col.sublabel}));
       headRow.appendChild(th);
     });
     thead.appendChild(headRow); table.appendChild(thead);
     var tbody = el("tbody");
-    var groups = [{label:"Chantiers", fn:function(ds){ return dossierCountOn(ds); }, sub:false, kind:"dossiers"}];
-    MOVE_TYPES.forEach(function(t){ groups.push({label:"— "+t, fn:function(ds){ return dossierCountOn(ds, t); }, sub:true}); });
-    groups.push({label:"Effectif mobilisé", fn:function(ds){ return empCountOn(ds, empCompanyMap); }, sub:false, kind:"emp"});
-    getCompanies().forEach(function(co){ groups.push({label:"— "+co.name, fn:function(ds){ return empCountOn(ds, empCompanyMap, co.id); }, sub:true}); });
-    groups.push({label:"Véhicules mobilisés", fn:function(ds){ return vehCountOn(ds, vehTypeMap); }, sub:false, kind:"veh"});
-    VEHICLE_TYPES.forEach(function(t){ groups.push({label:"— "+t, fn:function(ds){ return vehCountOn(ds, vehTypeMap, t); }, sub:true}); });
+    var groups = [{label:"Chantiers", fn:function(dates){ return dossierCountOverDates(dates); }, sub:false, kind:"dossiers"}];
+    MOVE_TYPES.forEach(function(t){ groups.push({label:"— "+t, fn:function(dates){ return dossierCountOverDates(dates, t); }, sub:true}); });
+    groups.push({label:"Effectif mobilisé", fn:function(dates){ return empCountOverDates(dates, empCompanyMap); }, sub:false, kind:"emp"});
+    getCompanies().forEach(function(co){ groups.push({label:"— "+co.name, fn:function(dates){ return empCountOverDates(dates, empCompanyMap, co.id); }, sub:true}); });
+    groups.push({label:"Véhicules mobilisés", fn:function(dates){ return vehCountOverDates(dates, vehTypeMap); }, sub:false, kind:"veh"});
+    VEHICLE_TYPES.forEach(function(t){ groups.push({label:"— "+t, fn:function(dates){ return vehCountOverDates(dates, vehTypeMap, t); }, sub:true}); });
     groups.forEach(function(r){
       var row = el("tr", {class: (r.sub ? "week-sub" : "week-main") + (r.kind ? " week-row-"+r.kind : "")});
       row.appendChild(el("td", {class:"week-metric-label", text:r.label}));
-      weekDates.forEach(function(ds){
-        var td = el("td", {class: ds===todayStr ? "week-today" : "", text:String(r.fn(ds))});
-        if (!r.sub){
+      cols.forEach(function(col){
+        var td = el("td", {class: (col.isToday ? "week-today " : "") + (col.compare ? "week-compare-col" : ""), text:String(r.fn(col.dates))});
+        if (!r.sub && col.dates.length === 1){
           td.style.cursor = "pointer";
-          td.addEventListener("click", function(ds){ return function(){ state.selectedDate = ds; state.vgSelectedDate = ds; setTab("planning"); renderCalendar(); renderDayPanel(); renderVgCalendar(); renderVgDayPanel(); }; }(ds));
+          td.addEventListener("click", function(ds){ return function(){ state.selectedDate = ds; state.vgSelectedDate = ds; setTab("planning"); renderCalendar(); renderDayPanel(); renderVgCalendar(); renderVgDayPanel(); }; }(col.dates[0]));
         }
         row.appendChild(td);
       });
@@ -3557,31 +4212,26 @@ body.has-top-banner .topbar{top:40px}
   }
   function renderTypeDistribution(){
     var host = $("#dashTypeDistribution"); if (!host) return;
-    var year = state.cursor.getFullYear(), month = state.cursor.getMonth();
-    $("#dashTypeMonthLabel").textContent = MONTHS_FR[month] + " " + year;
-    var nDays = new Date(year, month+1, 0).getDate();
-    var counts = {};
-    PLANNING_FILTER_TYPES.forEach(function(t){ counts[t.key] = 0; });
-    for (var day = 1; day <= nDays; day++){
-      activeDossiersOn(fmtDate(new Date(year, month, day))).forEach(function(d){
-        var key = planningFilterKey(d);
-        counts[key] = (counts[key] || 0) + 1;
-      });
-    }
+    var mode = state.dashboardViewMode, todayStr = state.selectedDate;
+    var dateStrs = mode === "week" ? getWeekDates(todayStr) : mode === "month" ? getMonthDates(todayStr) : [todayStr];
+    $("#dashTypeMonthLabel").textContent = dashboardStats().dateStr;
+    var counts = dossierCountsByTypeOverDates(dateStrs);
+    var lastYearCounts = dossierCountsByTypeOverDates(shiftDatesByYear(dateStrs));
     var max = Math.max.apply(null, [1].concat(Object.keys(counts).map(function(k){ return counts[k]; })));
     host.innerHTML = "";
     PLANNING_FILTER_TYPES.forEach(function(t){
-      var count = counts[t.key] || 0;
+      var count = counts[t.key] || 0, lastYearCount = lastYearCounts[t.key] || 0;
       var row = el("div", {class:"type-dist-row"});
       row.appendChild(el("div", {class:"type-dist-label", text:t.label}));
       var barWrap = el("div", {class:"type-dist-bar-wrap"});
       barWrap.appendChild(el("div", {class:"type-dist-bar", style:"width:" + Math.round(count/max*100) + "%;background:" + t.color}));
       row.appendChild(barWrap);
-      row.appendChild(el("div", {class:"type-dist-count", text:String(count)}));
+      row.appendChild(el("div", {class:"type-dist-count", text: count + " (vs " + lastYearCount + " l'an dernier)"}));
       host.appendChild(row);
     });
   }
   function renderDashboard(){
+    applyDashboardLayout();
     var d = computeDashboardData(dashFilters.dossiers, dashFilters.employees, dashFilters.vehicles);
     var t = dashboardStats();
     var periodLabels = {day:"Aujourd'hui", week:"Cette semaine", month:"Ce mois"};
@@ -3594,9 +4244,11 @@ body.has-top-banner .topbar{top:40px}
     $("#dashViewDayBtn").classList.toggle("active", state.dashboardViewMode === "day");
     $("#dashViewWeekBtn").classList.toggle("active", state.dashboardViewMode === "week");
     $("#dashViewMonthBtn").classList.toggle("active", state.dashboardViewMode === "month");
-    renderWeekTable();
+    var mobilizationTitles = {day:"Aujourd'hui", week:"Cette semaine", month:"Ce mois"};
+    $("#dashMobilizationTitle").textContent = mobilizationTitles[state.dashboardViewMode] || mobilizationTitles.day;
+    renderMobilizationTable();
     renderTypeDistribution();
-    $("#dashYearLabels").textContent = "Cette année (" + d.thisYear + ") comparée à l'année précédente (" + d.lastYear + ")";
+    $all(".dash-year-caption").forEach(function(el){ el.textContent = "Cette année (" + d.thisYear + ") comparée à l'année précédente (" + d.lastYear + ")"; });
     renderTypeFilter("filterDossiers", "dossiers", dossierFilterOptions());
     renderTypeFilter("filterEmployees", "employees", companyFilterOptions());
     renderTypeFilter("filterVehicles", "vehicles", vehicleFilterOptions());
@@ -3609,6 +4261,9 @@ body.has-top-banner .topbar{top:40px}
     renderGroupedBarChart("dashChartVehicles", MONTHS_SHORT_FR,
       {name:String(d.thisYear), values:d.resThisVeh, color:"var(--accent)"},
       {name:String(d.lastYear), values:d.resLastVeh, color:"var(--fg-muted)"});
+    renderGroupedBarChart("dashChartVolume", MONTHS_SHORT_FR,
+      {name:String(d.thisYear), values:d.volThis, color:"var(--accent)"},
+      {name:String(d.lastYear), values:d.volLast, color:"var(--fg-muted)"});
   }
 
   // ---------- Effectifs ----------
@@ -3975,6 +4630,88 @@ body.has-top-banner .topbar{top:40px}
     }).catch(function(){ restoreBtn.disabled = false; toast("Erreur réseau"); });
   });
 
+  var legacyImportAnalyzeBtn = $("#legacyImportAnalyzeBtn");
+  function renderLegacyImportSummary(summary, forCommit){
+    var box = $("#legacyImportSummary");
+    var warningsHtml = "";
+    if (summary.warnings && summary.warnings.length){
+      warningsHtml = "<p style='margin:10px 0 4px;font-weight:700;font-size:12px'>Avertissements (" + summary.warnings.length + ") — à vérifier après import :</p>" +
+        "<ul style='margin:0 0 10px;padding-left:18px;font-size:12px;color:var(--fg-muted);max-height:160px;overflow:auto'>" +
+        summary.warnings.slice(0, 30).map(function(w){ return "<li>" + escapeHtml(w) + "</li>"; }).join("") +
+        (summary.warnings.length > 30 ? "<li>… et " + (summary.warnings.length - 30) + " autre(s).</li>" : "") +
+        "</ul>";
+    }
+    box.innerHTML =
+      "<ul class='emp-list'>" +
+      "<li>" + summary.employeesToCreate + " employé(s) à créer</li>" +
+      "<li>" + summary.vehiclesToCreate + " véhicule(s) à créer</li>" +
+      "<li>" + summary.dossiersToCreate + " dossier(s) à créer (" + summary.assignmentsToCreate + " affectations)</li>" +
+      (summary.dossiersSkippedAlreadyPresent ? "<li>" + summary.dossiersSkippedAlreadyPresent + " dossier(s) déjà présents, ignorés</li>" : "") +
+      "</ul>" + warningsHtml +
+      (forCommit ? "<button class='btn' id='legacyImportCommitBtn' style='margin-top:6px'>Confirmer l'import</button>" : "");
+  }
+  if (legacyImportAnalyzeBtn) legacyImportAnalyzeBtn.addEventListener("click", function(){
+    var input = $("#legacyImportFileInput");
+    var file = input.files && input.files[0];
+    if (!file) return toast("Choisissez d'abord un fichier .xlsx ou .xlsm");
+    legacyImportAnalyzeBtn.disabled = true;
+    $("#legacyImportSummary").innerHTML = "<p class='chart-sub'>Analyse en cours…</p>";
+    fetch("/api/admin/legacy-import", {
+      method: "POST",
+      headers: {"X-Auth-Token": state.token, "Content-Type": "application/octet-stream"},
+      body: file
+    }).then(function(r){ return r.json(); }).then(function(res){
+      legacyImportAnalyzeBtn.disabled = false;
+      if (!res.ok) { $("#legacyImportSummary").innerHTML = ""; return toast("Analyse impossible (fichier invalide ?)"); }
+      renderLegacyImportSummary(res.summary, true);
+      var commitBtn = $("#legacyImportCommitBtn");
+      if (commitBtn) commitBtn.addEventListener("click", function(){
+        if (!confirm("Créer " + res.summary.employeesToCreate + " employé(s), " + res.summary.vehiclesToCreate + " véhicule(s) et " + res.summary.dossiersToCreate + " dossier(s) ? C'est temporaire : un bouton \"Annuler\" permettra de tout effacer d'un coup ensuite. Continuer ?")) return;
+        commitBtn.disabled = true;
+        fetch("/api/admin/legacy-import?commit=1", {
+          method: "POST",
+          headers: {"X-Auth-Token": state.token, "Content-Type": "application/octet-stream"},
+          body: file
+        }).then(function(r){ return r.json(); }).then(function(res2){
+          if (!res2.ok) { commitBtn.disabled = false; return toast("Import impossible"); }
+          toast("Import terminé — utilisez \"Annuler\" ci-dessous pour tout effacer si besoin.");
+          $("#legacyImportSummary").innerHTML = "";
+          input.value = "";
+          renderLegacyImportBatches();
+        }).catch(function(){ commitBtn.disabled = false; toast("Erreur réseau"); });
+      });
+    }).catch(function(){ legacyImportAnalyzeBtn.disabled = false; toast("Erreur réseau"); });
+  });
+  function renderLegacyImportBatches(){
+    var box = $("#legacyImportBatches");
+    if (!box || state.role !== "admin") return;
+    api("legacyImportBatches").then(function(res){
+      if (!res || !res.ok || !res.batches || !res.batches.length) { box.innerHTML = ""; return; }
+      box.innerHTML = "<p style='font-size:11px;font-weight:700;text-transform:uppercase;color:var(--fg-muted);margin:0 0 6px'>Imports précédents</p>" +
+        "<ul class='emp-list'>" + res.batches.map(function(b){
+          var d = new Date(b.createdAt);
+          var when = d.toLocaleDateString("fr-CH") + " " + d.toLocaleTimeString("fr-CH", {hour:"2-digit", minute:"2-digit"});
+          var desc = b.summary.dossiersToCreate + " dossier(s), " + b.summary.employeesToCreate + " employé(s), " + b.summary.vehiclesToCreate + " véhicule(s)";
+          return "<li style='display:flex;justify-content:space-between;align-items:center;gap:8px'>" +
+            "<span>" + escapeHtml(when) + " — " + escapeHtml(desc) + (b.undoneAt ? " <em>(annulé)</em>" : "") + "</span>" +
+            (b.undoneAt ? "" : "<button class='btn edit-only' data-undo-batch='" + b.id + "' style='flex:0 0 auto'>Annuler</button>") +
+            "</li>";
+        }).join("") + "</ul>";
+      $all("[data-undo-batch]", box).forEach(function(btn){
+        btn.addEventListener("click", function(){
+          var id = btn.dataset.undoBatch;
+          if (!confirm("Supprimer tout ce que cet import a créé (employés, véhicules, dossiers et leurs affectations) ? Une sauvegarde est prise avant, mais cette action modifie la base immédiatement.")) return;
+          btn.disabled = true;
+          api("undoLegacyImportBatch", {id: id}).then(function(res2){
+            if (!res2.ok) { btn.disabled = false; return toast(res2.error === "already_undone" ? "Déjà annulé" : "Annulation impossible"); }
+            toast("Import annulé");
+            renderLegacyImportBatches();
+          }).catch(function(){ btn.disabled = false; toast("Erreur réseau"); });
+        });
+      });
+    }).catch(function(){});
+  }
+
   // ---------- drag & drop reordering ----------
   var NO_DRAG_TAGS = ["INPUT", "SELECT", "TEXTAREA", "BUTTON", "A"];
   function getDragAfterElement(list, itemSelector, pos, horizontal){
@@ -4048,6 +4785,21 @@ body.has-top-banner .topbar{top:40px}
       persistReorder(ids, byId, function(item, patch){
         api("saveVehicle", {item: Object.assign({}, item, patch)}).then(function(res){ if (res.ok) refreshAll(); });
       }, "order");
+    }, false);
+    enableDragReorder($("#dossierFieldLayoutList"), ".dossier-field-row", "#dossierFieldLayoutList", function(r){ return r.dataset.id; }, function(ids){
+      var raw = state.settingsDraft["dossierCardFields"];
+      if (raw === undefined) raw = state.settings["dossierCardFields"];
+      var byId = {}; parseDossierCardFieldConfig(raw).forEach(function(f){ byId[f.id] = f; });
+      var reordered = ids.map(function(id){ return byId[id]; }).filter(Boolean);
+      state.settingsDraft["dossierCardFields"] = JSON.stringify(reordered);
+      renderDossierCardPreview();
+    }, false);
+    enableDragReorder($("#dashboardLayoutList"), ".dashboard-field-row", "#dashboardLayoutList", function(r){ return r.dataset.id; }, function(ids){
+      var raw = state.settingsDraft["dashboardLayout"];
+      if (raw === undefined) raw = state.settings["dashboardLayout"];
+      var byId = {}; parseDashboardWidgetConfig(raw).forEach(function(f){ byId[f.id] = f; });
+      var reordered = ids.map(function(id){ return byId[id]; }).filter(Boolean);
+      state.settingsDraft["dashboardLayout"] = JSON.stringify(reordered);
     }, false);
   }
 
@@ -4212,39 +4964,145 @@ body.has-top-banner .topbar{top:40px}
     if (zenAudio.playing) zenAudio.nodes.master.gain.value = (zenVolume.value/100) * 0.15;
   });
 
+  // ---------- Détente : sélection du jeu ----------
+  // Which of the two games is currently shown inside the Détente tab (or
+  // null for the picker menu) — lets each game's own keydown handler know
+  // whether it's the one actually on screen, and lets setTab pause
+  // whichever one is running without needing to know which it is.
+  var detenteActive = null;
+  function detenteStopActive(){
+    if (detenteActive === "arcade" && arc.running){ arc.running = false; cancelAnimationFrame(arc.rafId); }
+    if (detenteActive === "tetris" && tet.running){ tet.running = false; cancelAnimationFrame(tet.rafId); }
+  }
+  function detenteBestScore(key){
+    try { return parseInt(localStorage.getItem(key) || "0", 10) || 0; } catch (err) { return 0; }
+  }
+  function detenteShowMenu(){
+    detenteStopActive();
+    detenteActive = null;
+    $("#detenteMenu").hidden = false;
+    $("#detenteArcadeScreen").hidden = true;
+    $("#detenteTetrisScreen").hidden = true;
+    $("#detenteArcBest").textContent = String(detenteBestScore("pe_arcanoid_best"));
+    $("#detenteTetrisBest").textContent = String(detenteBestScore("pe_tetris_best"));
+  }
+  function detenteShowGame(name){
+    detenteStopActive();
+    detenteActive = name;
+    $("#detenteMenu").hidden = true;
+    $("#detenteArcadeScreen").hidden = name !== "arcade";
+    $("#detenteTetrisScreen").hidden = name !== "tetris";
+    if (name === "arcade") arcStart(); else if (name === "tetris") tetStart();
+  }
+  $all("[data-game]").forEach(function(btn){
+    btn.addEventListener("click", function(){ detenteShowGame(btn.dataset.game); });
+  });
+  var arcBackBtn = $("#arcBackBtn"); if (arcBackBtn) arcBackBtn.addEventListener("click", detenteShowMenu);
+  var tetrisBackBtn = $("#tetrisBackBtn"); if (tetrisBackBtn) tetrisBackBtn.addEventListener("click", detenteShowMenu);
+
   // ---------- Détente : casse-briques ----------
-  var ARC_ROWS = 5, ARC_COLS = 9;
+  // ARC_MAX_LEVEL procedurally-generated brick layouts, Arkanoid-style —
+  // clearing one advances to the next (same score/lives) instead of ending
+  // the game; clearing the last one does end it. With 200 of them, levels
+  // are generated from a formula (shape + row count + brick toughness, all
+  // functions of the level number) rather than hand-drawn one by one — the
+  // same level number always reproduces the same layout, but consecutive
+  // levels vary enough not to feel identical.
+  var ARC_ROWS = 5, ARC_COLS = 9, ARC_MAX_LEVEL = 200;
   var ARC_COLORS = ["#c1443a","#c98a1b","#2f9e5c","#3467b8","#7a4fc4"];
+  var ARC_TOUGH_SHADES = ["#5a5f66","#8a8f96","#c3c7cc"]; // darkest = most hits left
   var arc = {
-    canvas:null, ctx:null, running:false, rafId:null,
+    canvas:null, ctx:null, running:false, over:false, rafId:null, level:1,
     paddle:{x:300, w:90, h:12, speed:7},
     ball:{x:350, y:300, r:7, dx:0, dy:0, launched:false},
     bricks:[], score:0, lives:3, best:0, keys:{left:false, right:false}
   };
+  // A handful of named shapes, cycled every 5 levels (same shape, growing
+  // row count / toughness) so the set of 200 feels like a long, varied
+  // campaign instead of 200 near-identical screens.
+  var ARC_SHAPES = [
+    function full(){ return true; },
+    function checkerboard(r, c){ return (r + c) % 2 === 0; },
+    function pyramid(r, c, rows, cols){ return c >= r && c <= cols - 1 - r; },
+    function diamond(r, c, rows, cols){
+      var midR = (rows - 1) / 2, midC = (cols - 1) / 2;
+      return Math.abs(r - midR) + Math.abs(c - midC) <= Math.max(midR, midC);
+    },
+    function columns(r, c){ return c % 3 !== 1; },
+    function stripes(r){ return r % 2 === 0; },
+    function frame(r, c, rows, cols){ return r === 0 || r === rows - 1 || c === 0 || c === cols - 1; },
+    function cross(r, c, rows, cols){ return r === Math.floor(rows / 2) || c === Math.floor(cols / 2); }
+  ];
+  function arcRowsForLevel(level){
+    return Math.min(ARC_ROWS + 6, ARC_ROWS + Math.floor((level - 1) / 25));
+  }
+  function arcToughnessForLevel(level){
+    return level > 150 ? 3 : level > 60 ? 2 : 1;
+  }
+  function arcBuildBricks(level){
+    var cols = ARC_COLS, rows = arcRowsForLevel(level);
+    var shape = ARC_SHAPES[Math.floor((level - 1) / 5) % ARC_SHAPES.length];
+    var maxTough = arcToughnessForLevel(level);
+    var brickW = (arc.canvas.width - 20) / cols - 6;
+    var bricks = [];
+    for (var r=0; r<rows; r++){
+      for (var c=0; c<cols; c++){
+        if (!shape(r, c, rows, cols)) continue;
+        // Roughly 1 brick in 4 gets the level's full toughness, spread out
+        // deterministically (not random) so a given level always looks the same.
+        var hp = maxTough > 1 && (r + c + level) % 4 === 0 ? maxTough : 1;
+        var baseColor = ARC_COLORS[r % ARC_COLORS.length];
+        bricks.push({
+          x: 10 + c*(brickW+6), y: 40 + r*22, w:brickW, h:16, alive:true,
+          hp:hp, maxHp:hp, baseColor:baseColor,
+          color: hp > 1 ? ARC_TOUGH_SHADES[0] : baseColor // freshest = darkest shade
+        });
+      }
+    }
+    // A sparse shape (frame/cross) on a small grid could theoretically come
+    // up empty-ish — guarantee every level has something to actually break.
+    if (bricks.length < 5) return arcBuildFullGrid(level, rows, cols, brickW);
+    return bricks;
+  }
+  function arcBuildFullGrid(level, rows, cols, brickW){
+    var bricks = [];
+    for (var r=0; r<rows; r++){
+      for (var c=0; c<cols; c++){
+        var baseColor = ARC_COLORS[r % ARC_COLORS.length];
+        bricks.push({x: 10 + c*(brickW+6), y: 40 + r*22, w:brickW, h:16, alive:true, hp:1, maxHp:1, baseColor:baseColor, color:baseColor});
+      }
+    }
+    return bricks;
+  }
+  // Ball speed grows with level but flattens out after level 61 — the
+  // original uncapped +12%/level formula would have made the ball faster
+  // than the paddle/bricks could realistically react to well before
+  // level 20, let alone 200.
+  function arcSpeedForLevel(level){
+    var steps = Math.min(level - 1, 60);
+    var mult = 1 + steps * 0.02;
+    return {dx: 3.2*mult, dy: 3.6*mult, bounce: 4.5*mult};
+  }
   function arcResetBall(){
     arc.ball.x = arc.canvas.width/2; arc.ball.y = arc.canvas.height - 40;
     arc.ball.dx = 0; arc.ball.dy = 0; arc.ball.launched = false;
   }
   function arcResetLevel(fullReset){
-    arc.bricks = [];
-    var brickW = (arc.canvas.width - 20) / ARC_COLS - 6;
-    for (var r=0; r<ARC_ROWS; r++){
-      for (var c=0; c<ARC_COLS; c++){
-        arc.bricks.push({x: 10 + c*(brickW+6), y: 40 + r*22, w:brickW, h:16, alive:true, color:ARC_COLORS[r%ARC_COLORS.length]});
-      }
-    }
     if (fullReset){
-      arc.score = 0; arc.lives = 3;
+      arc.level = 1; arc.score = 0; arc.lives = 3; arc.over = false;
       $("#arcScore").textContent = "0"; $("#arcLives").textContent = "3";
     }
+    arc.bricks = arcBuildBricks(arc.level);
+    $("#arcLevel").textContent = String(arc.level);
     arc.paddle.x = (arc.canvas.width - arc.paddle.w)/2;
     arcResetBall();
   }
   function arcLaunch(){
     if (arc.ball.launched) return;
     arc.ball.launched = true;
-    arc.ball.dx = (Math.random()>0.5?1:-1) * 3.2;
-    arc.ball.dy = -3.6;
+    var speed = arcSpeedForLevel(arc.level);
+    arc.ball.dx = (Math.random()>0.5?1:-1) * speed.dx;
+    arc.ball.dy = -speed.dy;
   }
   function arcUpdate(){
     if (arc.keys.left) arc.paddle.x -= arc.paddle.speed;
@@ -4260,14 +5118,20 @@ body.has-top-banner .topbar{top:40px}
     if (b.dy > 0 && b.y + b.r >= paddleTop && b.y + b.r <= paddleTop + 12 && b.x >= arc.paddle.x && b.x <= arc.paddle.x + arc.paddle.w){
       var hitPos = (b.x - (arc.paddle.x + arc.paddle.w/2)) / (arc.paddle.w/2);
       b.dy = -Math.abs(b.dy);
-      b.dx = hitPos * 4.5;
+      b.dx = hitPos * arcSpeedForLevel(arc.level).bounce;
     }
     arc.bricks.forEach(function(brick){
       if (!brick.alive) return;
       if (b.x + b.r > brick.x && b.x - b.r < brick.x+brick.w && b.y + b.r > brick.y && b.y - b.r < brick.y+brick.h){
-        brick.alive = false;
         b.dy *= -1;
-        arc.score += 10;
+        brick.hp--;
+        if (brick.hp <= 0){
+          brick.alive = false;
+          arc.score += 10 * brick.maxHp;
+        } else {
+          arc.score += 5;
+          brick.color = ARC_TOUGH_SHADES[Math.min(ARC_TOUGH_SHADES.length-1, brick.maxHp - brick.hp)];
+        }
         $("#arcScore").textContent = String(arc.score);
       }
     });
@@ -4277,11 +5141,12 @@ body.has-top-banner .topbar{top:40px}
       if (arc.lives <= 0) arcEnd("Perdu — Score : " + arc.score);
       else arcResetBall();
     } else if (arc.bricks.every(function(br){ return !br.alive; })){
-      arcEnd("Bravo ! Score : " + arc.score);
+      if (arc.level < ARC_MAX_LEVEL){ arc.level++; arcResetLevel(false); }
+      else arcEnd("Bravo, niveaux terminés ! Score : " + arc.score);
     }
   }
   function arcEnd(message){
-    arc.running = false;
+    arc.running = false; arc.over = true;
     cancelAnimationFrame(arc.rafId);
     if (arc.score > arc.best){
       arc.best = arc.score;
@@ -4339,7 +5204,7 @@ body.has-top-banner .topbar{top:40px}
       movePaddleTo(t.clientX);
     }, {passive:false});
     document.addEventListener("keydown", function(ev){
-      if (state.activeTab !== "detente") return;
+      if (state.activeTab !== "detente" || detenteActive !== "arcade") return;
       if (ev.key === "ArrowLeft") arc.keys.left = true;
       else if (ev.key === "ArrowRight") arc.keys.right = true;
       else if (ev.key === " "){ arcLaunch(); ev.preventDefault(); }
@@ -4352,6 +5217,7 @@ body.has-top-banner .topbar{top:40px}
   function arcStart(){
     if (!arc.canvas) arcInit();
     if (arc.running) return;
+    if (arc.over) arcResetLevel(true);
     arc.running = true;
     arcLoop();
   }
@@ -4362,6 +5228,253 @@ body.has-top-banner .topbar{top:40px}
     arcResetLevel(true);
     arc.running = true;
     arcLoop();
+  });
+
+  // ---------- Détente : Tetris ----------
+  var TETRIS_COLS = 10, TETRIS_ROWS = 20, TETRIS_CELL = 30;
+  var TETRIS_PIECES = {
+    I: {matrix:[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color:"#3fd0e0"},
+    O: {matrix:[[1,1],[1,1]], color:"#e8c93f"},
+    T: {matrix:[[0,1,0],[1,1,1],[0,0,0]], color:"#9b59c9"},
+    S: {matrix:[[0,1,1],[1,1,0],[0,0,0]], color:"#2f9e5c"},
+    Z: {matrix:[[1,1,0],[0,1,1],[0,0,0]], color:"#c1443a"},
+    J: {matrix:[[1,0,0],[1,1,1],[0,0,0]], color:"#3467b8"},
+    L: {matrix:[[0,0,1],[1,1,1],[0,0,0]], color:"#e8863c"}
+  };
+  var TETRIS_KEYS = Object.keys(TETRIS_PIECES);
+  var TETRIS_LINE_SCORES = [0, 100, 300, 500, 800];
+  var tet = {
+    canvas:null, ctx:null, nextCanvas:null, nextCtx:null,
+    grid:[], current:null, next:null, bag:[],
+    running:false, over:false, rafId:null, lastDropAt:0, dropInterval:800,
+    score:0, lines:0, level:1, best:0
+  };
+  function tetEmptyGrid(){
+    var g = [];
+    for (var r=0; r<TETRIS_ROWS; r++) g.push(new Array(TETRIS_COLS).fill(null));
+    return g;
+  }
+  // 7-bag randomizer: each of the 7 pieces appears exactly once per bag,
+  // shuffled — avoids the "waited forever for an I-piece" streak a pure
+  // random pick can produce, the way real Tetris implementations do it.
+  function tetRefillBag(){
+    var bag = TETRIS_KEYS.slice();
+    for (var i = bag.length - 1; i > 0; i--){
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = bag[i]; bag[i] = bag[j]; bag[j] = tmp;
+    }
+    tet.bag = bag;
+  }
+  function tetNextFromBag(){
+    if (!tet.bag.length) tetRefillBag();
+    return tet.bag.pop();
+  }
+  function tetCollide(matrix, x, y){
+    for (var my=0; my<matrix.length; my++){
+      for (var mx=0; mx<matrix[my].length; mx++){
+        if (!matrix[my][mx]) continue;
+        var gx = x + mx, gy = y + my;
+        if (gx < 0 || gx >= TETRIS_COLS || gy >= TETRIS_ROWS) return true;
+        if (gy >= 0 && tet.grid[gy][gx]) return true;
+      }
+    }
+    return false;
+  }
+  function tetSpawnPiece(){
+    var key = tet.next || tetNextFromBag();
+    tet.next = tetNextFromBag();
+    var def = TETRIS_PIECES[key];
+    var matrix = def.matrix.map(function(row){ return row.slice(); });
+    var piece = {key:key, matrix:matrix, color:def.color, x: Math.floor((TETRIS_COLS - matrix.length) / 2), y: -2};
+    tet.current = piece;
+    tetDrawNext();
+    if (tetCollide(piece.matrix, piece.x, piece.y)) tetEnd();
+  }
+  function tetRotateMatrixCW(m){
+    var n = m.length, res = [];
+    for (var i=0;i<n;i++) res.push(new Array(n).fill(0));
+    for (var y=0;y<n;y++) for (var x=0;x<n;x++) res[x][n-1-y] = m[y][x];
+    return res;
+  }
+  function tetRotate(){
+    if (!tet.current) return;
+    var rotated = tetRotateMatrixCW(tet.current.matrix);
+    var kicks = [0, -1, 1, -2, 2];
+    for (var i=0; i<kicks.length; i++){
+      if (!tetCollide(rotated, tet.current.x + kicks[i], tet.current.y)){
+        tet.current.matrix = rotated;
+        tet.current.x += kicks[i];
+        return;
+      }
+    }
+  }
+  function tetMove(dx){
+    if (!tet.current) return;
+    if (!tetCollide(tet.current.matrix, tet.current.x + dx, tet.current.y)) tet.current.x += dx;
+  }
+  // Advances the current piece one row if it can; otherwise locks it in
+  // place. Shared by gravity, soft drop and hard drop so they all agree on
+  // what "the piece can't go further" means.
+  function tetDropOneRow(){
+    if (!tet.current) return false;
+    if (!tetCollide(tet.current.matrix, tet.current.x, tet.current.y + 1)){
+      tet.current.y++;
+      return true;
+    }
+    tetLockPiece();
+    return false;
+  }
+  function tetAddScore(n){
+    tet.score += n;
+    $("#tetrisScore").textContent = String(tet.score);
+  }
+  function tetSoftDrop(){ if (tetDropOneRow()) tetAddScore(1); }
+  function tetHardDrop(){
+    var cells = 0;
+    while (tetDropOneRow()) cells++;
+    tetAddScore(cells * 2);
+  }
+  function tetLockPiece(){
+    var p = tet.current;
+    p.matrix.forEach(function(row, my){
+      row.forEach(function(cell, mx){
+        if (!cell) return;
+        var gy = p.y + my, gx = p.x + mx;
+        if (gy >= 0 && gy < TETRIS_ROWS) tet.grid[gy][gx] = p.color;
+      });
+    });
+    var cleared = 0;
+    for (var r = TETRIS_ROWS - 1; r >= 0; r--){
+      if (tet.grid[r].every(function(c){ return c; })){
+        tet.grid.splice(r, 1);
+        tet.grid.unshift(new Array(TETRIS_COLS).fill(null));
+        cleared++;
+        r++; // row above just shifted down into this same index — recheck it
+      }
+    }
+    if (cleared){
+      tetAddScore((TETRIS_LINE_SCORES[cleared] || 0) * tet.level);
+      tet.lines += cleared;
+      $("#tetrisLines").textContent = String(tet.lines);
+      var newLevel = Math.floor(tet.lines / 10) + 1;
+      if (newLevel !== tet.level){
+        tet.level = newLevel;
+        $("#tetrisLevel").textContent = String(tet.level);
+        tet.dropInterval = Math.max(120, 800 - (tet.level - 1) * 70);
+      }
+    }
+    tetSpawnPiece();
+  }
+  function tetGhostY(){
+    var p = tet.current, y = p.y;
+    while (!tetCollide(p.matrix, p.x, y + 1)) y++;
+    return y;
+  }
+  function tetDrawCell(ctx, gx, gy, color){
+    ctx.fillStyle = color;
+    ctx.fillRect(gx*TETRIS_CELL+1, gy*TETRIS_CELL+1, TETRIS_CELL-2, TETRIS_CELL-2);
+  }
+  function tetDraw(){
+    var ctx = tet.ctx; if (!ctx) return;
+    ctx.fillStyle = "#0f1115"; ctx.fillRect(0, 0, tet.canvas.width, tet.canvas.height);
+    tet.grid.forEach(function(row, gy){ row.forEach(function(color, gx){ if (color) tetDrawCell(ctx, gx, gy, color); }); });
+    if (tet.current){
+      var p = tet.current, ghostY = tetGhostY();
+      ctx.globalAlpha = 0.25;
+      p.matrix.forEach(function(row, my){ row.forEach(function(cell, mx){ if (cell && ghostY+my >= 0) tetDrawCell(ctx, p.x+mx, ghostY+my, p.color); }); });
+      ctx.globalAlpha = 1;
+      p.matrix.forEach(function(row, my){ row.forEach(function(cell, mx){ if (cell && p.y+my >= 0) tetDrawCell(ctx, p.x+mx, p.y+my, p.color); }); });
+    }
+  }
+  function tetDrawNext(){
+    var ctx = tet.nextCtx; if (!ctx || !tet.next) return;
+    ctx.fillStyle = "#0f1115"; ctx.fillRect(0, 0, tet.nextCanvas.width, tet.nextCanvas.height);
+    var def = TETRIS_PIECES[tet.next];
+    var size = def.matrix.length, cell = Math.floor(tet.nextCanvas.width / 4);
+    var offset = (4 - size) / 2;
+    def.matrix.forEach(function(row, my){ row.forEach(function(cellOn, mx){
+      if (!cellOn) return;
+      ctx.fillStyle = def.color;
+      ctx.fillRect((offset+mx)*cell+1, (offset+my)*cell+1, cell-2, cell-2);
+    }); });
+  }
+  function tetEnd(){
+    tet.running = false; tet.over = true;
+    cancelAnimationFrame(tet.rafId);
+    if (tet.score > tet.best){
+      tet.best = tet.score;
+      try { localStorage.setItem("pe_tetris_best", String(tet.best)); } catch(e){ /* ignore */ }
+      $("#tetrisBest").textContent = String(tet.best);
+    }
+    tetDraw();
+    var ctx = tet.ctx, w = tet.canvas.width, h = tet.canvas.height;
+    ctx.fillStyle = "rgba(0,0,0,.65)"; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = "#fff"; ctx.font = "bold 20px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText("Partie terminée", w/2, h/2 - 10);
+    ctx.font = "14px sans-serif";
+    ctx.fillText("Score : " + tet.score, w/2, h/2 + 16);
+    ctx.font = "12px sans-serif";
+    ctx.fillText("« Recommencer » pour rejouer", w/2, h/2 + 38);
+  }
+  function tetNewGame(){
+    tet.grid = tetEmptyGrid();
+    tet.score = 0; tet.lines = 0; tet.level = 1; tet.dropInterval = 800; tet.over = false;
+    tet.bag = []; tet.next = null;
+    $("#tetrisScore").textContent = "0"; $("#tetrisLines").textContent = "0"; $("#tetrisLevel").textContent = "1";
+    tetSpawnPiece();
+  }
+  function tetLoop(timestamp){
+    if (!tet.running) return;
+    if (timestamp - tet.lastDropAt > tet.dropInterval){
+      tetDropOneRow();
+      tet.lastDropAt = timestamp;
+    }
+    tetDraw();
+    tet.rafId = requestAnimationFrame(tetLoop);
+  }
+  function tetInit(){
+    tet.canvas = $("#tetrisCanvas"); if (!tet.canvas) return;
+    tet.ctx = tet.canvas.getContext("2d");
+    tet.nextCanvas = $("#tetrisNextCanvas");
+    tet.nextCtx = tet.nextCanvas ? tet.nextCanvas.getContext("2d") : null;
+    try { tet.best = parseInt(localStorage.getItem("pe_tetris_best") || "0", 10) || 0; } catch(e){ tet.best = 0; }
+    $("#tetrisBest").textContent = String(tet.best);
+    tetNewGame();
+    tetDraw();
+    document.addEventListener("keydown", function(ev){
+      if (state.activeTab !== "detente" || detenteActive !== "tetris" || !tet.running) return;
+      if (ev.key === "ArrowLeft"){ tetMove(-1); ev.preventDefault(); }
+      else if (ev.key === "ArrowRight"){ tetMove(1); ev.preventDefault(); }
+      else if (ev.key === "ArrowUp"){ tetRotate(); ev.preventDefault(); }
+      else if (ev.key === "ArrowDown"){ tetSoftDrop(); ev.preventDefault(); }
+      else if (ev.key === " "){ tetHardDrop(); ev.preventDefault(); }
+    });
+    function bindTouchControl(id, fn){
+      var btn = $(id); if (!btn) return;
+      btn.addEventListener("click", function(){ if (tet.running) fn(); });
+    }
+    bindTouchControl("#tetrisBtnLeft", function(){ tetMove(-1); });
+    bindTouchControl("#tetrisBtnRight", function(){ tetMove(1); });
+    bindTouchControl("#tetrisBtnRotate", tetRotate);
+    bindTouchControl("#tetrisBtnDown", tetSoftDrop);
+    bindTouchControl("#tetrisBtnDrop", tetHardDrop);
+  }
+  function tetStart(){
+    if (!tet.canvas) tetInit();
+    if (tet.running) return;
+    if (tet.over) tetNewGame();
+    tet.running = true;
+    tet.lastDropAt = performance.now();
+    tetLoop(tet.lastDropAt);
+  }
+  var tetrisRestartBtn = $("#tetrisRestartBtn");
+  if (tetrisRestartBtn) tetrisRestartBtn.addEventListener("click", function(){
+    if (!tet.canvas) tetInit();
+    cancelAnimationFrame(tet.rafId);
+    tetNewGame();
+    tet.running = true;
+    tet.lastDropAt = performance.now();
+    tetLoop(tet.lastDropAt);
   });
 
   if ("serviceWorker" in navigator){
@@ -4461,6 +5574,7 @@ body.has-top-banner .topbar{top:40px}
     renderDow();
     setupDragReordering();
     syncTopbarHeight();
+    applyDispoNameColWidth(getDispoNameColWidth());
     if ("onLine" in navigator && !navigator.onLine) setOfflineBanner(true);
     if (loadSession()) enterApp();
   }

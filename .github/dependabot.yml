@@ -1,0 +1,29 @@
+version: 2
+updates:
+  # npm packages (better-sqlite3, express, @playwright/test...). Grouped
+  # minor/patch bumps land as one PR to cut down on noise for a
+  # solo-maintained repo; majors (more likely to need an actual code change)
+  # still come through individually for a real look before merging.
+  - package-ecosystem: "npm"
+    directory: "/"
+    target-branch: "main-63nl54"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+    labels:
+      - "dependencies"
+
+  # Actions pinned in .github/workflows/*.yml (actions/checkout,
+  # actions/setup-node, appleboy/ssh-action...).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    target-branch: "main-63nl54"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"

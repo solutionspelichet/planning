@@ -1,0 +1,32 @@
+name: Dependabot auto-merge
+
+# Closes the loop on dependabot.yml: a patch/minor bump that passes the
+# e2e suite (the "test" job in deploy.yml, triggered by the same PR) merges
+# itself — no need to click merge every Monday. A major-version bump never
+# auto-merges; it sits there for a real look, since those are the ones
+# actually likely to need a code change.
+on:
+  pull_request:
+    branches: [main-63nl54]
+
+permissions:
+  pull-requests: write
+  contents: write
+
+jobs:
+  auto-merge:
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Enable auto-merge for patch/minor bumps
+        if: steps.metadata.outputs.update-type != 'version-update:semver-major'
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

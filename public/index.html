@@ -339,6 +339,9 @@ td.dispo-cell{cursor:pointer}
 .stat-label{font-size:12px;color:var(--fg-muted);margin-top:4px}
 .chart-sub{font-size:12px;color:var(--fg-muted);margin:0 0 14px}
 .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:16px}
+.dashboard-widgets{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;align-items:start;margin-bottom:16px}
+.dashboard-widgets > .chart-card{margin-bottom:0}
+.dashboard-widgets > .wide{grid-column:1/-1}
 
 .zen-wrap{display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start}
 .zen-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px}
@@ -696,6 +699,12 @@ body.has-top-banner .topbar{top:40px}
       <ul class="emp-list" id="dossierFieldLayoutList"></ul>
       <button class="btn btn-ghost" id="resetDossierFieldLayoutBtn" style="margin-top:10px">Réinitialiser cette mise en page</button>
     </div>
+    <div class="chart-card edit-only" style="margin-top:16px">
+      <h3 style="margin-bottom:4px">Mise en page : Dashboard</h3>
+      <p class="chart-sub" style="margin-bottom:10px">Glissez pour réordonner les widgets, pleine largeur ou demi-largeur (côte à côte), une couleur d'accent, ou décochez pour le masquer.</p>
+      <ul class="emp-list" id="dashboardLayoutList"></ul>
+      <button class="btn btn-ghost" id="resetDashboardLayoutBtn" style="margin-top:10px">Réinitialiser cette mise en page</button>
+    </div>
     <div class="day-panel-actions edit-only" style="margin-top:16px">
       <button class="btn" id="saveSettingsBtn">Enregistrer</button>
       <button class="btn btn-ghost" id="resetSettingsBtn">Réinitialiser les valeurs par défaut</button>
@@ -711,55 +720,58 @@ body.has-top-banner .topbar{top:40px}
         <button type="button" class="view-mode-btn" id="dashViewMonthBtn">Mois</button>
       </div>
     </div>
-    <div class="stat-grid">
-      <div class="stat-card">
-        <div class="stat-value" id="dashDossiers">0</div>
-        <div class="stat-label">Chantiers actifs</div>
+    <div class="dashboard-widgets" id="dashboardWidgets">
+      <div class="stat-grid" data-widget="stats">
+        <div class="stat-card">
+          <div class="stat-value" id="dashDossiers">0</div>
+          <div class="stat-label">Chantiers actifs</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="dashEmployees">0</div>
+          <div class="stat-label">Ressources humaines monopolisées</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="dashVehicles">0</div>
+          <div class="stat-label">Véhicules monopolisés</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="dashVolume">0</div>
+          <div class="stat-label">Volume total (m³)</div>
+        </div>
       </div>
-      <div class="stat-card">
-        <div class="stat-value" id="dashEmployees">0</div>
-        <div class="stat-label">Ressources humaines monopolisées</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" id="dashVehicles">0</div>
-        <div class="stat-label">Véhicules monopolisés</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" id="dashVolume">0</div>
-        <div class="stat-label">Volume total (m³)</div>
-      </div>
-    </div>
 
-    <h2 style="font-size:15px;margin:28px 0 12px" id="dashMobilizationTitle">Cette semaine</h2>
-    <div class="chart-card">
-      <div style="overflow-x:auto"><div id="dashWeekTable"></div></div>
-    </div>
+      <div class="chart-card" data-widget="mobilization">
+        <h2 style="font-size:15px;margin:0 0 12px" id="dashMobilizationTitle">Cette semaine</h2>
+        <div style="overflow-x:auto"><div id="dashWeekTable"></div></div>
+      </div>
 
-    <h2 style="font-size:15px;margin:28px 0 4px">Évolution sur l'année</h2>
-    <p class="chart-sub" id="dashYearLabels">—</p>
-
-    <div class="chart-card">
-      <h3>Répartition par type — <span id="dashTypeMonthLabel">—</span></h3>
-      <div id="dashTypeDistribution"></div>
-    </div>
-    <div class="chart-card">
-      <h3>Nombre de chantiers par mois</h3>
-      <div class="type-filter" id="filterDossiers"></div>
-      <div id="dashChartDossiers"></div>
-    </div>
-    <div class="chart-card">
-      <h3>Ressources humaines monopolisées par mois (personne-jours)</h3>
-      <div class="type-filter" id="filterEmployees"></div>
-      <div id="dashChartEmployees"></div>
-    </div>
-    <div class="chart-card">
-      <h3>Véhicules monopolisés par mois (véhicule-jours)</h3>
-      <div class="type-filter" id="filterVehicles"></div>
-      <div id="dashChartVehicles"></div>
-    </div>
-    <div class="chart-card">
-      <h3>Volume transporté par mois (m³)</h3>
-      <div id="dashChartVolume"></div>
+      <div class="chart-card" data-widget="typeDistribution">
+        <h3>Répartition par type — <span id="dashTypeMonthLabel">—</span></h3>
+        <div id="dashTypeDistribution"></div>
+      </div>
+      <div class="chart-card" data-widget="chartDossiers">
+        <p class="chart-sub dash-year-caption">—</p>
+        <h3>Nombre de chantiers par mois</h3>
+        <div class="type-filter" id="filterDossiers"></div>
+        <div id="dashChartDossiers"></div>
+      </div>
+      <div class="chart-card" data-widget="chartEmployees">
+        <p class="chart-sub dash-year-caption">—</p>
+        <h3>Ressources humaines monopolisées par mois (personne-jours)</h3>
+        <div class="type-filter" id="filterEmployees"></div>
+        <div id="dashChartEmployees"></div>
+      </div>
+      <div class="chart-card" data-widget="chartVehicles">
+        <p class="chart-sub dash-year-caption">—</p>
+        <h3>Véhicules monopolisés par mois (véhicule-jours)</h3>
+        <div class="type-filter" id="filterVehicles"></div>
+        <div id="dashChartVehicles"></div>
+      </div>
+      <div class="chart-card" data-widget="chartVolume">
+        <p class="chart-sub dash-year-caption">—</p>
+        <h3>Volume transporté par mois (m³)</h3>
+        <div id="dashChartVolume"></div>
+      </div>
     </div>
   </div>
 
@@ -1067,25 +1079,65 @@ body.has-top-banner .topbar{top:40px}
     task:"Tâche à réaliser", comment:"Commentaire", arrivalTime:"Heure d'arrivée (jour)",
     sameDaysToggle:"Même équipe tous les jours", employeesChips:"Effectif (équipe)", vehiclesChips:"Véhicules"
   };
-  function parseDossierCardFieldConfig(raw){
+  // Shared by the dossier-card fields and the Dashboard widgets below —
+  // both are just "an ordered list of {id, width, visible, color}" stored
+  // as one JSON settings value, reconciled against whichever registry
+  // (defaults + labels) they belong to.
+  function parseFieldLayoutConfig(raw, defaults, labelsMap){
     var parsed = null;
     if (raw) { try { parsed = JSON.parse(raw); } catch(e){ parsed = null; } }
-    if (!Array.isArray(parsed)) return DOSSIER_CARD_FIELDS_DEFAULT.map(function(f){ return Object.assign({}, f); });
+    if (!Array.isArray(parsed)) return defaults.map(function(f){ return Object.assign({}, f); });
     var seen = {};
     var result = [];
     parsed.forEach(function(f){
-      if (!f || !DOSSIER_CARD_FIELD_LABELS[f.id] || seen[f.id]) return;
+      if (!f || !labelsMap[f.id] || seen[f.id]) return;
       seen[f.id] = true;
       result.push({id:f.id, width: f.width==="narrow"?"narrow":"wide", visible: f.visible!==false, color: f.color||""});
     });
-    // A field added to the app after this config was saved — append it at
-    // the end with its default so it doesn't just silently disappear.
-    DOSSIER_CARD_FIELDS_DEFAULT.forEach(function(def){
+    // An id added to the app after this config was saved — append it at the
+    // end with its default so it doesn't just silently disappear.
+    defaults.forEach(function(def){
       if (!seen[def.id]) result.push(Object.assign({}, def));
     });
     return result;
   }
+  function parseDossierCardFieldConfig(raw){ return parseFieldLayoutConfig(raw, DOSSIER_CARD_FIELDS_DEFAULT, DOSSIER_CARD_FIELD_LABELS); }
   function getDossierCardFieldConfig(){ return parseDossierCardFieldConfig(state.settings["dossierCardFields"]); }
+
+  // ---------- customizable Dashboard layout (Settings) ----------
+  var DASHBOARD_WIDGETS_DEFAULT = [
+    {id:"stats", width:"wide", visible:true, color:""},
+    {id:"mobilization", width:"wide", visible:true, color:""},
+    {id:"typeDistribution", width:"wide", visible:true, color:""},
+    {id:"chartDossiers", width:"wide", visible:true, color:""},
+    {id:"chartEmployees", width:"wide", visible:true, color:""},
+    {id:"chartVehicles", width:"wide", visible:true, color:""},
+    {id:"chartVolume", width:"wide", visible:true, color:""}
+  ];
+  var DASHBOARD_WIDGET_LABELS = {
+    stats:"Chiffres clés", mobilization:"Tableau de mobilisation", typeDistribution:"Répartition par type",
+    chartDossiers:"Nombre de chantiers par mois", chartEmployees:"Ressources humaines par mois",
+    chartVehicles:"Véhicules par mois", chartVolume:"Volume transporté par mois"
+  };
+  function parseDashboardWidgetConfig(raw){ return parseFieldLayoutConfig(raw, DASHBOARD_WIDGETS_DEFAULT, DASHBOARD_WIDGET_LABELS); }
+  function getDashboardWidgetConfig(){ return parseDashboardWidgetConfig(state.settings["dashboardLayout"]); }
+  // Dashboard widgets are static markup (each already has its own render
+  // function targeting fixed ids inside it) — layout only needs to move the
+  // existing wrapper nodes into the configured order/width/color, not
+  // rebuild their contents.
+  function applyDashboardLayout(){
+    var host = $("#dashboardWidgets"); if (!host) return;
+    var byId = {};
+    $all("[data-widget]", host).forEach(function(w){ byId[w.dataset.widget] = w; });
+    getDashboardWidgetConfig().forEach(function(cfg){
+      var w = byId[cfg.id]; if (!w) return;
+      w.hidden = !cfg.visible;
+      w.classList.remove("wide", "narrow");
+      w.classList.add(cfg.width === "narrow" ? "narrow" : "wide");
+      w.style.borderLeft = cfg.color ? "4px solid " + cfg.color : "";
+      host.appendChild(w);
+    });
+  }
 
   var CODE_LOAD = {J:1, M:0.5, A:0.5};
   var MONTHS_FR = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
@@ -2260,23 +2312,27 @@ body.has-top-banner .topbar{top:40px}
       host.appendChild(card);
     });
     renderDossierFieldLayoutEditor();
+    renderDashboardLayoutEditor();
   }
-  function renderDossierFieldLayoutEditor(){
-    var host = $("#dossierFieldLayoutList"); if (!host) return;
-    var raw = state.settingsDraft["dossierCardFields"];
-    if (raw === undefined) raw = state.settings["dossierCardFields"];
-    var config = parseDossierCardFieldConfig(raw);
+  // Shared by both layout editors in Settings (dossier-card fields and
+  // Dashboard widgets) — same row shape (visible / order / width / color)
+  // over whichever settings key and registry it's handed.
+  function renderFieldLayoutEditor(hostId, rowClass, settingsKey, defaults, labelsMap){
+    var host = $("#" + hostId); if (!host) return;
+    var raw = state.settingsDraft[settingsKey];
+    if (raw === undefined) raw = state.settings[settingsKey];
+    var config = parseFieldLayoutConfig(raw, defaults, labelsMap);
     host.innerHTML = "";
     config.forEach(function(f){
-      var row = el("li", {class:"emp-row dossier-field-row"});
+      var row = el("li", {class:"emp-row " + rowClass});
       if (canEdit()){ row.draggable = true; row.dataset.id = f.id; row.classList.add("draggable-row"); }
       var visChk = el("input", {type:"checkbox"});
       visChk.checked = f.visible;
       visChk.disabled = !canEdit();
-      visChk.title = "Afficher ce champ";
-      visChk.addEventListener("change", function(){ f.visible = visChk.checked; state.settingsDraft["dossierCardFields"] = JSON.stringify(config); });
+      visChk.title = "Afficher";
+      visChk.addEventListener("change", function(){ f.visible = visChk.checked; state.settingsDraft[settingsKey] = JSON.stringify(config); });
       row.appendChild(visChk);
-      row.appendChild(el("span", {class:"emp-name", text: DOSSIER_CARD_FIELD_LABELS[f.id] || f.id}));
+      row.appendChild(el("span", {class:"emp-name", text: labelsMap[f.id] || f.id}));
       var widthSel = el("select", {});
       widthSel.disabled = !canEdit();
       [["wide","Pleine largeur"], ["narrow","Étroit"]].forEach(function(pair){
@@ -2284,26 +2340,40 @@ body.has-top-banner .topbar{top:40px}
         if (pair[0] === f.width) opt.setAttribute("selected","selected");
         widthSel.appendChild(opt);
       });
-      widthSel.addEventListener("change", function(){ f.width = widthSel.value; state.settingsDraft["dossierCardFields"] = JSON.stringify(config); });
+      widthSel.addEventListener("change", function(){ f.width = widthSel.value; state.settingsDraft[settingsKey] = JSON.stringify(config); });
       row.appendChild(widthSel);
       var colorInput = el("input", {type:"color", value: f.color || "#888888"});
       colorInput.disabled = !canEdit();
       colorInput.title = "Couleur d'accent (optionnelle)";
-      colorInput.addEventListener("input", function(){ f.color = colorInput.value; state.settingsDraft["dossierCardFields"] = JSON.stringify(config); });
+      colorInput.addEventListener("input", function(){ f.color = colorInput.value; state.settingsDraft[settingsKey] = JSON.stringify(config); });
       row.appendChild(colorInput);
       if (f.color){
         row.appendChild(el("button", {class:"icon-btn edit-only", title:"Retirer la couleur", text:"✕", onclick: function(){
-          f.color = ""; state.settingsDraft["dossierCardFields"] = JSON.stringify(config); renderDossierFieldLayoutEditor();
+          f.color = ""; state.settingsDraft[settingsKey] = JSON.stringify(config);
+          renderFieldLayoutEditor(hostId, rowClass, settingsKey, defaults, labelsMap);
         }}));
       }
       host.appendChild(row);
     });
+  }
+  function renderDossierFieldLayoutEditor(){
+    renderFieldLayoutEditor("dossierFieldLayoutList", "dossier-field-row", "dossierCardFields", DOSSIER_CARD_FIELDS_DEFAULT, DOSSIER_CARD_FIELD_LABELS);
+  }
+  function renderDashboardLayoutEditor(){
+    renderFieldLayoutEditor("dashboardLayoutList", "dashboard-field-row", "dashboardLayout", DASHBOARD_WIDGETS_DEFAULT, DASHBOARD_WIDGET_LABELS);
   }
   var resetDossierFieldLayoutBtn = $("#resetDossierFieldLayoutBtn");
   if (resetDossierFieldLayoutBtn) resetDossierFieldLayoutBtn.addEventListener("click", function(){
     if (!canEdit()) return;
     state.settingsDraft["dossierCardFields"] = JSON.stringify(DOSSIER_CARD_FIELDS_DEFAULT);
     renderDossierFieldLayoutEditor();
+    toast("Mise en page par défaut rétablie — cliquez Enregistrer pour confirmer");
+  });
+  var resetDashboardLayoutBtn = $("#resetDashboardLayoutBtn");
+  if (resetDashboardLayoutBtn) resetDashboardLayoutBtn.addEventListener("click", function(){
+    if (!canEdit()) return;
+    state.settingsDraft["dashboardLayout"] = JSON.stringify(DASHBOARD_WIDGETS_DEFAULT);
+    renderDashboardLayoutEditor();
     toast("Mise en page par défaut rétablie — cliquez Enregistrer pour confirmer");
   });
   var saveSettingsBtn = $("#saveSettingsBtn");
@@ -3983,6 +4053,7 @@ body.has-top-banner .topbar{top:40px}
     });
   }
   function renderDashboard(){
+    applyDashboardLayout();
     var d = computeDashboardData(dashFilters.dossiers, dashFilters.employees, dashFilters.vehicles);
     var t = dashboardStats();
     var periodLabels = {day:"Aujourd'hui", week:"Cette semaine", month:"Ce mois"};
@@ -3999,7 +4070,7 @@ body.has-top-banner .topbar{top:40px}
     $("#dashMobilizationTitle").textContent = mobilizationTitles[state.dashboardViewMode] || mobilizationTitles.day;
     renderMobilizationTable();
     renderTypeDistribution();
-    $("#dashYearLabels").textContent = "Cette année (" + d.thisYear + ") comparée à l'année précédente (" + d.lastYear + ")";
+    $all(".dash-year-caption").forEach(function(el){ el.textContent = "Cette année (" + d.thisYear + ") comparée à l'année précédente (" + d.lastYear + ")"; });
     renderTypeFilter("filterDossiers", "dossiers", dossierFilterOptions());
     renderTypeFilter("filterEmployees", "employees", companyFilterOptions());
     renderTypeFilter("filterVehicles", "vehicles", vehicleFilterOptions());
@@ -4543,6 +4614,13 @@ body.has-top-banner .topbar{top:40px}
       var byId = {}; parseDossierCardFieldConfig(raw).forEach(function(f){ byId[f.id] = f; });
       var reordered = ids.map(function(id){ return byId[id]; }).filter(Boolean);
       state.settingsDraft["dossierCardFields"] = JSON.stringify(reordered);
+    }, false);
+    enableDragReorder($("#dashboardLayoutList"), ".dashboard-field-row", "#dashboardLayoutList", function(r){ return r.dataset.id; }, function(ids){
+      var raw = state.settingsDraft["dashboardLayout"];
+      if (raw === undefined) raw = state.settings["dashboardLayout"];
+      var byId = {}; parseDashboardWidgetConfig(raw).forEach(function(f){ byId[f.id] = f; });
+      var reordered = ids.map(function(id){ return byId[id]; }).filter(Boolean);
+      state.settingsDraft["dashboardLayout"] = JSON.stringify(reordered);
     }, false);
   }
 

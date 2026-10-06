@@ -71,6 +71,10 @@ Détente (casse-briques à 200 niveaux, Tetris).
       personnalisable — glisser pour réordonner les 19 champs, largeur
       (pleine/étroite), couleur d'accent et masquage par champ, partagée
       pour tout le monde
+- [x] Settings (admin/planning) : mise en page du Dashboard personnalisable
+      — mêmes réglages (ordre, pleine/demi-largeur, couleur, masquage) sur
+      les 7 widgets (chiffres clés, mobilisation, répartition par type, 4
+      graphiques annuels)
 
 ## Volontairement pas fait (à confirmer avant de s'y lancer)
 

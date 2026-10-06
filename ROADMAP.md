@@ -75,6 +75,10 @@ Détente (casse-briques à 200 niveaux, Tetris).
       — mêmes réglages (ordre, pleine/demi-largeur, couleur, masquage) sur
       les 7 widgets (chiffres clés, mobilisation, répartition par type, 4
       graphiques annuels)
+- [x] Settings : aperçu live d'une fiche chantier (données fictives, lecture
+      seule) sous l'éditeur de mise en page, mis à jour instantanément à
+      chaque case décochée, largeur ou couleur changée, sans attendre
+      "Enregistrer"
 
 ## Volontairement pas fait (à confirmer avant de s'y lancer)
 

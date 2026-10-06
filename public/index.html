@@ -413,6 +413,8 @@ table.week-table tr.week-row-veh td.week-metric-label{border-left:4px solid var(
 .address-field textarea.addr-transit{background:color-mix(in srgb, var(--addr-transit) 16%, var(--surface));border-color:var(--addr-transit);color:color-mix(in srgb, var(--addr-transit) 65%, black)}
 .dossier-fields-zone{display:grid;grid-template-columns:repeat(auto-fill,minmax(95px,1fr));gap:6px 8px}
 .dossier-fields-zone > .wide{grid-column:1/-1}
+.dossier-card-preview-frame{max-width:420px;pointer-events:none;user-select:none}
+.dossier-card-preview-frame .dossier-card{cursor:default}
 td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
 .draggable-row{cursor:grab}
 .draggable-row:active{cursor:grabbing}
@@ -698,6 +700,8 @@ body.has-top-banner .topbar{top:40px}
       <p class="chart-sub" style="margin-bottom:10px">Glissez pour réordonner, choisissez la largeur et la couleur de chaque champ, ou décochez pour le masquer. S'applique à toutes les fiches, dans Planning.</p>
       <ul class="emp-list" id="dossierFieldLayoutList"></ul>
       <button class="btn btn-ghost" id="resetDossierFieldLayoutBtn" style="margin-top:10px">Réinitialiser cette mise en page</button>
+      <p class="chart-sub" style="margin:14px 0 6px">Aperçu (données fictives, en lecture seule) :</p>
+      <div class="dossier-card-preview-frame" id="dossierCardPreview"></div>
     </div>
     <div class="chart-card edit-only" style="margin-top:16px">
       <h3 style="margin-bottom:4px">Mise en page : Dashboard</h3>
@@ -2313,11 +2317,12 @@ body.has-top-banner .topbar{top:40px}
     });
     renderDossierFieldLayoutEditor();
     renderDashboardLayoutEditor();
+    renderDossierCardPreview();
   }
   // Shared by both layout editors in Settings (dossier-card fields and
   // Dashboard widgets) — same row shape (visible / order / width / color)
   // over whichever settings key and registry it's handed.
-  function renderFieldLayoutEditor(hostId, rowClass, settingsKey, defaults, labelsMap){
+  function renderFieldLayoutEditor(hostId, rowClass, settingsKey, defaults, labelsMap, onChange){
     var host = $("#" + hostId); if (!host) return;
     var raw = state.settingsDraft[settingsKey];
     if (raw === undefined) raw = state.settings[settingsKey];
@@ -2330,7 +2335,7 @@ body.has-top-banner .topbar{top:40px}
       visChk.checked = f.visible;
       visChk.disabled = !canEdit();
       visChk.title = "Afficher";
-      visChk.addEventListener("change", function(){ f.visible = visChk.checked; state.settingsDraft[settingsKey] = JSON.stringify(config); });
+      visChk.addEventListener("change", function(){ f.visible = visChk.checked; state.settingsDraft[settingsKey] = JSON.stringify(config); if (onChange) onChange(); });
       row.appendChild(visChk);
       row.appendChild(el("span", {class:"emp-name", text: labelsMap[f.id] || f.id}));
       var widthSel = el("select", {});
@@ -2340,27 +2345,72 @@ body.has-top-banner .topbar{top:40px}
         if (pair[0] === f.width) opt.setAttribute("selected","selected");
         widthSel.appendChild(opt);
       });
-      widthSel.addEventListener("change", function(){ f.width = widthSel.value; state.settingsDraft[settingsKey] = JSON.stringify(config); });
+      widthSel.addEventListener("change", function(){ f.width = widthSel.value; state.settingsDraft[settingsKey] = JSON.stringify(config); if (onChange) onChange(); });
       row.appendChild(widthSel);
       var colorInput = el("input", {type:"color", value: f.color || "#888888"});
       colorInput.disabled = !canEdit();
       colorInput.title = "Couleur d'accent (optionnelle)";
-      colorInput.addEventListener("input", function(){ f.color = colorInput.value; state.settingsDraft[settingsKey] = JSON.stringify(config); });
+      colorInput.addEventListener("input", function(){ f.color = colorInput.value; state.settingsDraft[settingsKey] = JSON.stringify(config); if (onChange) onChange(); });
       row.appendChild(colorInput);
       if (f.color){
         row.appendChild(el("button", {class:"icon-btn edit-only", title:"Retirer la couleur", text:"✕", onclick: function(){
           f.color = ""; state.settingsDraft[settingsKey] = JSON.stringify(config);
-          renderFieldLayoutEditor(hostId, rowClass, settingsKey, defaults, labelsMap);
+          renderFieldLayoutEditor(hostId, rowClass, settingsKey, defaults, labelsMap, onChange);
+          if (onChange) onChange();
         }}));
       }
       host.appendChild(row);
     });
   }
   function renderDossierFieldLayoutEditor(){
-    renderFieldLayoutEditor("dossierFieldLayoutList", "dossier-field-row", "dossierCardFields", DOSSIER_CARD_FIELDS_DEFAULT, DOSSIER_CARD_FIELD_LABELS);
+    renderFieldLayoutEditor("dossierFieldLayoutList", "dossier-field-row", "dossierCardFields", DOSSIER_CARD_FIELDS_DEFAULT, DOSSIER_CARD_FIELD_LABELS, renderDossierCardPreview);
   }
   function renderDashboardLayoutEditor(){
     renderFieldLayoutEditor("dashboardLayoutList", "dashboard-field-row", "dashboardLayout", DASHBOARD_WIDGETS_DEFAULT, DASHBOARD_WIDGET_LABELS);
+  }
+  // Read-only live preview of a dossier card inside Settings, using fake
+  // data and the real renderDossierCard() so the preview matches exactly
+  // what Planning will show. All inputs/buttons get disabled on top of
+  // the frame's own pointer-events:none (belt and suspenders — a disabled
+  // native input also can't be tabbed to or focused via JS).
+  function renderDossierCardPreview(){
+    var host = $("#dossierCardPreview"); if (!host) return;
+    var today = new Date().toISOString().slice(0, 10);
+    var sampleDossier = {
+      id: "__preview__",
+      client: "Client exemple",
+      dossierNumber: "DOS-2026-001",
+      startDate: today,
+      endDate: today,
+      workWeekends: false,
+      sameResourcesAllDays: false,
+      moveType: MOVE_TYPES[0] || "",
+      addressFrom: "Rue du Lac 12, Genève",
+      addressTo: "Avenue de la Gare 4, Lausanne",
+      volume: "25",
+      seller: "AB",
+      coordinator: "CD",
+      plannedEmployees: 3,
+      plannedFourgon: 1,
+      plannedPL: 0,
+      plannedVL: 1,
+      task: "Chargement\nLivraison",
+      comment: "Exemple d'aperçu en direct."
+    };
+    var sampleAssignment = {
+      id: "__preview__", dossierId: "__preview__", date: today,
+      employees: (state.employees||[]).slice(0, 2).map(function(e){ return {employeeId: e.id}; }),
+      vehicleIds: (state.vehicles||[]).slice(0, 1).map(function(v){ return v.id; }),
+      arrivalTime: "07:30", slot: "J"
+    };
+    var fakeConflicts = {employees: [], vehicles: []};
+    var draftRaw = state.settingsDraft["dossierCardFields"];
+    if (draftRaw === undefined) draftRaw = state.settings["dossierCardFields"];
+    var draftConfig = parseDossierCardFieldConfig(draftRaw);
+    host.innerHTML = "";
+    var card = renderDossierCard(sampleDossier, fakeConflicts, today, null, sampleAssignment, draftConfig);
+    card.querySelectorAll("input, select, textarea, button").forEach(function(elm){ elm.disabled = true; });
+    host.appendChild(card);
   }
   var resetDossierFieldLayoutBtn = $("#resetDossierFieldLayoutBtn");
   if (resetDossierFieldLayoutBtn) resetDossierFieldLayoutBtn.addEventListener("click", function(){
@@ -2765,8 +2815,8 @@ body.has-top-banner .topbar{top:40px}
     var totalLabel = (Math.round(total*10)/10).toString().replace(".", ",");
     return "Volume " + dossier.volume + " m³ > capacité des véhicules assignés (" + totalLabel + " m³)";
   }
-  function renderDossierCard(dossier, conflicts, dateStr, orderIndex){
-    var assignment = assignmentFor(dossier.id, dateStr);
+  function renderDossierCard(dossier, conflicts, dateStr, orderIndex, presetAssignment, presetFieldConfig){
+    var assignment = presetAssignment || assignmentFor(dossier.id, dateStr);
     var autoKind = autoDossierKind(dossier);
     // Border-left color now follows the slot (J/A/M); the move type moved up
     // to the full-width header (see typeHeader below), swapping their roles.
@@ -3009,7 +3059,7 @@ body.has-top-banner .topbar{top:40px}
       }
     };
     var fieldsZone = el("div", {class:"dossier-fields-zone"});
-    getDossierCardFieldConfig().forEach(function(cfg){
+    (presetFieldConfig || getDossierCardFieldConfig()).forEach(function(cfg){
       if (!cfg.visible) return;
       var renderer = FIELD_RENDERERS[cfg.id];
       if (!renderer) return;
@@ -4614,6 +4664,7 @@ body.has-top-banner .topbar{top:40px}
       var byId = {}; parseDossierCardFieldConfig(raw).forEach(function(f){ byId[f.id] = f; });
       var reordered = ids.map(function(id){ return byId[id]; }).filter(Boolean);
       state.settingsDraft["dossierCardFields"] = JSON.stringify(reordered);
+      renderDossierCardPreview();
     }, false);
     enableDragReorder($("#dashboardLayoutList"), ".dashboard-field-row", "#dashboardLayoutList", function(r){ return r.dataset.id; }, function(ids){
       var raw = state.settingsDraft["dashboardLayout"];

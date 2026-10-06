@@ -73,4 +73,30 @@ test.describe('Settings : mise en page de la fiche chantier', () => {
     card = await dossierCardByName(page, 'E2E Layout Reset After');
     await expect(card.locator('.info-field', { hasText: 'Commentaire' })).toHaveCount(1);
   });
+
+  test('aperçu live dans Settings : se mettre à jour sans "Enregistrer" et rester en lecture seule', async ({ page }) => {
+    await login(page);
+    await page.click('[data-tab="settings"]');
+    await page.waitForSelector('#dossierFieldLayoutList .dossier-field-row', { timeout: 10000 });
+    const preview = page.locator('#dossierCardPreview .dossier-card');
+    await expect(preview).toHaveCount(1);
+    await expect(preview.locator('.info-field', { hasText: 'Vendeur' })).toHaveCount(1);
+
+    // Uncheck "Vendeur" without saving — the preview must update live,
+    // while the real settings (and any already-rendered dossier card) stay
+    // untouched until "Enregistrer" is clicked.
+    const sellerRow = page.locator('.dossier-field-row', { hasText: 'Vendeur' });
+    await sellerRow.locator('input[type=checkbox]').uncheck();
+    await expect(preview.locator('.info-field', { hasText: 'Vendeur' })).toHaveCount(0);
+
+    const numberRow = page.locator('.dossier-field-row', { hasText: 'N° dossier' });
+    await numberRow.locator('input[type=color]').fill('#0000ff');
+    const numberBorder = await preview.locator('input[placeholder="N° dossier"]').evaluate((input) => input.closest('.info-field').style.borderLeft);
+    expect(numberBorder).toContain('rgb(0, 0, 255)');
+
+    // Every input/select/textarea/button inside the preview must be
+    // disabled, so it can never write real data.
+    const enabledCount = await preview.locator('input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])').count();
+    expect(enabledCount).toBe(0);
+  });
 });

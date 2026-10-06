@@ -46,17 +46,24 @@ test.describe('Vue Semaine : badges effectif/véhicules assigné vs prévu', () 
     await page.waitForTimeout(300);
     await createDossier(page, 'E2E Planifie Vs Assigne');
     const card = await dossierCardByName(page, 'E2E Planifie Vs Assigne');
+    // saveDossierMeta() round-trips a POST /api/dossiers then a full
+    // refreshAll() (GET /api/all) before the UI reflects the new value —
+    // under load that's slower than a short fixed wait, so wait for the
+    // save response itself rather than guessing a delay.
+    const plannedSaved = page.waitForResponse((r) => r.url().includes('/api/dossiers') && r.request().method() === 'POST');
     await card.locator('input[type=number]').first().fill('4'); // Effectif prévu
     await card.locator('input[type=number]').first().dispatchEvent('change');
+    await plannedSaved;
     await page.waitForTimeout(300);
     await card.locator('.chips .add-chip').first().click();
     await page.waitForTimeout(300);
+    const assignSaved = page.waitForResponse((r) => r.url().includes('/api/assignments') && r.request().method() === 'POST');
     await page.locator('.popover .opt', { hasText: 'PEL-ROSALES Oscar' }).click();
+    await assignSaved;
     await page.waitForTimeout(500);
 
     await page.click('#viewModeWeekBtn');
-    await page.waitForTimeout(600);
-    await expect(page.locator('.week-day-empcount-item').first()).toContainText('/4 pers.');
+    await expect(page.locator('.week-day-empcount-item').first()).toContainText('/4 pers.', { timeout: 10000 });
   });
 
   test('sans "prévu" saisi ce jour-là, le badge affiche quand même "assigné/0"', async ({ page }) => {

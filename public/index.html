@@ -697,7 +697,7 @@ body.has-top-banner .topbar{top:40px}
     <div class="company-grid" id="settingsGroups" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr))"></div>
     <div class="chart-card edit-only" style="margin-top:16px">
       <h3 style="margin-bottom:4px">Mise en page : fiche chantier</h3>
-      <p class="chart-sub" style="margin-bottom:10px">Glissez pour réordonner, choisissez la largeur et la couleur de chaque champ, ou décochez pour le masquer. S'applique à toutes les fiches, dans Planning.</p>
+      <p class="chart-sub" style="margin-bottom:10px">Glissez pour réordonner, choisissez la largeur et la couleur de fond de chaque champ, ou décochez pour le masquer. S'applique à toutes les fiches, dans Planning.</p>
       <ul class="emp-list" id="dossierFieldLayoutList"></ul>
       <button class="btn btn-ghost" id="resetDossierFieldLayoutBtn" style="margin-top:10px">Réinitialiser cette mise en page</button>
       <p class="chart-sub" style="margin:14px 0 6px">Aperçu (données fictives, en lecture seule) :</p>
@@ -705,7 +705,7 @@ body.has-top-banner .topbar{top:40px}
     </div>
     <div class="chart-card edit-only" style="margin-top:16px">
       <h3 style="margin-bottom:4px">Mise en page : Dashboard</h3>
-      <p class="chart-sub" style="margin-bottom:10px">Glissez pour réordonner les widgets, pleine largeur ou demi-largeur (côte à côte), une couleur d'accent, ou décochez pour le masquer.</p>
+      <p class="chart-sub" style="margin-bottom:10px">Glissez pour réordonner les widgets, pleine largeur ou demi-largeur (côte à côte), une couleur de fond, ou décochez pour le masquer.</p>
       <ul class="emp-list" id="dashboardLayoutList"></ul>
       <button class="btn btn-ghost" id="resetDashboardLayoutBtn" style="margin-top:10px">Réinitialiser cette mise en page</button>
     </div>
@@ -1138,7 +1138,7 @@ body.has-top-banner .topbar{top:40px}
       w.hidden = !cfg.visible;
       w.classList.remove("wide", "narrow");
       w.classList.add(cfg.width === "narrow" ? "narrow" : "wide");
-      w.style.borderLeft = cfg.color ? "4px solid " + cfg.color : "";
+      w.style.background = cfg.color || "";
       host.appendChild(w);
     });
   }
@@ -2355,7 +2355,7 @@ body.has-top-banner .topbar{top:40px}
       row.appendChild(widthSel);
       var colorInput = el("input", {type:"color", value: f.color || "#888888"});
       colorInput.disabled = !canEdit();
-      colorInput.title = "Couleur d'accent (optionnelle)";
+      colorInput.title = "Couleur de fond (optionnelle)";
       colorInput.addEventListener("input", function(){ f.color = colorInput.value; state.settingsDraft[settingsKey] = JSON.stringify(config); if (onChange) onChange(); });
       row.appendChild(colorInput);
       if (f.color){
@@ -3072,7 +3072,7 @@ body.has-top-banner .topbar{top:40px}
       var node = renderer();
       if (!node) return;
       node.classList.add(cfg.width === "narrow" ? "narrow" : "wide");
-      if (cfg.color) { node.style.borderLeft = "3px solid " + cfg.color; node.style.paddingLeft = "6px"; }
+      if (cfg.color) { node.style.background = cfg.color; node.style.borderRadius = "6px"; node.style.padding = "6px"; }
       fieldsZone.appendChild(node);
     });
     card.appendChild(fieldsZone);

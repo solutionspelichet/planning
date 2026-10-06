@@ -36,8 +36,8 @@ test.describe('Settings : mise en page du Dashboard', () => {
     await page.waitForTimeout(400);
 
     await expect(page.locator('[data-widget="typeDistribution"]')).toBeHidden();
-    const statsBorder = await page.locator('[data-widget="stats"]').evaluate((el) => el.style.borderLeft);
-    expect(statsBorder).toContain('rgb(0, 255, 0)');
+    const statsBg = await page.locator('[data-widget="stats"]').evaluate((el) => el.style.background);
+    expect(statsBg).toContain('rgb(0, 255, 0)');
   });
 
   test('réinitialiser la mise en page restaure l\'ordre et la visibilité par défaut', async ({ page }) => {

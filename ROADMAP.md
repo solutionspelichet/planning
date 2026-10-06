@@ -69,7 +69,7 @@ Détente (casse-briques à 200 niveaux, Tetris).
       masqués)
 - [x] Settings (admin/planning) : mise en page de la fiche chantier
       personnalisable — glisser pour réordonner les 19 champs, largeur
-      (pleine/étroite), couleur d'accent et masquage par champ, partagée
+      (pleine/étroite), couleur de fond et masquage par champ, partagée
       pour tout le monde
 - [x] Settings (admin/planning) : mise en page du Dashboard personnalisable
       — mêmes réglages (ordre, pleine/demi-largeur, couleur, masquage) sur

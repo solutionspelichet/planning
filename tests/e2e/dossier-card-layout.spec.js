@@ -5,7 +5,7 @@ const { login, createDossier, dossierCardByName } = require('./helpers');
 // the HTML5 drag gestures behind enableDragReorder() (used by the dossier
 // list, Effectifs and Véhicules too), so this follows that same precedent
 // and sticks to the checkbox/select/color-input path, which is what an
-// admin actually uses to hide a field or set its accent color.
+// admin actually uses to hide a field or set its background color.
 test.describe('Settings : mise en page de la fiche chantier', () => {
   test.afterEach(async ({ page }) => {
     // Leave the shared layout as the default for every other spec file's
@@ -42,8 +42,8 @@ test.describe('Settings : mise en page de la fiche chantier', () => {
     const card = await dossierCardByName(page, 'E2E Layout Fields');
 
     await expect(card.locator('.info-field', { hasText: 'Vendeur' })).toHaveCount(0);
-    const numberBorder = await card.locator('input[placeholder="N° dossier"]').evaluate((input) => input.closest('.info-field').style.borderLeft);
-    expect(numberBorder).toContain('rgb(255, 0, 0)');
+    const numberBg = await card.locator('input[placeholder="N° dossier"]').evaluate((input) => input.closest('.info-field').style.background);
+    expect(numberBg).toContain('rgb(255, 0, 0)');
   });
 
   test('réinitialiser la mise en page restaure l\'ordre et la visibilité par défaut', async ({ page }) => {
@@ -91,8 +91,8 @@ test.describe('Settings : mise en page de la fiche chantier', () => {
 
     const numberRow = page.locator('.dossier-field-row', { hasText: 'N° dossier' });
     await numberRow.locator('input[type=color]').fill('#0000ff');
-    const numberBorder = await preview.locator('input[placeholder="N° dossier"]').evaluate((input) => input.closest('.info-field').style.borderLeft);
-    expect(numberBorder).toContain('rgb(0, 0, 255)');
+    const numberBg = await preview.locator('input[placeholder="N° dossier"]').evaluate((input) => input.closest('.info-field').style.background);
+    expect(numberBg).toContain('rgb(0, 0, 255)');
 
     // Every input/select/textarea/button inside the preview must be
     // disabled, so it can never write real data.

@@ -44,14 +44,14 @@ test.describe('Settings : mise en page de la fiche chantier', () => {
     const card = await dossierCardByName(page, 'E2E Layout Fields');
 
     await expect(card.locator('.info-field', { hasText: 'Vendeur' })).toHaveCount(0);
-    const numberInput = card.locator('input[placeholder="N° dossier"]');
-    const numberBg = await numberInput.evaluate((input) => input.closest('.info-field').style.background);
-    expect(numberBg).toContain('rgb(255, 0, 0)');
-    // The input's own opaque background must be cleared, otherwise it
-    // covers the colored box and only the padding ring around it shows —
-    // looking like an outline instead of a filled background.
-    const inputBg = await numberInput.evaluate((input) => getComputedStyle(input).backgroundColor);
-    expect(inputBg).toBe('rgba(0, 0, 0, 0)');
+    const numberField = card.locator('.info-field', { hasText: 'N° dossier' });
+    // Only the value box (the input) gets the color, not the field's label
+    // ("N° DOSSIER" text) — matches "Volume en rouge" coloring the number
+    // box, not the word "VOLUME" above it.
+    const labelBg = await numberField.locator('label').evaluate((label) => getComputedStyle(label).backgroundColor);
+    expect(labelBg).toBe('rgba(0, 0, 0, 0)');
+    const inputBg = await numberField.locator('input').evaluate((input) => getComputedStyle(input).backgroundColor);
+    expect(inputBg).toBe('rgb(255, 0, 0)');
   });
 
   test('réinitialiser la mise en page restaure l\'ordre et la visibilité par défaut', async ({ page }) => {
@@ -114,8 +114,8 @@ test.describe('Settings : mise en page de la fiche chantier', () => {
 
     await page.locator('.dossier-field-row', { hasText: 'N° dossier' }).click();
     await page.locator('#dossierFieldDetail input[type=color]').fill('#0000ff');
-    const numberBg = await preview.locator('input[placeholder="N° dossier"]').evaluate((input) => input.closest('.info-field').style.background);
-    expect(numberBg).toContain('rgb(0, 0, 255)');
+    const numberInputBg = await preview.locator('input[placeholder="N° dossier"]').evaluate((input) => getComputedStyle(input).backgroundColor);
+    expect(numberInputBg).toBe('rgb(0, 0, 255)');
 
     // Every input/select/textarea/button inside the preview must be
     // disabled, so it can never write real data.

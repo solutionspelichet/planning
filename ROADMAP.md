@@ -62,6 +62,15 @@ Détente (casse-briques à 200 niveaux, Tetris).
       employés/véhicules/dossiers numérotés déjà présents, bouton "Annuler"
       par import qui efface précisément ce qu'il a créé (sans toucher aux
       changements faits depuis)
+- [x] Rôle "user" : navigation limitée à Planning (plus l'onglet Effectifs,
+      Véhicules, Vacances, Dashboard, Zen, Détente ni Settings), et dans
+      Planning seuls le calendrier principal, Aujourd'hui/Jour/Semaine et
+      Imprimer restent visibles (exports et calendriers Vacances/Garage
+      masqués)
+- [x] Settings (admin/planning) : mise en page de la fiche chantier
+      personnalisable — glisser pour réordonner les 19 champs, largeur
+      (pleine/étroite), couleur d'accent et masquage par champ, partagée
+      pour tout le monde
 
 ## Volontairement pas fait (à confirmer avant de s'y lancer)
 

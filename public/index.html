@@ -56,6 +56,11 @@ body{background:var(--bg);color:var(--fg);font-family:'Public Sans',system-ui,sa
 h1,h2,h3{font-family:'Public Sans',system-ui,sans-serif;font-weight:700;margin:0}
 [hidden]{display:none!important}
 .view-only .edit-only{display:none!important}
+/* Role "user": only the Planning tab, and only its main calendar + jobsite
+   day/week panel with Aujourd'hui/Jour/Semaine/Imprimer — see canEdit()'s
+   .view-only, which this class piggybacks on since it's already exactly
+   "role === user" for the whole time the app is usable. */
+.view-only .user-hide{display:none!important}
 
 .topbar{position:sticky;top:0;z-index:30;background:var(--bg);padding-top:16px;padding-bottom:12px;
   border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;align-items:center;gap:14px;justify-content:space-between}
@@ -398,13 +403,13 @@ table.week-table tr.week-row-veh td.week-metric-label{border-left:4px solid var(
 .next-day-toggle{display:flex;align-items:center;gap:8px;font:inherit;font-size:14px;font-weight:700;
   background:none;border:none;color:var(--fg);cursor:pointer;padding:0 0 10px;width:100%;text-align:left}
 .next-day-toggle:hover{color:var(--accent)}
-.address-stack{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
-.address-stack .info-field textarea,.info-field.wide textarea{width:100%;font-size:13px;font-weight:700;padding:7px 9px;font-family:inherit;
-  border:1px solid var(--border);background:var(--surface);color:var(--fg);border-radius:6px;resize:vertical}
+.info-field.wide textarea{width:100%;font-size:13px;font-weight:700;padding:7px 9px;font-family:inherit;
+  border:1px solid var(--border);background:var(--surface);color:var(--fg);border-radius:6px;resize:none;overflow:hidden;min-height:44px}
 .info-field.wide{width:100%;margin-bottom:8px}
-.info-field.wide textarea{resize:none;overflow:hidden;min-height:44px}
 .address-field textarea.addr-gm{background:color-mix(in srgb, var(--addr-gm) 16%, var(--surface));border-color:var(--addr-gm);color:color-mix(in srgb, var(--addr-gm) 65%, black)}
 .address-field textarea.addr-transit{background:color-mix(in srgb, var(--addr-transit) 16%, var(--surface));border-color:var(--addr-transit);color:color-mix(in srgb, var(--addr-transit) 65%, black)}
+.dossier-fields-zone{display:grid;grid-template-columns:repeat(auto-fill,minmax(95px,1fr));gap:6px 8px}
+.dossier-fields-zone > .wide{grid-column:1/-1}
 td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
 .draggable-row{cursor:grab}
 .draggable-row:active{cursor:grabbing}
@@ -520,13 +525,13 @@ body.has-top-banner .topbar{top:40px}
     </div>
     <div class="tabs" id="tabBar">
       <button class="tab-btn active" data-tab="planning">Planning</button>
-      <button class="tab-btn" data-tab="effectifs">Effectifs</button>
-      <button class="tab-btn" data-tab="vehicules">Véhicules</button>
-      <button class="tab-btn" data-tab="vacances">Vacances &amp; Garage</button>
-      <button class="tab-btn" data-tab="dashboard">Dashboard</button>
-      <button class="tab-btn" data-tab="zen">🧘 Zen Attitude</button>
-      <button class="tab-btn" data-tab="detente">🎮 Détente</button>
-      <button class="tab-btn" data-tab="settings">Settings</button>
+      <button class="tab-btn user-hide" data-tab="effectifs">Effectifs</button>
+      <button class="tab-btn user-hide" data-tab="vehicules">Véhicules</button>
+      <button class="tab-btn user-hide" data-tab="vacances">Vacances &amp; Garage</button>
+      <button class="tab-btn user-hide" data-tab="dashboard">Dashboard</button>
+      <button class="tab-btn user-hide" data-tab="zen">🧘 Zen Attitude</button>
+      <button class="tab-btn user-hide" data-tab="detente">🎮 Détente</button>
+      <button class="tab-btn user-hide" data-tab="settings">Settings</button>
       <button class="tab-btn edit-only" data-tab="admin" id="adminTabBtn">Admin</button>
     </div>
     <div class="search-wrap">
@@ -555,7 +560,7 @@ body.has-top-banner .topbar{top:40px}
           <div class="cal-dow" id="calDow"></div>
           <div class="cal-days" id="calDays"></div>
         </div>
-        <div class="calendar">
+        <div class="calendar user-hide">
           <h3 class="calendar-label">Vacances, Congés et Immobilisation</h3>
           <div class="cal-head">
             <button id="vgPrevMonth" aria-label="Mois précédent">‹</button>
@@ -565,7 +570,7 @@ body.has-top-banner .topbar{top:40px}
           <div class="cal-dow" id="vgCalDow"></div>
           <div class="cal-days" id="vgCalDays"></div>
         </div>
-        <div class="calendar">
+        <div class="calendar user-hide">
           <h3 style="font-size:12.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--fg-muted);margin-bottom:10px">
             Congés &amp; Garage — <span id="vgDayTitle">—</span>
           </h3>
@@ -581,9 +586,9 @@ body.has-top-banner .topbar{top:40px}
               <button type="button" class="view-mode-btn active" id="viewModeDayBtn">Jour</button>
               <button type="button" class="view-mode-btn" id="viewModeWeekBtn">Semaine</button>
             </div>
-            <button class="btn btn-ghost" id="exportCsvBtn">⬇ Export CSV (mois)</button>
-            <button class="btn btn-ghost" id="exportPdfBtn">📄 Export PDF (jour)</button>
-            <button class="btn btn-ghost" id="exportWeekPdfBtn">📄 Export PDF (semaine)</button>
+            <button class="btn btn-ghost user-hide" id="exportCsvBtn">⬇ Export CSV (mois)</button>
+            <button class="btn btn-ghost user-hide" id="exportPdfBtn">📄 Export PDF (jour)</button>
+            <button class="btn btn-ghost user-hide" id="exportWeekPdfBtn">📄 Export PDF (semaine)</button>
             <button class="btn btn-ghost" id="printDayBtn">🖨 Imprimer</button>
             <button class="btn edit-only" id="newDossierBtn">+ Nouveau dossier</button>
           </div>
@@ -685,6 +690,12 @@ body.has-top-banner .topbar{top:40px}
     </div>
     <div class="settings-preview" id="settingsPreview"></div>
     <div class="company-grid" id="settingsGroups" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr))"></div>
+    <div class="chart-card edit-only" style="margin-top:16px">
+      <h3 style="margin-bottom:4px">Mise en page : fiche chantier</h3>
+      <p class="chart-sub" style="margin-bottom:10px">Glissez pour réordonner, choisissez la largeur et la couleur de chaque champ, ou décochez pour le masquer. S'applique à toutes les fiches, dans Planning.</p>
+      <ul class="emp-list" id="dossierFieldLayoutList"></ul>
+      <button class="btn btn-ghost" id="resetDossierFieldLayoutBtn" style="margin-top:10px">Réinitialiser cette mise en page</button>
+    </div>
     <div class="day-panel-actions edit-only" style="margin-top:16px">
       <button class="btn" id="saveSettingsBtn">Enregistrer</button>
       <button class="btn btn-ghost" id="resetSettingsBtn">Réinitialiser les valeurs par défaut</button>
@@ -1021,6 +1032,61 @@ body.has-top-banner .topbar{top:40px}
       {key:"cal-heat-red", label:"Rouge à partir de", type:"number", def:60, min:1, max:500, unit:"pers."}
     ]}
   ];
+  // ---------- customizable dossier-card layout (Settings) ----------
+  // Every field below the card's fixed header (type + client name) can be
+  // reordered, resized (narrow = packs two per row like the old .info-grid
+  // did, wide = its own full row) and given an accent color from Settings.
+  // The header itself and the capacity/absence warnings stay fixed — they're
+  // the card's identity and its alerts, not configurable content.
+  var DOSSIER_CARD_FIELDS_DEFAULT = [
+    {id:"dossierNumber", width:"wide", visible:true, color:""},
+    {id:"dateRange", width:"wide", visible:true, color:""},
+    {id:"workWeekends", width:"wide", visible:true, color:""},
+    {id:"slot", width:"wide", visible:true, color:""},
+    {id:"addressFrom", width:"wide", visible:true, color:""},
+    {id:"addressTo", width:"wide", visible:true, color:""},
+    {id:"volume", width:"narrow", visible:true, color:""},
+    {id:"seller", width:"narrow", visible:true, color:""},
+    {id:"coordinator", width:"narrow", visible:true, color:""},
+    {id:"plannedEmployees", width:"narrow", visible:true, color:""},
+    {id:"plannedFourgon", width:"narrow", visible:true, color:""},
+    {id:"plannedPL", width:"narrow", visible:true, color:""},
+    {id:"plannedVL", width:"narrow", visible:true, color:""},
+    {id:"task", width:"wide", visible:true, color:""},
+    {id:"comment", width:"wide", visible:true, color:""},
+    {id:"arrivalTime", width:"narrow", visible:true, color:""},
+    {id:"sameDaysToggle", width:"wide", visible:true, color:""},
+    {id:"employeesChips", width:"wide", visible:true, color:""},
+    {id:"vehiclesChips", width:"wide", visible:true, color:""}
+  ];
+  var DOSSIER_CARD_FIELD_LABELS = {
+    dossierNumber:"N° dossier", dateRange:"Dates (du / au)", workWeekends:"Travail le week-end",
+    slot:"Créneau", addressFrom:"Adresse de départ", addressTo:"Adresse d'arrivée",
+    volume:"Volume", seller:"Vendeur", coordinator:"Coordinatrice",
+    plannedEmployees:"Effectif prévu", plannedFourgon:"Fourgons prévus", plannedPL:"PL prévus", plannedVL:"VL prévus",
+    task:"Tâche à réaliser", comment:"Commentaire", arrivalTime:"Heure d'arrivée (jour)",
+    sameDaysToggle:"Même équipe tous les jours", employeesChips:"Effectif (équipe)", vehiclesChips:"Véhicules"
+  };
+  function parseDossierCardFieldConfig(raw){
+    var parsed = null;
+    if (raw) { try { parsed = JSON.parse(raw); } catch(e){ parsed = null; } }
+    if (!Array.isArray(parsed)) return DOSSIER_CARD_FIELDS_DEFAULT.map(function(f){ return Object.assign({}, f); });
+    var seen = {};
+    var result = [];
+    parsed.forEach(function(f){
+      if (!f || !DOSSIER_CARD_FIELD_LABELS[f.id] || seen[f.id]) return;
+      seen[f.id] = true;
+      result.push({id:f.id, width: f.width==="narrow"?"narrow":"wide", visible: f.visible!==false, color: f.color||""});
+    });
+    // A field added to the app after this config was saved — append it at
+    // the end with its default so it doesn't just silently disappear.
+    DOSSIER_CARD_FIELDS_DEFAULT.forEach(function(def){
+      if (!seen[def.id]) result.push(Object.assign({}, def));
+    });
+    return result;
+  }
+  function getDossierCardFieldConfig(){ return parseDossierCardFieldConfig(state.settings["dossierCardFields"]); }
+
   var CODE_LOAD = {J:1, M:0.5, A:0.5};
   var MONTHS_FR = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
   var DOW_FR = ["L","M","M","J","V","S","D"];
@@ -1428,6 +1494,10 @@ body.has-top-banner .topbar{top:40px}
 
   // ---------- tabs ----------
   function setTab(tab){
+    // Belt-and-suspenders: the tab buttons for anything but Planning are
+    // already hidden for role "user" (see the .user-hide CSS rule), but
+    // nothing stops a direct setTab("dashboard") call from the console.
+    if (state.role === "user" && tab !== "planning") tab = "planning";
     state.activeTab = tab;
     $all(".tab-btn").forEach(function(b){ b.classList.toggle("active", b.dataset.tab === tab); });
     $("#view-planning").hidden = tab !== "planning";
@@ -2189,7 +2259,53 @@ body.has-top-banner .topbar{top:40px}
       });
       host.appendChild(card);
     });
+    renderDossierFieldLayoutEditor();
   }
+  function renderDossierFieldLayoutEditor(){
+    var host = $("#dossierFieldLayoutList"); if (!host) return;
+    var raw = state.settingsDraft["dossierCardFields"];
+    if (raw === undefined) raw = state.settings["dossierCardFields"];
+    var config = parseDossierCardFieldConfig(raw);
+    host.innerHTML = "";
+    config.forEach(function(f){
+      var row = el("li", {class:"emp-row dossier-field-row"});
+      if (canEdit()){ row.draggable = true; row.dataset.id = f.id; row.classList.add("draggable-row"); }
+      var visChk = el("input", {type:"checkbox"});
+      visChk.checked = f.visible;
+      visChk.disabled = !canEdit();
+      visChk.title = "Afficher ce champ";
+      visChk.addEventListener("change", function(){ f.visible = visChk.checked; state.settingsDraft["dossierCardFields"] = JSON.stringify(config); });
+      row.appendChild(visChk);
+      row.appendChild(el("span", {class:"emp-name", text: DOSSIER_CARD_FIELD_LABELS[f.id] || f.id}));
+      var widthSel = el("select", {});
+      widthSel.disabled = !canEdit();
+      [["wide","Pleine largeur"], ["narrow","Étroit"]].forEach(function(pair){
+        var opt = el("option", {value:pair[0], text:pair[1]});
+        if (pair[0] === f.width) opt.setAttribute("selected","selected");
+        widthSel.appendChild(opt);
+      });
+      widthSel.addEventListener("change", function(){ f.width = widthSel.value; state.settingsDraft["dossierCardFields"] = JSON.stringify(config); });
+      row.appendChild(widthSel);
+      var colorInput = el("input", {type:"color", value: f.color || "#888888"});
+      colorInput.disabled = !canEdit();
+      colorInput.title = "Couleur d'accent (optionnelle)";
+      colorInput.addEventListener("input", function(){ f.color = colorInput.value; state.settingsDraft["dossierCardFields"] = JSON.stringify(config); });
+      row.appendChild(colorInput);
+      if (f.color){
+        row.appendChild(el("button", {class:"icon-btn edit-only", title:"Retirer la couleur", text:"✕", onclick: function(){
+          f.color = ""; state.settingsDraft["dossierCardFields"] = JSON.stringify(config); renderDossierFieldLayoutEditor();
+        }}));
+      }
+      host.appendChild(row);
+    });
+  }
+  var resetDossierFieldLayoutBtn = $("#resetDossierFieldLayoutBtn");
+  if (resetDossierFieldLayoutBtn) resetDossierFieldLayoutBtn.addEventListener("click", function(){
+    if (!canEdit()) return;
+    state.settingsDraft["dossierCardFields"] = JSON.stringify(DOSSIER_CARD_FIELDS_DEFAULT);
+    renderDossierFieldLayoutEditor();
+    toast("Mise en page par défaut rétablie — cliquez Enregistrer pour confirmer");
+  });
   var saveSettingsBtn = $("#saveSettingsBtn");
   if (saveSettingsBtn) saveSettingsBtn.addEventListener("click", function(){
     if (!canEdit()) return;
@@ -2626,74 +2742,8 @@ body.has-top-banner .topbar{top:40px}
       card.appendChild(el("div", {class:"capacity-warning", text:"🚫 " + msg}));
     });
 
-    var numberField = el("div", {class:"info-field wide", style:"margin-bottom:8px"});
-    numberField.appendChild(el("label", {text:"N° dossier"}));
-    var numberInput = el("input", {value: dossier.dossierNumber || "", placeholder:"N° dossier", style:"text-transform:uppercase"});
-    numberInput.disabled = !canEdit();
-    numberInput.addEventListener("input", function(){
-      var pos = numberInput.selectionStart;
-      numberInput.value = numberInput.value.toUpperCase();
-      try { numberInput.setSelectionRange(pos, pos); } catch(e){}
-    });
-    numberInput.addEventListener("change", function(){ saveDossierMeta(dossier, {dossierNumber: numberInput.value.toUpperCase()}); });
-    numberField.appendChild(numberInput);
-    card.appendChild(numberField);
-    if (dossier.dossierNumber && state.dossiers.some(function(d){ return d.id !== dossier.id && d.dossierNumber === dossier.dossierNumber; })){
-      card.appendChild(el("div", {class:"capacity-warning", text:"⚠ Le N° " + dossier.dossierNumber + " est déjà utilisé par un autre dossier"}));
-    }
-
-    var range = el("div", {class:"date-range"});
-    range.appendChild(el("span", {text:"Du"}));
-    var startInput = el("input", {type:"date", value: dossier.startDate});
-    startInput.disabled = !canEdit();
-    startInput.addEventListener("change", function(){
-      if (startInput.value && startInput.value <= dossier.endDate) saveDossierMeta(dossier, {startDate: startInput.value});
-      else { toast("La date de début doit précéder la fin"); startInput.value = dossier.startDate; }
-    });
-    range.appendChild(startInput);
-    range.appendChild(el("span", {text:"au"}));
-    var endInput = el("input", {type:"date", value: dossier.endDate});
-    endInput.disabled = !canEdit();
-    endInput.addEventListener("change", function(){
-      if (endInput.value && endInput.value >= dossier.startDate) saveDossierMeta(dossier, {endDate: endInput.value});
-      else { toast("La date de fin doit suivre le début"); endInput.value = dossier.endDate; }
-    });
-    range.appendChild(endInput);
-    card.appendChild(range);
-
-    if (canEdit()){
-      var weekendRow = el("label", {class:"copy-all-days"});
-      var weekendChk = el("input", {type:"checkbox"});
-      weekendChk.checked = !!dossier.workWeekends;
-      weekendChk.addEventListener("change", function(){
-        saveDossierMeta(dossier, {workWeekends: weekendChk.checked});
-      });
-      weekendRow.appendChild(weekendChk);
-      weekendRow.appendChild(document.createTextNode("Travail le week-end (compte les samedis/dimanches dans la durée)"));
-      card.appendChild(weekendRow);
-    }
-
-    var slotField = el("div", {class:"info-field wide"});
-    slotField.appendChild(el("label", {text:"Créneau"}));
-    var slotSel = el("select", {class: assignment.slot ? "slot-"+assignment.slot : ""});
-    slotSel.disabled = !canEdit();
-    [["", "—"], ["J","J — JOURNÉE"], ["M","M — MATIN"], ["A","A — APRÈS-MIDI"]].forEach(function(pair){
-      var opt = el("option", {value:pair[0], text:pair[1]});
-      if (pair[0] === (assignment.slot||"")) opt.setAttribute("selected","selected");
-      slotSel.appendChild(opt);
-    });
-    slotSel.addEventListener("change", function(){
-      slotSel.className = slotSel.value ? "slot-"+slotSel.value : "";
-      card.classList.remove("slot-J", "slot-M", "slot-A");
-      if (!autoKind && slotSel.value) card.classList.add("slot-"+slotSel.value);
-      applyDossierBg(card, dossier, Object.assign({}, assignment, {slot: slotSel.value}), autoKind);
-      saveAssignment(assignment, {slot: slotSel.value});
-    });
-    slotField.appendChild(slotSel);
-    card.appendChild(slotField);
-
-    function infoField(labelText, key, placeholder, narrow, wide){
-      var field = el("div", {class:"info-field" + (narrow?" narrow":"") + (wide?" wide":"")});
+    function infoField(labelText, key, placeholder){
+      var field = el("div", {class:"info-field"});
       field.appendChild(el("label", {text:labelText}));
       var input = el("input", {value: dossier[key]||"", placeholder: placeholder||""});
       input.disabled = !canEdit();
@@ -2702,7 +2752,7 @@ body.has-top-banner .topbar{top:40px}
       return field;
     }
     function plannedField(labelText, key){
-      var field = el("div", {class:"info-field narrow"});
+      var field = el("div", {class:"info-field"});
       field.appendChild(el("label", {text:labelText}));
       var input = el("input", {type:"number", min:"0", value: dossier[key] ? String(dossier[key]) : ""});
       input.disabled = !canEdit();
@@ -2730,23 +2780,9 @@ body.has-top-banner .topbar{top:40px}
       field.appendChild(input);
       return field;
     }
-    var addressStack = el("div", {class:"address-stack"});
-    addressStack.appendChild(addressField("Adresse de départ", "addressFrom"));
-    addressStack.appendChild(addressField("Adresse d'arrivée", "addressTo"));
-    card.appendChild(addressStack);
-
-    var infoGrid = el("div", {class:"info-grid"});
-    infoGrid.appendChild(infoField("Volume", "volume", "m³", true));
-    infoGrid.appendChild(infoField("Vendeur", "seller", "Initiales", true));
-    infoGrid.appendChild(infoField("Coordinatrice", "coordinator", "Initiales", true));
-    infoGrid.appendChild(plannedField("Effectif prévu", "plannedEmployees"));
-    infoGrid.appendChild(plannedField("Fourgons prévus", "plannedFourgon"));
-    infoGrid.appendChild(plannedField("PL prévus", "plannedPL"));
-    infoGrid.appendChild(plannedField("VL prévus", "plannedVL"));
-    card.appendChild(infoGrid);
     function autoGrow(ta){ ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; }
     function textareaField(labelText, key, placeholder){
-      var field = el("div", {class:"info-field wide"});
+      var field = el("div", {class:"info-field"});
       field.appendChild(el("label", {text:labelText}));
       var input = el("textarea", {rows:"2", placeholder: placeholder||""});
       input.value = dossier[key]||"";
@@ -2757,61 +2793,163 @@ body.has-top-banner .topbar{top:40px}
       setTimeout(function(){ autoGrow(input); }, 0);
       return field;
     }
-    card.appendChild(textareaField("Tâche à réaliser (une par ligne)", "task", "Ex. chargement, livraison, garde-meuble…"));
-    card.appendChild(textareaField("Commentaire", "comment", "Notes diverses…"));
 
-    var dayFields = el("div", {class:"day-fields"});
-    var timeField = el("div", {class:"info-field narrow"});
-    timeField.appendChild(el("label", {text:"Arrivée sur site"}));
-    var timeInput = el("input", {type:"time", value: assignment.arrivalTime || ""});
-    timeInput.disabled = !canEdit();
-    timeInput.addEventListener("change", function(){ saveAssignment(assignment, {arrivalTime: timeInput.value}); });
-    timeField.appendChild(timeInput);
-    dayFields.appendChild(timeField);
-    card.appendChild(dayFields);
-
-    if (totalDays > 1 && canEdit()){
-      var copyRow = el("label", {class:"copy-all-days"});
-      var copyChk = el("input", {type:"checkbox"});
-      copyChk.checked = !!dossier.sameResourcesAllDays;
-      copyChk.addEventListener("change", function(){
-        saveDossierMeta(dossier, {sameResourcesAllDays: copyChk.checked});
-        if (copyChk.checked) copyAssignmentToAllDays(dossier, assignment, totalDays);
-      });
-      copyRow.appendChild(copyChk);
-      copyRow.appendChild(document.createTextNode("Même équipe et véhicules tous les jours (copie sur les " + totalDays + " jours)"));
-      card.appendChild(copyRow);
-    }
-
-    card.appendChild(el("div", {class:"section-label", text: totalDays>1 ? "Effectif de ce jour" : "Effectif"}));
-    var empChips = el("div", {class:"chips"});
-    (assignment.employees||[]).forEach(function(a){
-      var isConflict = conflicts.employees.indexOf(a.employeeId) !== -1;
-      var chip = el("span", {class:"chip"+(isConflict?" conflict":"")});
-      chip.appendChild(el("span", {class:"chip-emp-name", text: empName(a.employeeId)}));
-      chip.appendChild(el("button", {class:"edit-only", text:"✕", onclick: function(){
-        var updated = (assignment.employees||[]).filter(function(x){ return x.employeeId !== a.employeeId; });
-        saveAssignment(assignment, {employees: updated});
-      }}));
-      empChips.appendChild(chip);
+    // One renderer per customizable field id (see DOSSIER_CARD_FIELD_LABELS)
+    // — returning null skips the field entirely (e.g. an edit-only toggle
+    // while read-only), same as the fixed blocks used to be wrapped in an
+    // `if` before this became configurable.
+    var FIELD_RENDERERS = {
+      dossierNumber: function(){
+        var field = el("div", {class:"info-field"});
+        field.appendChild(el("label", {text:"N° dossier"}));
+        var numberInput = el("input", {value: dossier.dossierNumber || "", placeholder:"N° dossier", style:"text-transform:uppercase"});
+        numberInput.disabled = !canEdit();
+        numberInput.addEventListener("input", function(){
+          var pos = numberInput.selectionStart;
+          numberInput.value = numberInput.value.toUpperCase();
+          try { numberInput.setSelectionRange(pos, pos); } catch(e){}
+        });
+        numberInput.addEventListener("change", function(){ saveDossierMeta(dossier, {dossierNumber: numberInput.value.toUpperCase()}); });
+        field.appendChild(numberInput);
+        if (dossier.dossierNumber && state.dossiers.some(function(d){ return d.id !== dossier.id && d.dossierNumber === dossier.dossierNumber; })){
+          field.appendChild(el("div", {class:"capacity-warning", text:"⚠ Le N° " + dossier.dossierNumber + " est déjà utilisé par un autre dossier"}));
+        }
+        return field;
+      },
+      dateRange: function(){
+        var field = el("div", {class:"info-field"});
+        var range = el("div", {class:"date-range"});
+        range.appendChild(el("span", {text:"Du"}));
+        var startInput = el("input", {type:"date", value: dossier.startDate});
+        startInput.disabled = !canEdit();
+        startInput.addEventListener("change", function(){
+          if (startInput.value && startInput.value <= dossier.endDate) saveDossierMeta(dossier, {startDate: startInput.value});
+          else { toast("La date de début doit précéder la fin"); startInput.value = dossier.startDate; }
+        });
+        range.appendChild(startInput);
+        range.appendChild(el("span", {text:"au"}));
+        var endInput = el("input", {type:"date", value: dossier.endDate});
+        endInput.disabled = !canEdit();
+        endInput.addEventListener("change", function(){
+          if (endInput.value && endInput.value >= dossier.startDate) saveDossierMeta(dossier, {endDate: endInput.value});
+          else { toast("La date de fin doit suivre le début"); endInput.value = dossier.endDate; }
+        });
+        range.appendChild(endInput);
+        field.appendChild(range);
+        return field;
+      },
+      workWeekends: function(){
+        if (!canEdit()) return null;
+        var weekendRow = el("label", {class:"copy-all-days"});
+        var weekendChk = el("input", {type:"checkbox"});
+        weekendChk.checked = !!dossier.workWeekends;
+        weekendChk.addEventListener("change", function(){ saveDossierMeta(dossier, {workWeekends: weekendChk.checked}); });
+        weekendRow.appendChild(weekendChk);
+        weekendRow.appendChild(document.createTextNode("Travail le week-end (compte les samedis/dimanches dans la durée)"));
+        return weekendRow;
+      },
+      slot: function(){
+        var slotField = el("div", {class:"info-field"});
+        slotField.appendChild(el("label", {text:"Créneau"}));
+        var slotSel = el("select", {class: assignment.slot ? "slot-"+assignment.slot : ""});
+        slotSel.disabled = !canEdit();
+        [["", "—"], ["J","J — JOURNÉE"], ["M","M — MATIN"], ["A","A — APRÈS-MIDI"]].forEach(function(pair){
+          var opt = el("option", {value:pair[0], text:pair[1]});
+          if (pair[0] === (assignment.slot||"")) opt.setAttribute("selected","selected");
+          slotSel.appendChild(opt);
+        });
+        slotSel.addEventListener("change", function(){
+          slotSel.className = slotSel.value ? "slot-"+slotSel.value : "";
+          card.classList.remove("slot-J", "slot-M", "slot-A");
+          if (!autoKind && slotSel.value) card.classList.add("slot-"+slotSel.value);
+          applyDossierBg(card, dossier, Object.assign({}, assignment, {slot: slotSel.value}), autoKind);
+          saveAssignment(assignment, {slot: slotSel.value});
+        });
+        slotField.appendChild(slotSel);
+        return slotField;
+      },
+      addressFrom: function(){ return addressField("Adresse de départ", "addressFrom"); },
+      addressTo: function(){ return addressField("Adresse d'arrivée", "addressTo"); },
+      volume: function(){ return infoField("Volume", "volume", "m³"); },
+      seller: function(){ return infoField("Vendeur", "seller", "Initiales"); },
+      coordinator: function(){ return infoField("Coordinatrice", "coordinator", "Initiales"); },
+      plannedEmployees: function(){ return plannedField("Effectif prévu", "plannedEmployees"); },
+      plannedFourgon: function(){ return plannedField("Fourgons prévus", "plannedFourgon"); },
+      plannedPL: function(){ return plannedField("PL prévus", "plannedPL"); },
+      plannedVL: function(){ return plannedField("VL prévus", "plannedVL"); },
+      task: function(){ return textareaField("Tâche à réaliser (une par ligne)", "task", "Ex. chargement, livraison, garde-meuble…"); },
+      comment: function(){ return textareaField("Commentaire", "comment", "Notes diverses…"); },
+      arrivalTime: function(){
+        var timeField = el("div", {class:"info-field"});
+        timeField.appendChild(el("label", {text:"Arrivée sur site"}));
+        var timeInput = el("input", {type:"time", value: assignment.arrivalTime || ""});
+        timeInput.disabled = !canEdit();
+        timeInput.addEventListener("change", function(){ saveAssignment(assignment, {arrivalTime: timeInput.value}); });
+        timeField.appendChild(timeInput);
+        return timeField;
+      },
+      sameDaysToggle: function(){
+        if (totalDays <= 1 || !canEdit()) return null;
+        var copyRow = el("label", {class:"copy-all-days"});
+        var copyChk = el("input", {type:"checkbox"});
+        copyChk.checked = !!dossier.sameResourcesAllDays;
+        copyChk.addEventListener("change", function(){
+          saveDossierMeta(dossier, {sameResourcesAllDays: copyChk.checked});
+          if (copyChk.checked) copyAssignmentToAllDays(dossier, assignment, totalDays);
+        });
+        copyRow.appendChild(copyChk);
+        copyRow.appendChild(document.createTextNode("Même équipe et véhicules tous les jours (copie sur les " + totalDays + " jours)"));
+        return copyRow;
+      },
+      employeesChips: function(){
+        var wrap = el("div", {});
+        wrap.appendChild(el("div", {class:"section-label", text: totalDays>1 ? "Effectif de ce jour" : "Effectif"}));
+        var empChips = el("div", {class:"chips"});
+        (assignment.employees||[]).forEach(function(a){
+          var isConflict = conflicts.employees.indexOf(a.employeeId) !== -1;
+          var chip = el("span", {class:"chip"+(isConflict?" conflict":"")});
+          chip.appendChild(el("span", {class:"chip-emp-name", text: empName(a.employeeId)}));
+          chip.appendChild(el("button", {class:"edit-only", text:"✕", onclick: function(){
+            var updated = (assignment.employees||[]).filter(function(x){ return x.employeeId !== a.employeeId; });
+            saveAssignment(assignment, {employees: updated});
+          }}));
+          empChips.appendChild(chip);
+        });
+        empChips.appendChild(el("button", {class:"add-chip edit-only", text:"+ Ajouter", onclick: function(ev){ openEmployeePicker(ev.target, assignment); }}));
+        wrap.appendChild(empChips);
+        return wrap;
+      },
+      vehiclesChips: function(){
+        var wrap = el("div", {});
+        wrap.appendChild(el("div", {class:"section-label", text: totalDays>1 ? "Véhicules de ce jour" : "Véhicules"}));
+        var vehChips = el("div", {class:"chips"});
+        (assignment.vehicleIds||[]).forEach(function(vid){
+          var isConflict = conflicts.vehicles.indexOf(vid) !== -1;
+          var chip = el("span", {class:"chip"+(isConflict?" conflict":"")+(isVehPL(vid)?" chip-pl":"")});
+          chip.appendChild(el("span", {text: vehName(vid)}));
+          chip.appendChild(el("button", {class:"edit-only", text:"✕", onclick: function(){
+            var updated = (assignment.vehicleIds||[]).filter(function(x){ return x !== vid; });
+            saveAssignment(assignment, {vehicleIds: updated});
+          }}));
+          vehChips.appendChild(chip);
+        });
+        vehChips.appendChild(el("button", {class:"add-chip edit-only", text:"+ Ajouter", onclick: function(ev){ openVehiclePicker(ev.target, assignment); }}));
+        wrap.appendChild(vehChips);
+        return wrap;
+      }
+    };
+    var fieldsZone = el("div", {class:"dossier-fields-zone"});
+    getDossierCardFieldConfig().forEach(function(cfg){
+      if (!cfg.visible) return;
+      var renderer = FIELD_RENDERERS[cfg.id];
+      if (!renderer) return;
+      var node = renderer();
+      if (!node) return;
+      node.classList.add(cfg.width === "narrow" ? "narrow" : "wide");
+      if (cfg.color) { node.style.borderLeft = "3px solid " + cfg.color; node.style.paddingLeft = "6px"; }
+      fieldsZone.appendChild(node);
     });
-    empChips.appendChild(el("button", {class:"add-chip edit-only", text:"+ Ajouter", onclick: function(ev){ openEmployeePicker(ev.target, assignment); }}));
-    card.appendChild(empChips);
-
-    card.appendChild(el("div", {class:"section-label", text: totalDays>1 ? "Véhicules de ce jour" : "Véhicules"}));
-    var vehChips = el("div", {class:"chips"});
-    (assignment.vehicleIds||[]).forEach(function(vid){
-      var isConflict = conflicts.vehicles.indexOf(vid) !== -1;
-      var chip = el("span", {class:"chip"+(isConflict?" conflict":"")+(isVehPL(vid)?" chip-pl":"")});
-      chip.appendChild(el("span", {text: vehName(vid)}));
-      chip.appendChild(el("button", {class:"edit-only", text:"✕", onclick: function(){
-        var updated = (assignment.vehicleIds||[]).filter(function(x){ return x !== vid; });
-        saveAssignment(assignment, {vehicleIds: updated});
-      }}));
-      vehChips.appendChild(chip);
-    });
-    vehChips.appendChild(el("button", {class:"add-chip edit-only", text:"+ Ajouter", onclick: function(ev){ openVehiclePicker(ev.target, assignment); }}));
-    card.appendChild(vehChips);
+    card.appendChild(fieldsZone);
 
     var foot = el("div", {class:"dossier-foot"});
     foot.appendChild(el("button", {class:"link-btn history-btn", text:"Historique", onclick: function(ev){ openHistoryPopover(ev.target, dossier); }}));
@@ -4398,6 +4536,13 @@ body.has-top-banner .topbar{top:40px}
       persistReorder(ids, byId, function(item, patch){
         api("saveVehicle", {item: Object.assign({}, item, patch)}).then(function(res){ if (res.ok) refreshAll(); });
       }, "order");
+    }, false);
+    enableDragReorder($("#dossierFieldLayoutList"), ".dossier-field-row", "#dossierFieldLayoutList", function(r){ return r.dataset.id; }, function(ids){
+      var raw = state.settingsDraft["dossierCardFields"];
+      if (raw === undefined) raw = state.settings["dossierCardFields"];
+      var byId = {}; parseDossierCardFieldConfig(raw).forEach(function(f){ byId[f.id] = f; });
+      var reordered = ids.map(function(id){ return byId[id]; }).filter(Boolean);
+      state.settingsDraft["dossierCardFields"] = JSON.stringify(reordered);
     }, false);
   }
 

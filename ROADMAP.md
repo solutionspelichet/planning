@@ -79,6 +79,11 @@ Détente (casse-briques à 200 niveaux, Tetris).
       seule) sous l'éditeur de mise en page, mis à jour instantanément à
       chaque case décochée, largeur ou couleur changée, sans attendre
       "Enregistrer"
+- [x] Correction : un brouillon non enregistré dans Settings ne se
+      réinitialise plus tout seul — il se remettait à la valeur sauvegardée
+      dès qu'une écriture avait lieu n'importe où dans l'app (un autre
+      utilisateur, une sauvegarde automatique…), à cause du rafraîchissement
+      temps réel qui rechargeait tout l'onglet
 
 ## Volontairement pas fait (à confirmer avant de s'y lancer)
 

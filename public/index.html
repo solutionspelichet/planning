@@ -1568,8 +1568,8 @@ body.has-top-banner .topbar{top:40px}
     if (tab === "dashboard") renderDashboard();
     if (tab === "admin") { renderFullActionLog(); renderLegacyImportBatches(); }
     if (tab === "vacances") { renderAbsenceSelects(); renderAbsenceList(); renderDowntimeList(); renderVacAvailability(); }
-    if (tab === "settings") renderSettingsTab();
-    else applySettingsToRoot(state.settings); // leaving Settings: drop any unsaved live-preview changes
+    if (tab === "settings") renderSettingsTab(Object.assign({}, state.settings)); // entering Settings: always start from a fresh draft
+    else { state.settingsDraft = null; applySettingsToRoot(state.settings); } // leaving Settings: drop any unsaved live-preview changes
     if (tab === "zen") renderZenPatternSelect();
     else if (zenAudio.playing) zenStopSound();
     if (tab === "detente") detenteShowMenu();
@@ -2262,9 +2262,15 @@ body.has-top-banner .topbar{top:40px}
   }
   // presetDraft lets the reset button hand over fresh defaults without this
   // function immediately clobbering them with the still-saved state.settings.
+  // When called with no argument — which happens on every live refresh (SSE
+  // "changed" push or the slow-poll fallback, both firing on ANY client's
+  // write anywhere in the app, not just Settings) — keep the existing draft
+  // instead of reseeding it from state.settings, otherwise an unrelated
+  // background write would silently wipe whatever the admin is mid-editing.
   function renderSettingsTab(presetDraft){
     renderNotifStatus();
-    state.settingsDraft = presetDraft || Object.assign({}, state.settings);
+    if (presetDraft) state.settingsDraft = presetDraft;
+    else if (!state.settingsDraft) state.settingsDraft = Object.assign({}, state.settings);
     applySettingsToRoot(state.settingsDraft);
     renderSettingsPreview();
     var host = $("#settingsGroups"); if (!host) return;

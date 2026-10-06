@@ -44,8 +44,14 @@ test.describe('Settings : mise en page de la fiche chantier', () => {
     const card = await dossierCardByName(page, 'E2E Layout Fields');
 
     await expect(card.locator('.info-field', { hasText: 'Vendeur' })).toHaveCount(0);
-    const numberBg = await card.locator('input[placeholder="N° dossier"]').evaluate((input) => input.closest('.info-field').style.background);
+    const numberInput = card.locator('input[placeholder="N° dossier"]');
+    const numberBg = await numberInput.evaluate((input) => input.closest('.info-field').style.background);
     expect(numberBg).toContain('rgb(255, 0, 0)');
+    // The input's own opaque background must be cleared, otherwise it
+    // covers the colored box and only the padding ring around it shows —
+    // looking like an outline instead of a filled background.
+    const inputBg = await numberInput.evaluate((input) => getComputedStyle(input).backgroundColor);
+    expect(inputBg).toBe('rgba(0, 0, 0, 0)');
   });
 
   test('réinitialiser la mise en page restaure l\'ordre et la visibilité par défaut', async ({ page }) => {

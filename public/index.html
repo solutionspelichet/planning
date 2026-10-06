@@ -3171,7 +3171,20 @@ body.has-top-banner .topbar{top:40px}
       var node = renderer();
       if (!node) return;
       node.classList.add(cfg.width === "narrow" ? "narrow" : "wide");
-      if (cfg.color) { node.style.background = cfg.color; node.style.borderRadius = "6px"; node.style.padding = "6px"; }
+      if (cfg.color) {
+        node.style.background = cfg.color; node.style.borderRadius = "6px"; node.style.padding = "6px";
+        // The input/select/textarea inside has its own opaque background
+        // (see .info-field input/select/textarea), which otherwise covers
+        // almost the whole box and leaves only the padding ring colored —
+        // looking like an outline instead of a filled background. Clear it
+        // so the field's own color shows through, except where the control
+        // already carries its own meaningful color (slot J/M/A, GM/transit
+        // dépôt address highlighting).
+        node.querySelectorAll("input, select, textarea").forEach(function(ctrl){
+          var hasOwnColor = Array.prototype.some.call(ctrl.classList, function(c){ return /^(slot-|addr-)/.test(c); });
+          if (!hasOwnColor) ctrl.style.background = "transparent";
+        });
+      }
       fieldsZone.appendChild(node);
     });
     card.appendChild(fieldsZone);

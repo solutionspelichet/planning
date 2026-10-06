@@ -3,9 +3,10 @@ const { login, createDossier, dossierCardByName } = require('./helpers');
 
 // Drag-reorder itself isn't exercised here — no spec in this suite drives
 // the HTML5 drag gestures behind enableDragReorder() (used by the dossier
-// list, Effectifs and Véhicules too), so this follows that same precedent
-// and sticks to the checkbox/select/color-input path, which is what an
-// admin actually uses to hide a field or set its background color.
+// list, Effectifs and Véhicules too). The 3-column editor splits the field
+// catalogue (left list, click to select) from its settings (detail column:
+// visible/width/color for whichever field is selected), so every test here
+// selects a field by clicking its row before touching the detail controls.
 test.describe('Settings : mise en page de la fiche chantier', () => {
   test.afterEach(async ({ page }) => {
     // Leave the shared layout as the default for every other spec file's
@@ -28,10 +29,11 @@ test.describe('Settings : mise en page de la fiche chantier', () => {
     await expect(rows).toHaveCount(19);
     await expect(rows.first().locator('.emp-name')).toHaveText('N° dossier');
 
-    const numberRow = page.locator('.dossier-field-row', { hasText: 'N° dossier' });
-    await numberRow.locator('input[type=color]').fill('#ff0000');
-    const sellerRow = page.locator('.dossier-field-row', { hasText: 'Vendeur' });
-    await sellerRow.locator('input[type=checkbox]').uncheck();
+    await page.locator('.dossier-field-row', { hasText: 'N° dossier' }).click();
+    await page.locator('#dossierFieldDetail input[type=color]').fill('#ff0000');
+
+    await page.locator('.dossier-field-row', { hasText: 'Vendeur' }).click();
+    await page.locator('#dossierFieldDetail input[type=checkbox]').uncheck();
 
     await page.click('#saveSettingsBtn');
     await page.waitForTimeout(600);
@@ -51,7 +53,8 @@ test.describe('Settings : mise en page de la fiche chantier', () => {
     await page.click('[data-tab="settings"]');
     await page.waitForSelector('#dossierFieldLayoutList .dossier-field-row', { timeout: 10000 });
 
-    await page.locator('.dossier-field-row', { hasText: 'Commentaire' }).locator('input[type=checkbox]').uncheck();
+    await page.locator('.dossier-field-row', { hasText: 'Commentaire' }).click();
+    await page.locator('#dossierFieldDetail input[type=checkbox]').uncheck();
     await page.click('#saveSettingsBtn');
     await page.waitForTimeout(600);
 
@@ -74,6 +77,20 @@ test.describe('Settings : mise en page de la fiche chantier', () => {
     await expect(card.locator('.info-field', { hasText: 'Commentaire' })).toHaveCount(1);
   });
 
+  test('sélectionner un champ dans la liste affiche ses réglages dans la colonne du milieu', async ({ page }) => {
+    await login(page);
+    await page.click('[data-tab="settings"]');
+    await page.waitForSelector('#dossierFieldLayoutList .dossier-field-row', { timeout: 10000 });
+
+    await page.locator('.dossier-field-row', { hasText: 'Volume' }).click();
+    await expect(page.locator('#dossierFieldDetail h4')).toHaveText('Volume');
+    await expect(page.locator('.dossier-field-row', { hasText: 'Volume' })).toHaveClass(/selected/);
+
+    await page.locator('.dossier-field-row', { hasText: 'Commentaire' }).click();
+    await expect(page.locator('#dossierFieldDetail h4')).toHaveText('Commentaire');
+    await expect(page.locator('.dossier-field-row', { hasText: 'Volume' })).not.toHaveClass(/selected/);
+  });
+
   test('aperçu live dans Settings : se mettre à jour sans "Enregistrer" et rester en lecture seule', async ({ page }) => {
     await login(page);
     await page.click('[data-tab="settings"]');
@@ -85,12 +102,12 @@ test.describe('Settings : mise en page de la fiche chantier', () => {
     // Uncheck "Vendeur" without saving — the preview must update live,
     // while the real settings (and any already-rendered dossier card) stay
     // untouched until "Enregistrer" is clicked.
-    const sellerRow = page.locator('.dossier-field-row', { hasText: 'Vendeur' });
-    await sellerRow.locator('input[type=checkbox]').uncheck();
+    await page.locator('.dossier-field-row', { hasText: 'Vendeur' }).click();
+    await page.locator('#dossierFieldDetail input[type=checkbox]').uncheck();
     await expect(preview.locator('.info-field', { hasText: 'Vendeur' })).toHaveCount(0);
 
-    const numberRow = page.locator('.dossier-field-row', { hasText: 'N° dossier' });
-    await numberRow.locator('input[type=color]').fill('#0000ff');
+    await page.locator('.dossier-field-row', { hasText: 'N° dossier' }).click();
+    await page.locator('#dossierFieldDetail input[type=color]').fill('#0000ff');
     const numberBg = await preview.locator('input[placeholder="N° dossier"]').evaluate((input) => input.closest('.info-field').style.background);
     expect(numberBg).toContain('rgb(0, 0, 255)');
 

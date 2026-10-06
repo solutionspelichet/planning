@@ -415,6 +415,15 @@ table.week-table tr.week-row-veh td.week-metric-label{border-left:4px solid var(
 .dossier-fields-zone > .wide{grid-column:1/-1}
 .dossier-card-preview-frame{max-width:420px;pointer-events:none;user-select:none}
 .dossier-card-preview-frame .dossier-card{cursor:default}
+.layout-editor-3col{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;align-items:start;margin-top:10px}
+.layout-editor-col{min-width:0}
+.dossier-field-row{cursor:pointer}
+.dossier-field-row.selected{background:var(--accent);color:var(--accent-fg)}
+.dossier-field-row.selected .emp-name{color:inherit}
+.field-hidden-badge{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--fg-muted);flex:none}
+.dossier-field-row.selected .field-hidden-badge{color:inherit;opacity:.8}
+.layout-editor-detail{background:var(--weekend);border-radius:10px;padding:10px 12px}
+.layout-editor-detail h4{margin:0 0 6px;font-size:13px}
 td.dispo-name-col.dispo-pl{color:#c0362c;font-weight:700}
 .draggable-row{cursor:grab}
 .draggable-row:active{cursor:grabbing}
@@ -697,11 +706,18 @@ body.has-top-banner .topbar{top:40px}
     <div class="company-grid" id="settingsGroups" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr))"></div>
     <div class="chart-card edit-only" style="margin-top:16px">
       <h3 style="margin-bottom:4px">Mise en page : fiche chantier</h3>
-      <p class="chart-sub" style="margin-bottom:10px">Glissez pour réordonner, choisissez la largeur et la couleur de fond de chaque champ, ou décochez pour le masquer. S'applique à toutes les fiches, dans Planning.</p>
-      <ul class="emp-list" id="dossierFieldLayoutList"></ul>
-      <button class="btn btn-ghost" id="resetDossierFieldLayoutBtn" style="margin-top:10px">Réinitialiser cette mise en page</button>
-      <p class="chart-sub" style="margin:14px 0 6px">Aperçu (données fictives, en lecture seule) :</p>
-      <div class="dossier-card-preview-frame" id="dossierCardPreview"></div>
+      <p class="chart-sub" style="margin-bottom:10px">Glissez pour réordonner les champs à gauche, cliquez sur l'un d'eux pour régler sa largeur, sa couleur de fond ou le masquer, et suivez le résultat dans l'aperçu. S'applique à toutes les fiches, dans Planning.</p>
+      <div class="layout-editor-3col">
+        <div class="layout-editor-col">
+          <ul class="emp-list" id="dossierFieldLayoutList"></ul>
+          <button class="btn btn-ghost" id="resetDossierFieldLayoutBtn" style="margin-top:10px">Réinitialiser cette mise en page</button>
+        </div>
+        <div class="layout-editor-col layout-editor-detail" id="dossierFieldDetail"></div>
+        <div class="layout-editor-col">
+          <p class="chart-sub" style="margin:0 0 6px">Aperçu (données fictives, en lecture seule) :</p>
+          <div class="dossier-card-preview-frame" id="dossierCardPreview"></div>
+        </div>
+      </div>
     </div>
     <div class="chart-card edit-only" style="margin-top:16px">
       <h3 style="margin-bottom:4px">Mise en page : Dashboard</h3>
@@ -2368,11 +2384,92 @@ body.has-top-banner .topbar{top:40px}
       host.appendChild(row);
     });
   }
-  function renderDossierFieldLayoutEditor(){
-    renderFieldLayoutEditor("dossierFieldLayoutList", "dossier-field-row", "dossierCardFields", DOSSIER_CARD_FIELDS_DEFAULT, DOSSIER_CARD_FIELD_LABELS, renderDossierCardPreview);
-  }
   function renderDashboardLayoutEditor(){
     renderFieldLayoutEditor("dashboardLayoutList", "dashboard-field-row", "dashboardLayout", DASHBOARD_WIDGETS_DEFAULT, DASHBOARD_WIDGET_LABELS);
+  }
+  function currentDossierFieldConfig(){
+    var raw = state.settingsDraft["dossierCardFields"];
+    if (raw === undefined) raw = state.settings["dossierCardFields"];
+    return parseDossierCardFieldConfig(raw);
+  }
+  // Three-column layout: this list is just the reorderable catalogue of
+  // fields (what can be customized) — clicking one selects it for editing
+  // in the detail column, which holds the actual values (visible/width/
+  // color). Kept separate from the generic checkbox+select+color row used
+  // by the Dashboard editor, which the user didn't ask to split up.
+  function renderDossierFieldLayoutList(){
+    var host = $("#dossierFieldLayoutList"); if (!host) return;
+    var config = currentDossierFieldConfig();
+    if (!config.some(function(f){ return f.id === state.dossierFieldLayoutSelectedId; })){
+      state.dossierFieldLayoutSelectedId = config.length ? config[0].id : null;
+    }
+    host.innerHTML = "";
+    config.forEach(function(f){
+      var row = el("li", {class:"emp-row dossier-field-row" + (f.id === state.dossierFieldLayoutSelectedId ? " selected" : "")});
+      if (canEdit()){ row.draggable = true; row.dataset.id = f.id; row.classList.add("draggable-row"); }
+      row.appendChild(el("span", {class:"emp-name", text: DOSSIER_CARD_FIELD_LABELS[f.id] || f.id}));
+      if (!f.visible) row.appendChild(el("span", {class:"field-hidden-badge", text:"masqué"}));
+      row.addEventListener("click", function(){
+        state.dossierFieldLayoutSelectedId = f.id;
+        renderDossierFieldLayoutList();
+        renderDossierFieldDetail();
+      });
+      host.appendChild(row);
+    });
+  }
+  // The detail column: visible/width/color for whichever field is selected
+  // in the list column.
+  function renderDossierFieldDetail(){
+    var host = $("#dossierFieldDetail"); if (!host) return;
+    var config = currentDossierFieldConfig();
+    var f = config.find(function(x){ return x.id === state.dossierFieldLayoutSelectedId; });
+    host.innerHTML = "";
+    if (!f){ host.appendChild(el("p", {class:"chart-sub", text:"Sélectionnez un champ à gauche."})); return; }
+    host.appendChild(el("h4", {text: DOSSIER_CARD_FIELD_LABELS[f.id] || f.id}));
+    function persist(){ state.settingsDraft["dossierCardFields"] = JSON.stringify(config); }
+
+    var visRow = el("div", {class:"settings-row"});
+    visRow.appendChild(el("label", {text:"Afficher ce champ"}));
+    var visChk = el("input", {type:"checkbox"});
+    visChk.checked = f.visible;
+    visChk.disabled = !canEdit();
+    visChk.addEventListener("change", function(){
+      f.visible = visChk.checked; persist();
+      renderDossierFieldLayoutList(); renderDossierCardPreview();
+    });
+    visRow.appendChild(visChk);
+    host.appendChild(visRow);
+
+    var widthRow = el("div", {class:"settings-row"});
+    widthRow.appendChild(el("label", {text:"Largeur"}));
+    var widthSel = el("select", {});
+    widthSel.disabled = !canEdit();
+    [["wide","Pleine largeur"], ["narrow","Étroit"]].forEach(function(pair){
+      var opt = el("option", {value:pair[0], text:pair[1]});
+      if (pair[0] === f.width) opt.setAttribute("selected","selected");
+      widthSel.appendChild(opt);
+    });
+    widthSel.addEventListener("change", function(){ f.width = widthSel.value; persist(); renderDossierCardPreview(); });
+    widthRow.appendChild(widthSel);
+    host.appendChild(widthRow);
+
+    var colorRow = el("div", {class:"settings-row"});
+    colorRow.appendChild(el("label", {text:"Couleur de fond"}));
+    var colorInput = el("input", {type:"color", value: f.color || "#888888"});
+    colorInput.disabled = !canEdit();
+    colorInput.addEventListener("input", function(){ f.color = colorInput.value; persist(); renderDossierCardPreview(); });
+    colorRow.appendChild(colorInput);
+    if (f.color){
+      colorRow.appendChild(el("button", {class:"icon-btn edit-only", title:"Retirer la couleur", text:"✕", onclick: function(){
+        f.color = ""; persist();
+        renderDossierFieldDetail(); renderDossierCardPreview();
+      }}));
+    }
+    host.appendChild(colorRow);
+  }
+  function renderDossierFieldLayoutEditor(){
+    renderDossierFieldLayoutList();
+    renderDossierFieldDetail();
   }
   // Read-only live preview of a dossier card inside Settings, using fake
   // data and the real renderDossierCard() so the preview matches exactly
@@ -2422,7 +2519,9 @@ body.has-top-banner .topbar{top:40px}
   if (resetDossierFieldLayoutBtn) resetDossierFieldLayoutBtn.addEventListener("click", function(){
     if (!canEdit()) return;
     state.settingsDraft["dossierCardFields"] = JSON.stringify(DOSSIER_CARD_FIELDS_DEFAULT);
+    state.dossierFieldLayoutSelectedId = null;
     renderDossierFieldLayoutEditor();
+    renderDossierCardPreview();
     toast("Mise en page par défaut rétablie — cliquez Enregistrer pour confirmer");
   });
   var resetDashboardLayoutBtn = $("#resetDashboardLayoutBtn");

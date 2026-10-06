@@ -15,7 +15,8 @@ test.describe('Settings : le brouillon non enregistré résiste à un rafraîchi
     await page.click('[data-tab="settings"]');
     await page.waitForSelector('#dossierFieldLayoutList .dossier-field-row', { timeout: 10000 });
 
-    const sellerCheckbox = page.locator('.dossier-field-row', { hasText: 'Vendeur' }).locator('input[type=checkbox]');
+    await page.locator('.dossier-field-row', { hasText: 'Vendeur' }).click();
+    const sellerCheckbox = page.locator('#dossierFieldDetail input[type=checkbox]');
     await expect(sellerCheckbox).toBeChecked();
     await sellerCheckbox.uncheck();
     await expect(sellerCheckbox).not.toBeChecked();

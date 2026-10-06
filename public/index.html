@@ -792,6 +792,7 @@ body.has-top-banner .topbar{top:40px}
           <button id="legacyImportAnalyzeBtn">Analyser</button>
         </div>
         <div id="legacyImportSummary" style="margin-top:12px"></div>
+        <div id="legacyImportBatches" style="margin-top:12px"></div>
       </div>
       <div class="company-card">
         <h3><span>Archives</span></h3>
@@ -1258,6 +1259,8 @@ body.has-top-banner .topbar{top:40px}
       case "health": p = request("GET", "/api/health"); break;
       case "searchArchive": p = request("GET", "/api/dossiers/archive?q=" + encodeURIComponent(extra.q || "")); break;
       case "runBackup": p = request("POST", "/api/backups/run"); break;
+      case "legacyImportBatches": p = request("GET", "/api/admin/legacy-import/batches"); break;
+      case "undoLegacyImportBatch": p = request("POST", "/api/admin/legacy-import/batches/" + encodeURIComponent(extra.id) + "/undo"); break;
       default: p = Promise.resolve({ok:false, error:"unknown_action"});
     }
     return p.then(function(res){
@@ -1398,6 +1401,7 @@ body.has-top-banner .topbar{top:40px}
     if (state.activeTab === "vacances") { renderAbsenceSelects(); renderAbsenceList(); renderDowntimeList(); renderVacAvailability(); }
     if (state.activeTab === "settings") renderSettingsTab();
     if (state.role === "admin") { renderUsers(); renderBackups(); renderDriveSyncStatus(); renderDiskStatus(); }
+    if (state.role === "admin" && state.activeTab === "admin") renderLegacyImportBatches();
   }
   function refreshAll(){
     var prevConflictCount = computeTodayConflictCount();
@@ -1436,7 +1440,7 @@ body.has-top-banner .topbar{top:40px}
     $("#view-zen").hidden = tab !== "zen";
     $("#view-detente").hidden = tab !== "detente";
     if (tab === "dashboard") renderDashboard();
-    if (tab === "admin") renderFullActionLog();
+    if (tab === "admin") { renderFullActionLog(); renderLegacyImportBatches(); }
     if (tab === "vacances") { renderAbsenceSelects(); renderAbsenceList(); renderDowntimeList(); renderVacAvailability(); }
     if (tab === "settings") renderSettingsTab();
     else applySettingsToRoot(state.settings); // leaving Settings: drop any unsaved live-preview changes
@@ -4275,7 +4279,7 @@ body.has-top-banner .topbar{top:40px}
       renderLegacyImportSummary(res.summary, true);
       var commitBtn = $("#legacyImportCommitBtn");
       if (commitBtn) commitBtn.addEventListener("click", function(){
-        if (!confirm("Créer " + res.summary.employeesToCreate + " employé(s), " + res.summary.vehiclesToCreate + " véhicule(s) et " + res.summary.dossiersToCreate + " dossier(s) ? Une sauvegarde est prise automatiquement avant, mais mieux vaut vérifier les avertissements ci-dessus d'abord. Continuer ?")) return;
+        if (!confirm("Créer " + res.summary.employeesToCreate + " employé(s), " + res.summary.vehiclesToCreate + " véhicule(s) et " + res.summary.dossiersToCreate + " dossier(s) ? C'est temporaire : un bouton \"Annuler\" permettra de tout effacer d'un coup ensuite. Continuer ?")) return;
         commitBtn.disabled = true;
         fetch("/api/admin/legacy-import?commit=1", {
           method: "POST",
@@ -4283,12 +4287,43 @@ body.has-top-banner .topbar{top:40px}
           body: file
         }).then(function(r){ return r.json(); }).then(function(res2){
           if (!res2.ok) { commitBtn.disabled = false; return toast("Import impossible"); }
-          toast("Import terminé, rechargement…");
-          setTimeout(function(){ location.reload(); }, 1200);
+          toast("Import terminé — utilisez \"Annuler\" ci-dessous pour tout effacer si besoin.");
+          $("#legacyImportSummary").innerHTML = "";
+          input.value = "";
+          renderLegacyImportBatches();
         }).catch(function(){ commitBtn.disabled = false; toast("Erreur réseau"); });
       });
     }).catch(function(){ legacyImportAnalyzeBtn.disabled = false; toast("Erreur réseau"); });
   });
+  function renderLegacyImportBatches(){
+    var box = $("#legacyImportBatches");
+    if (!box || state.role !== "admin") return;
+    api("legacyImportBatches").then(function(res){
+      if (!res || !res.ok || !res.batches || !res.batches.length) { box.innerHTML = ""; return; }
+      box.innerHTML = "<p style='font-size:11px;font-weight:700;text-transform:uppercase;color:var(--fg-muted);margin:0 0 6px'>Imports précédents</p>" +
+        "<ul class='emp-list'>" + res.batches.map(function(b){
+          var d = new Date(b.createdAt);
+          var when = d.toLocaleDateString("fr-CH") + " " + d.toLocaleTimeString("fr-CH", {hour:"2-digit", minute:"2-digit"});
+          var desc = b.summary.dossiersToCreate + " dossier(s), " + b.summary.employeesToCreate + " employé(s), " + b.summary.vehiclesToCreate + " véhicule(s)";
+          return "<li style='display:flex;justify-content:space-between;align-items:center;gap:8px'>" +
+            "<span>" + escapeHtml(when) + " — " + escapeHtml(desc) + (b.undoneAt ? " <em>(annulé)</em>" : "") + "</span>" +
+            (b.undoneAt ? "" : "<button class='btn edit-only' data-undo-batch='" + b.id + "' style='flex:0 0 auto'>Annuler</button>") +
+            "</li>";
+        }).join("") + "</ul>";
+      $all("[data-undo-batch]", box).forEach(function(btn){
+        btn.addEventListener("click", function(){
+          var id = btn.dataset.undoBatch;
+          if (!confirm("Supprimer tout ce que cet import a créé (employés, véhicules, dossiers et leurs affectations) ? Une sauvegarde est prise avant, mais cette action modifie la base immédiatement.")) return;
+          btn.disabled = true;
+          api("undoLegacyImportBatch", {id: id}).then(function(res2){
+            if (!res2.ok) { btn.disabled = false; return toast(res2.error === "already_undone" ? "Déjà annulé" : "Annulation impossible"); }
+            toast("Import annulé");
+            renderLegacyImportBatches();
+          }).catch(function(){ btn.disabled = false; toast("Erreur réseau"); });
+        });
+      });
+    }).catch(function(){});
+  }
 
   // ---------- drag & drop reordering ----------
   var NO_DRAG_TAGS = ["INPUT", "SELECT", "TEXTAREA", "BUTTON", "A"];

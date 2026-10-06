@@ -139,6 +139,16 @@ db.exec(`
     changedBy TEXT DEFAULT '',
     changedAt INTEGER NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS legacy_import_batches (
+    id TEXT PRIMARY KEY,
+    createdAt INTEGER NOT NULL,
+    createdBy TEXT DEFAULT '',
+    summaryJson TEXT NOT NULL,
+    employeeIdsJson TEXT NOT NULL,
+    vehicleIdsJson TEXT NOT NULL,
+    dossierIdsJson TEXT NOT NULL,
+    undoneAt INTEGER
+  );
   CREATE TABLE IF NOT EXISTS action_log (
     id TEXT PRIMARY KEY,
     entityType TEXT NOT NULL,
@@ -977,12 +987,17 @@ app.post('/api/admin/legacy-import', requireAuth, requireAdmin, express.raw({ ty
   // A per-row action_log entry (recordAction) for every one of ~3000+ rows
   // would only ever keep the last ACTION_LOG_LIMIT of them anyway (see
   // recordAction above) and would slow this transaction down for nothing —
-  // the pre-import backup above is the real undo path for a bulk import.
+  // instead, every id this import creates is recorded as one
+  // legacy_import_batches row below, so the whole import (employees,
+  // vehicles, dossiers and their assignments) can be undone as one action
+  // from the Admin tab without discarding unrelated changes made since.
+  const dossierIds = [];
   const tx = db.transaction(() => {
     for (const e of newEmployees) saveEmployeeRow({ id: e.id, company: e.company, name: e.name, active: true, order: 0 });
     for (const v of newVehicles) saveVehicleRow({ id: v.id, name: v.name, active: true, order: 0 });
     for (const d of newDossiers) {
       const dossierId = crypto.randomUUID();
+      dossierIds.push(dossierId);
       saveDossierRow({
         id: dossierId, client: d.client, dossierNumber: d.dossierNumber,
         startDate: d.startDate, endDate: d.endDate,
@@ -1003,8 +1018,55 @@ app.post('/api/admin/legacy-import', requireAuth, requireAdmin, express.raw({ ty
     }
   });
   tx();
+
+  const importBatchId = crypto.randomUUID();
+  db.prepare(`
+    INSERT INTO legacy_import_batches (id, createdAt, createdBy, summaryJson, employeeIdsJson, vehicleIdsJson, dossierIdsJson)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    importBatchId, Date.now(), req.session.username, JSON.stringify(summary),
+    JSON.stringify(newEmployees.map(e => e.id)), JSON.stringify(newVehicles.map(v => v.id)), JSON.stringify(dossierIds)
+  );
+
   broadcast();
-  res.json({ ok: true, committed: true, summary });
+  res.json({ ok: true, committed: true, summary, importBatchId });
+});
+
+function rowToLegacyImportBatch(r) {
+  return {
+    id: r.id, createdAt: r.createdAt, createdBy: r.createdBy || '',
+    summary: JSON.parse(r.summaryJson), undoneAt: r.undoneAt || null,
+  };
+}
+app.get('/api/admin/legacy-import/batches', requireAuth, requireAdmin, (req, res) => {
+  const batches = db.prepare('SELECT * FROM legacy_import_batches ORDER BY createdAt DESC LIMIT 20').all().map(rowToLegacyImportBatch);
+  res.json({ ok: true, batches });
+});
+// Deletes exactly what one import created — the employees, vehicles and
+// dossiers (which cascades to their own assignments/history via
+// removeDossierRow) whose ids this batch recorded — rather than restoring
+// the pre-import backup, which would also discard any unrelated changes
+// made in the meantime. An employee/vehicle this import created that got
+// used on a dossier from a later, separate action is still removed; that
+// later dossier is left referencing an id that no longer exists, the same
+// way deleting an employee from the Effectifs tab already behaves.
+app.post('/api/admin/legacy-import/batches/:id/undo', requireAuth, requireAdmin, (req, res) => {
+  const batch = db.prepare('SELECT * FROM legacy_import_batches WHERE id = ?').get(req.params.id);
+  if (!batch) return res.status(404).json({ ok: false, error: 'not_found' });
+  if (batch.undoneAt) return res.json({ ok: false, error: 'already_undone' });
+
+  runBackup(); // safety snapshot before this bulk delete too
+
+  const tx = db.transaction(() => {
+    for (const id of JSON.parse(batch.dossierIdsJson)) removeDossierRow(id);
+    for (const id of JSON.parse(batch.employeeIdsJson)) removeEmployeeRow(id);
+    for (const id of JSON.parse(batch.vehicleIdsJson)) removeVehicleRow(id);
+    db.prepare('UPDATE legacy_import_batches SET undoneAt = ? WHERE id = ?').run(Date.now(), batch.id);
+  });
+  tx();
+
+  broadcast();
+  res.json({ ok: true });
 });
 
 // Catches anything a route handler throws synchronously (an async handler's

@@ -59,7 +59,9 @@ Détente (casse-briques à 200 niveaux, Tetris).
       mois) — recrée employés/véhicules/dossiers/affectations manquants,
       aperçu (comptage + avertissements) avant confirmation, sauvegarde
       automatique avant d'écrire, ré-import sans danger pour les
-      employés/véhicules/dossiers numérotés déjà présents
+      employés/véhicules/dossiers numérotés déjà présents, bouton "Annuler"
+      par import qui efface précisément ce qu'il a créé (sans toucher aux
+      changements faits depuis)
 
 ## Volontairement pas fait (à confirmer avant de s'y lancer)
 

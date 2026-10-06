@@ -58,4 +58,37 @@ test.describe("Import de l'ancien planning Excel", () => {
     expect(summaryText).toContain('0 dossier(s) à créer');
     expect(summaryText).toContain('1 dossier(s) déjà présents, ignorés');
   });
+
+  test("Annuler un import précédent efface exactement ce qu'il a créé", async ({ page }) => {
+    await login(page);
+    await page.click('#adminTabBtn');
+    await page.waitForSelector('#legacyImportBatches .emp-list li', { timeout: 10000 });
+
+    // The first test's batch is the only one that actually created
+    // anything (the second test's re-import created nothing) — find it by
+    // its distinctive counts rather than by position in the list.
+    const row = page.locator('#legacyImportBatches li', { hasText: '1 dossier(s), 1 employé(s), 1 véhicule(s)' });
+    await expect(row).toBeVisible();
+
+    const token = await page.evaluate(() => JSON.parse(localStorage.getItem('pe_session_v1')).token);
+    const before = await page.evaluate(async (token) => {
+      const r = await fetch('/api/all', { headers: { 'X-Auth-Token': token } });
+      return r.json();
+    }, token);
+    expect(before.dossiers.some((d) => d.dossierNumber === 'TEST-0001')).toBe(true);
+
+    page.once('dialog', (d) => d.accept());
+    await row.locator('[data-undo-batch]').click();
+    await page.waitForTimeout(1000);
+
+    await expect(row).toContainText('(annulé)');
+
+    const after = await page.evaluate(async (token) => {
+      const r = await fetch('/api/all', { headers: { 'X-Auth-Token': token } });
+      return r.json();
+    }, token);
+    expect(after.employees.some((e) => e.name === 'PEL-TESTEUR Alice')).toBe(false);
+    expect(after.vehicles.some((v) => v.name === '901')).toBe(false);
+    expect(after.dossiers.some((d) => d.dossierNumber === 'TEST-0001')).toBe(false);
+  });
 });
